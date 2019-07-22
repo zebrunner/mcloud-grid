@@ -10,6 +10,7 @@
   <parent>
     <groupId>com.qaprosoft</groupId>
     <artifactId>carina</artifactId>
+    <!-- TODO: swotch to RELEASE version -->
     <version>6.1.25-SNAPSHOT</version>
   </parent>
   <properties>
