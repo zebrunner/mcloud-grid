@@ -31,6 +31,8 @@ ENV GRID_CAPABILITY_MATCHER com.qaprosoft.carina.grid.MobileCapabilityMatcher
 ENV STF_URL ""
 ENV STF_TOKEN ""
 
+RUN mkdir /opt/selenium
+
 COPY generate_config \
     entry_point.sh \
     /opt/bin/

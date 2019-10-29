@@ -40,6 +40,11 @@
 			<version>4.0.0-alpha-2</version>
 		</dependency>
 		<dependency>
+			<groupId>org.seleniumhq.selenium</groupId>
+			<artifactId>selenium-api</artifactId>
+			<version>4.0.0-alpha-2</version>
+		</dependency>
+		<dependency>
 			<groupId>com.qaprosoft</groupId>
 			<artifactId>zafira-client</artifactId>
 			<version>4.1.63</version>
@@ -77,8 +82,8 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>${maven-compiler-plugin.version}</version>
 				<configuration>
-        		<release>11</release>
-    		</configuration>
+					<release>11</release>
+				</configuration>
 			</plugin>
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
