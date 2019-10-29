@@ -77,6 +77,7 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
         // If deviceBrowser is found in requested capabilities then convert it to browserName on our selenium grid
         if (requestedCapability.containsKey(DEVICE_BROWSER)) {
             String deviceBrowser = requestedCapability.get(DEVICE_BROWSER).toString().toLowerCase();
+/*
             switch (deviceBrowser) {
                 case BrowserType.CHROME:
                     requestedCapability.put(APP_PACKAGE, "com.android.chrome");
@@ -119,6 +120,7 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
                     // unsupported mobile browser for startup
                     return false;
             }
+*/
         }
     	
         for (String key : requestedCapability.keySet()) {
