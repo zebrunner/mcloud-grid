@@ -38,6 +38,8 @@ COPY generate_config \
     /opt/bin/
 COPY target/carina-grid-jar-with-dependencies.jar \
     /opt/selenium
+COPY target/carina-grid-1.0.jar \
+    /opt/selenium
 # Running this command as sudo just to avoid the message:
 # To run a command as administrator (user "root"), use "sudo <command>". See "man sudo_root" for details.
 # When logging into the container
