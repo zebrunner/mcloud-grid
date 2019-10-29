@@ -1,4 +1,4 @@
-FROM selenium/base:3.141.59
+FROM openjdk:11
 LABEL authors=Qaprosoft
 
 USER seluser
