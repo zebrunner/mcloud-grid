@@ -35,7 +35,6 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
     private static final String DEVICE_TYPE = "deviceType";
     private static final String DEVICE_POOL = "devicePool";
     private static final String DEVICE_BROWSER = "deviceBrowser";
-    private static final String BROWSER_NAME = "browserName";
     private static final String APP_PACKAGE = "appPackage";
     private static final String APP_ACTIVITY = "appActivity";
     
@@ -66,7 +65,8 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
      *            - capabilities requested by Selenium client
      * @return match results
      */
-    private boolean extensionCapabilityCheck(Map<String, Object> nodeCapability,
+    @SuppressWarnings("deprecation")
+	private boolean extensionCapabilityCheck(Map<String, Object> nodeCapability,
             Map<String, Object> requestedCapability) {
 
         // If devicePool is found in requested capabilities then convert it to deviceName on our selenium grid
