@@ -1,8 +1,6 @@
 FROM openjdk:11
 LABEL authors=Qaprosoft
 
-USER seluser
-
 #========================
 # Selenium Configuration
 #========================
