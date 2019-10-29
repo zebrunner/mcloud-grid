@@ -45,11 +45,11 @@
 			<artifactId>selenium-api</artifactId>
 			<version>${selenium.version}</version>
 		</dependency>
-		<!--dependency>
+		<dependency>
 			<groupId>com.qaprosoft</groupId>
 			<artifactId>zafira-client</artifactId>
 			<version>RELEASE</version>
-		</dependency-->
+		</dependency>
 		<dependency>
 			<groupId>commons-logging</groupId>
 			<artifactId>commons-logging</artifactId>
