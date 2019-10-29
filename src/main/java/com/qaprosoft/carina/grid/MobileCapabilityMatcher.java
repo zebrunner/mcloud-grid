@@ -75,57 +75,6 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
             requestedCapability.put(DEVICE_NAME, requestedCapability.get(DEVICE_POOL));
         }
         
-        // If deviceBrowser is found in requested capabilities then convert it to browserName on our selenium grid
-        if (requestedCapability.containsKey(DEVICE_BROWSER)) {
-            requestedCapability.put(BROWSER_NAME, requestedCapability.get(DEVICE_BROWSER));
-/*
-            String deviceBrowser = requestedCapability.get(DEVICE_BROWSER).toString().toLowerCase();
-
-            switch (deviceBrowser) {
-                case BrowserType.CHROME:
-                    requestedCapability.put(APP_PACKAGE, "com.android.chrome");
-                    requestedCapability.put(APP_ACTIVITY, "com.google.android.apps.chrome.Main");
-                    break;
-                case BrowserType.FIREFOX:
-                    requestedCapability.put(APP_PACKAGE, "org.mozilla.firefox");
-                    requestedCapability.put(APP_ACTIVITY, ".App");
-                    break;
-                case BrowserType.SAFARI:
-                    // Safari mobile browser on iOS 
-                    //TODO: analyzed do we need to test on Safari for android and identify valid app_package and app-activity!
-                    requestedCapability.put(BUNDLE_ID, "com.apple.mobilesafari");
-                    break;                    
-                case BrowserType.EDGE:
-                    // MS mobile Edge browser 
-                    requestedCapability.put(APP_PACKAGE, "com.microsoft.emmx");
-                    requestedCapability.put(APP_ACTIVITY, "com.microsoft.ruby.Main");
-                    break;
-                case BrowserType.OPERA:
-                case BrowserType.OPERA_BLINK:
-                    requestedCapability.put(APP_PACKAGE, "com.opera.browser");
-                    requestedCapability.put(APP_ACTIVITY, "com.opera.Opera");
-                    break;
-                case "opera_mini":
-                    requestedCapability.put(APP_PACKAGE, "com.opera.mini.native");
-                    requestedCapability.put(APP_ACTIVITY, "com.opera.mini.android.Browser");
-                    break;                    
-                case "sbrowser":
-                    // Native Samsung Browser
-                    requestedCapability.put(APP_PACKAGE, "com.sec.android.app.sbrowser");
-                    requestedCapability.put(APP_ACTIVITY, ".SBrowserMainActivity");
-                    break;                    
-                case "yandex":
-                    // Yandex mobile browser 
-                    requestedCapability.put(APP_PACKAGE, "ru.yandex.searchplugin");
-                    requestedCapability.put(APP_ACTIVITY, ".MainActivity");
-                    break;
-                default:
-                    // unsupported mobile browser for startup
-                    return false;
-            }
-*/
-        }
-    	
         for (String key : requestedCapability.keySet()) {
             String expectedValue = requestedCapability.get(key) != null ? requestedCapability.get(key).toString()
                     : null;
@@ -204,6 +153,11 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
                     break;
                 }
             }
+        }
+
+        // If deviceBrowser is found in requested capabilities then convert it to browserName on our selenium grid
+        if (requestedCapability.containsKey(DEVICE_BROWSER)) {
+            requestedCapability.put(BROWSER_NAME, requestedCapability.get(DEVICE_BROWSER));
         }
 
         return true;
