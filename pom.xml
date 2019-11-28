@@ -8,13 +8,16 @@
 	<version>1.0</version>
 	<packaging>jar</packaging>
 	<name>Carina Grid</name>
+
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
-    <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
-    <maven-source-plugin.version>3.0.1</maven-source-plugin.version>
-    <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
+		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
+		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
+		<selenium.version>3.141.59</selenium.version>
 	</properties>
+
 	<repositories>
 		<repository>
 			<id>qaprosoft_snapshots</id>
@@ -32,22 +35,22 @@
 		<dependency>
 			<groupId>com.qaprosoft</groupId>
 			<artifactId>carina-commons</artifactId>
-			<version>6.2.28</version>
+			<version>RELEASE</version>
 		</dependency>
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-server</artifactId>
-			<version>3.141.59</version>
+			<version>${selenium.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-api</artifactId>
-			<version>3.141.59</version>
+			<version>${selenium.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.qaprosoft</groupId>
 			<artifactId>zafira-client</artifactId>
-			<version>4.1.64</version>
+			<version>RELEASE</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-logging</groupId>
