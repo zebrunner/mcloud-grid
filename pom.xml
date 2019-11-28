@@ -8,6 +8,7 @@
 	<version>1.0</version>
 	<packaging>jar</packaging>
 	<name>Carina Grid</name>
+
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
@@ -16,6 +17,7 @@
 		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
 		<selenium.version>3.141.59</selenium.version>
 	</properties>
+
 	<repositories>
 		<repository>
 			<id>qaprosoft_snapshots</id>
