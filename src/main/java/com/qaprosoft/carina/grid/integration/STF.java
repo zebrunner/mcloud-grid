@@ -23,11 +23,12 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.qaprosoft.carina.core.foundation.commons.SpecialKeywords;
 import com.qaprosoft.carina.grid.Platform;
-import com.qaprosoft.zafira.client.STFClient;
-import com.qaprosoft.zafira.client.impl.STFClientImpl;
-import com.qaprosoft.zafira.models.stf.Devices;
-import com.qaprosoft.zafira.models.stf.STFDevice;
-import com.qaprosoft.zafira.util.http.HttpClient;
+import com.qaprosoft.carina.grid.integration.client.STFClient;
+import com.qaprosoft.carina.grid.integration.client.impl.STFClientImpl;
+import com.qaprosoft.carina.grid.models.stf.Device;
+import com.qaprosoft.carina.grid.models.stf.Devices;
+import com.qaprosoft.carina.grid.models.stf.STFDevice;
+import com.qaprosoft.carina.grid.util.HttpClient;
 
 /**
  * Singleton for STF client.
@@ -106,12 +107,12 @@ public class STF {
      * @return STF device
      */
     public static STFDevice getDevice(String udid) {
-        STFDevice device = null;
+    	STFDevice device = null;
         if (isRunning()) {
             try {
-                HttpClient.Response<STFDevice> rs = INSTANCE.client.getDevice(udid);
+                HttpClient.Response<Device> rs = INSTANCE.client.getDevice(udid);
                 if (rs.getStatus() == 200) {
-                    device = rs.getObject();
+                    device = rs.getObject().getDevice();
                 }
             } catch (Exception e) {
                 LOGGER.info("Unable to get device HTTP status via udid: " + udid);
