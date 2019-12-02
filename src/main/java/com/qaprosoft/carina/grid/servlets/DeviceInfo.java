@@ -31,7 +31,7 @@ import org.openqa.grid.web.servlet.RegistryBasedServlet;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qaprosoft.carina.commons.models.RemoteDevice;
 import com.qaprosoft.carina.grid.integration.STF;
-import com.qaprosoft.zafira.models.stf.STFDevice;
+import com.qaprosoft.carina.grid.models.stf.STFDevice;
 
 /**
  * Servlet that retrieves information about STF device.

@@ -20,7 +20,6 @@ import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.grid.internal.utils.DefaultCapabilityMatcher;
-import org.openqa.selenium.remote.BrowserType;
 
 /**
  * Custom selenium capability matcher for mobile grid.
@@ -32,13 +31,7 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
     private static final String PLATFORM_NAME = "platformName";
     private static final String PLATFORM_VERSION = "platformVersion";
     private static final String DEVICE_NAME = "deviceName";
-    private static final String BROWSER_NAME = "browserName";
     private static final String DEVICE_TYPE = "deviceType";
-    private static final String APP_PACKAGE = "appPackage";
-    private static final String APP_ACTIVITY = "appActivity";
-    
-    private static final String BUNDLE_ID = "bundleId";
-    
     private static final String UDID = "udid";
 
     @Override
@@ -62,7 +55,6 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
      *            - capabilities requested by Selenium client
      * @return match results
      */
-    @SuppressWarnings("deprecation")
 	private boolean extensionCapabilityCheck(Map<String, Object> nodeCapability,
             Map<String, Object> requestedCapability) {
 

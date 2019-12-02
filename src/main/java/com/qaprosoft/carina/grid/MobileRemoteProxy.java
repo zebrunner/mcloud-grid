@@ -27,7 +27,7 @@ import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 
 import com.qaprosoft.carina.grid.integration.STF;
-import com.qaprosoft.zafira.models.stf.STFDevice;
+import com.qaprosoft.carina.grid.models.stf.STFDevice;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
