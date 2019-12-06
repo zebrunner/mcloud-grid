@@ -131,7 +131,7 @@ public class HttpClient {
                 }
             } catch (Exception e) {
                 String message = errorMessage == null ? e.getMessage() : e.getMessage() + ". " + errorMessage;
-                LOGGER.info(message);
+                LOGGER.error(message, e);
             }
             return rs;
         }

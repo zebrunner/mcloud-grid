@@ -45,20 +45,20 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
 
-        LOGGER.fine("Trying to create a new session on node " + this);
+        LOGGER.info("Trying to create a new session on node " + this);
 
         if (isDown()) {
             return null;
         }
 
         if (!hasCapability(requestedCapability)) {
-            LOGGER.fine("Node " + this + " has no matching capability");
+            LOGGER.info("Node " + this + " has no matching capability");
             return null;
         }
 
         // any slot left at all?
         if (getTotalUsed() >= config.maxSession) {
-            LOGGER.fine("Node " + this + " has no free slots");
+            LOGGER.info("Node " + this + " has no free slots");
             return null;
         }
 
@@ -86,7 +86,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
-        	LOGGER.fine("STF reserve device: " + udid);
+        	LOGGER.info("STF reserve device: " + udid);
             STF.reserveDevice(udid);
             //session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
         }
@@ -103,7 +103,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         super.afterSession(session);
         if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
         	String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        	LOGGER.fine("STF return device: " + udid);
+        	LOGGER.info("STF return device: " + udid);
             STF.returnDevice(udid);
         }
     }
@@ -120,9 +120,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 			String remoteURL = null;
 			STFDevice stfDevice = STF.getDevice(udid);
 			if (stfDevice != null) {
-				LOGGER.fine("Identified '" + stfDevice.getModel() + "' device by udid: " + udid);
+				LOGGER.info("Identified '" + stfDevice.getModel() + "' device by udid: " + udid);
 				remoteURL = (String) stfDevice.getRemoteConnectUrl();
-				LOGGER.fine("Identified remoteURL '" + remoteURL + "' by udid: " + udid);
+				LOGGER.info("Identified remoteURL '" + remoteURL + "' by udid: " + udid);
 				slotCapabilities.put("remoteURL", remoteURL);
 			}
 		}

@@ -90,10 +90,10 @@ public class STF {
                         }
                     }
                 } else {
-                    LOGGER.info("Unable to get devices status HTTP status: " + rs.getStatus());
+                    LOGGER.error("Unable to get devices status HTTP status: " + rs.getStatus());
                 }
             } catch (Exception e) {
-                LOGGER.info("Unable to get devices status HTTP status via udid: " + udid);
+                LOGGER.error("Unable to get devices status HTTP status via udid: " + udid, e);
             }
         }
         return available;
@@ -115,7 +115,7 @@ public class STF {
                     device = rs.getObject().getDevice();
                 }
             } catch (Exception e) {
-                LOGGER.info("Unable to get device HTTP status via udid: " + udid);
+                LOGGER.error("Unable to get device HTTP status via udid: " + udid, e);
             }
         }
         return device;
