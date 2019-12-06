@@ -18,6 +18,7 @@ package com.qaprosoft.carina.grid.integration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -90,10 +91,10 @@ public class STF {
                         }
                     }
                 } else {
-                    LOGGER.error("Unable to get devices status HTTP status: " + rs.getStatus());
+                    LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status: " + rs.getStatus());
                 }
             } catch (Exception e) {
-                LOGGER.error("Unable to get devices status HTTP status via udid: " + udid, e);
+                LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status via udid: " + udid, e);
             }
         }
         return available;
@@ -115,7 +116,7 @@ public class STF {
                     device = rs.getObject().getDevice();
                 }
             } catch (Exception e) {
-                LOGGER.error("Unable to get device HTTP status via udid: " + udid, e);
+                LOGGER.log(Level.SEVERE, "Unable to get device HTTP status via udid: " + udid, e);
             }
         }
         return device;

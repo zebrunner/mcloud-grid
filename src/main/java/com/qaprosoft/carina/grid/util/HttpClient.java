@@ -18,6 +18,7 @@ package com.qaprosoft.carina.grid.util;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -131,7 +132,7 @@ public class HttpClient {
                 }
             } catch (Exception e) {
                 String message = errorMessage == null ? e.getMessage() : e.getMessage() + ". " + errorMessage;
-                LOGGER.error(message, e);
+                LOGGER.log(Level.SEVERE, message, e);
             }
             return rs;
         }
