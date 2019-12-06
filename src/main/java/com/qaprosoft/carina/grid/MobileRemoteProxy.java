@@ -45,20 +45,20 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
 
-        LOGGER.info("Trying to create a new session on node " + this);
+        LOGGER.fine("Trying to create a new session on node " + this);
 
         if (isDown()) {
             return null;
         }
 
         if (!hasCapability(requestedCapability)) {
-            LOGGER.info("Node " + this + " has no matching capability");
+            LOGGER.fine("Node " + this + " has no matching capability");
             return null;
         }
 
         // any slot left at all?
         if (getTotalUsed() >= config.maxSession) {
-            LOGGER.info("Node " + this + " has no free slots");
+            LOGGER.fine("Node " + this + " has no free slots");
             return null;
         }
 
