@@ -173,11 +173,6 @@ public class STF {
                     : Boolean.valueOf((String) requestedCapability.get(SpecialKeywords.STF_ENABLED));
         }
 
-        // STF integration is not available for iOS devices for now
-        if (status && Platform.IOS.equals(Platform.fromCapabilities(requestedCapability))) {
-            status = false;
-        }
-
         // Appium node should contain UDID capability to be identified in STF
         if (status && !nodeCapability.containsKey("udid")) {
             status = false;
