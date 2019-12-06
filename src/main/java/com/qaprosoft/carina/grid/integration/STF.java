@@ -129,9 +129,9 @@ public class STF {
      *            - device UDID
      * @return status of connected device
      */
-    public static boolean reserveDevice(String udid) {
+    public static boolean reserveDevice(String udid, Map<String, Object> requestedCapability) {
         boolean status = INSTANCE.client.reserveDevice(udid, TimeUnit.SECONDS.toMillis(STF_TIMEOUT));
-        if (status) {
+        if (status && Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
             status = INSTANCE.client.remoteConnectDevice(udid).getStatus() == 200;
         }
         return status;
@@ -144,10 +144,14 @@ public class STF {
      *            - device UDID
      * @return status of returned device
      */
-    public static boolean returnDevice(String udid) {
+    public static boolean returnDevice(String udid, Map<String, Object> requestedCapability) {
         // it seems like return and remote disconnect guarantee that device becomes free
         // asap
-        return INSTANCE.client.remoteDisconnectDevice(udid) && INSTANCE.client.returnDevice(udid);
+    	boolean status = true;
+    	if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
+    		status = INSTANCE.client.remoteDisconnectDevice(udid);
+    	}
+        return  status && INSTANCE.client.returnDevice(udid);
     }
 
     /**

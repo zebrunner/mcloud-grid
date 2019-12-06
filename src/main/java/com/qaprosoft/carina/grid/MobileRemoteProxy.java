@@ -87,14 +87,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
         	LOGGER.info("STF reserve device: " + udid);
-            STF.reserveDevice(udid);
-            //session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
+            STF.reserveDevice(udid, session.getRequestedCapabilities());
         }
         
-        if (!StringUtils.isEmpty(udid)) {
-            	// this is our mobile Android or iOS device
-            	session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
-        }
+		if (!StringUtils.isEmpty(udid)) {
+			// this is our mobile Android or iOS device
+			session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
+		}
         
     }
 
@@ -104,7 +103,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
         	String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         	LOGGER.info("STF return device: " + udid);
-            STF.returnDevice(udid);
+            STF.returnDevice(udid, session.getRequestedCapabilities());
         }
     }
     
