@@ -17,8 +17,8 @@ package com.qaprosoft.carina.grid.integration;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -38,6 +38,9 @@ import com.qaprosoft.carina.grid.util.HttpClient;
  */
 public class STF {
     private static Logger LOGGER = Logger.getLogger(STF.class.getName());
+    
+    private static final String STF_URL = "STF_URL";
+    private static final String STF_TOKEN = "STF_TOKEN";
 
     private static final Long STF_TIMEOUT = 3600L;
 
@@ -48,8 +51,8 @@ public class STF {
     public final static STF INSTANCE = new STF();
 
     private STF() {
-        String serviceURL = System.getProperty(SpecialKeywords.STF_URL);
-        String authToken = System.getProperty(SpecialKeywords.STF_TOKEN);
+        String serviceURL = System.getProperty(STF_URL);
+        String authToken = System.getProperty(STF_TOKEN);
         LOGGER.info("*********************************");
         LOGGER.info("Credentials for STF: " + serviceURL + " / " + authToken);
         if (!StringUtils.isEmpty(serviceURL) && !StringUtils.isEmpty(authToken)) {

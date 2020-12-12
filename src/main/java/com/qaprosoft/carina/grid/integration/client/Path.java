@@ -21,7 +21,10 @@ public enum Path {
     DEVICES_ITEM_PATH("/api/v1/devices/%s"),
     USER_DEVICES_PATH("/api/v1/user/devices"),
     USER_DEVICES_BY_ID_PATH("/api/v1/user/devices/%s"),
-    USER_DEVICES_REMOTE_CONNECT_PATH("/api/v1/user/devices/%s/remoteConnect");
+    USER_DEVICES_REMOTE_CONNECT_PATH("/api/v1/user/devices/%s/remoteConnect"),
+    APPIUM_STATUS("/status"),
+    APPIUM_START_RECORDING_SCREEN_PATH("/session/%s/appium/start_recording_screen"),
+    APPIUM_STOP_RECORDING_SCREEN_PATH("/session/%s/appium/stop_recording_screen");
     
     private final String relativePath;
 
