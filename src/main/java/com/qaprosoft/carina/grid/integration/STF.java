@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.qaprosoft.carina.core.foundation.commons.SpecialKeywords;
 import com.qaprosoft.carina.grid.Platform;
 import com.qaprosoft.carina.grid.integration.client.STFClient;
 import com.qaprosoft.carina.grid.integration.client.impl.STFClientImpl;
@@ -41,6 +40,7 @@ public class STF {
     
     private static final String STF_URL = "STF_URL";
     private static final String STF_TOKEN = "STF_TOKEN";
+    private static final String STF_ENABLED = "enableStf";
 
     private static final Long STF_TIMEOUT = 3600L;
 
@@ -174,11 +174,11 @@ public class STF {
             status = false;
         }
 
-        // User may pass desired capability STF_ENABLED=false for local run
-        if (status && (requestedCapability.containsKey(SpecialKeywords.STF_ENABLED))) {
-            status = (requestedCapability.get(SpecialKeywords.STF_ENABLED) instanceof Boolean)
-                    ? (Boolean) requestedCapability.get(SpecialKeywords.STF_ENABLED)
-                    : Boolean.valueOf((String) requestedCapability.get(SpecialKeywords.STF_ENABLED));
+        // User may pass desired capability enableStf=false for local run
+        if (status && (requestedCapability.containsKey(STF_ENABLED))) {
+            status = (requestedCapability.get(STF_ENABLED) instanceof Boolean)
+                    ? (Boolean) requestedCapability.get(STF_ENABLED)
+                    : Boolean.valueOf((String) requestedCapability.get(STF_ENABLED));
         }
 
         // Appium node should contain UDID capability to be identified in STF

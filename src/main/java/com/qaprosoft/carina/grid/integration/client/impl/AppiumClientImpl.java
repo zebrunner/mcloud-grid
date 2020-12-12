@@ -44,6 +44,11 @@ public class AppiumClientImpl implements AppiumClient {
         entity.put("method", "PUT");
         
         HttpClient.Response response = HttpClient.uri(Path.APPIUM_STOP_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Void.class, entity);
+        
+//        18:27:56.544 ERROR [RequestHandler.process] - cannot forward the request null
+//        java.lang.NullPointerException
+//                at com.qaprosoft.carina.grid.integration.client.impl.AppiumClientImpl.stopRecordingScreen(AppiumClientImpl.java:..)
+        //TODO: find a way to retrieve valid result (base64 encoded video string from response)
         return response.getObject().toString();
     }
 
