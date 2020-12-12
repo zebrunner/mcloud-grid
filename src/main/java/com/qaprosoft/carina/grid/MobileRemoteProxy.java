@@ -80,6 +80,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             TestSession session = testslot.getNewSession(requestedCapability);
 
 			if (session != null) {
+			    LOGGER.info("Detected sessionId:" + getSessionId(session));
 				return session;
 			}
         }
