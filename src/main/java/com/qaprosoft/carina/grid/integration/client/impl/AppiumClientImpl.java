@@ -17,9 +17,12 @@ package com.qaprosoft.carina.grid.integration.client.impl;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.qaprosoft.carina.grid.integration.client.AppiumClient;
 import com.qaprosoft.carina.grid.integration.client.Path;
+import com.qaprosoft.carina.grid.models.appium.Recording;
 import com.qaprosoft.carina.grid.models.appium.Status;
 import com.qaprosoft.carina.grid.util.HttpClient;
 import com.qaprosoft.carina.grid.util.HttpClient.Response;
@@ -27,6 +30,8 @@ import com.qaprosoft.carina.grid.util.HttpClient.Response;
 @SuppressWarnings("rawtypes")
 public class AppiumClientImpl implements AppiumClient {
 
+	private static Logger LOGGER = Logger.getLogger(AppiumClientImpl.class.getName());
+	
     public AppiumClientImpl() {
     }
 
@@ -43,13 +48,18 @@ public class AppiumClientImpl implements AppiumClient {
         entity.put("password", "");
         entity.put("method", "PUT");
         
-        HttpClient.Response response = HttpClient.uri(Path.APPIUM_STOP_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Void.class, entity);
+        HttpClient.Response response = HttpClient.uri(Path.APPIUM_STOP_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Recording.class, entity);
         
 //        18:27:56.544 ERROR [RequestHandler.process] - cannot forward the request null
 //        java.lang.NullPointerException
 //                at com.qaprosoft.carina.grid.integration.client.impl.AppiumClientImpl.stopRecordingScreen(AppiumClientImpl.java:..)
-        //TODO: find a way to retrieve valid result (base64 encoded video string from response)
-        return response.getObject().toString();
+        String result = null;
+        if (response.getStatus() == 200) {
+            result = ((Recording) response.getObject()).getValue();
+        } else {
+            LOGGER.log(Level.WARNING, "Appium response is unsuccessful for stop recoding call: " + response.getStatus());
+        }
+        return result;
     }
 
     @Override
