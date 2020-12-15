@@ -37,7 +37,7 @@ import com.qaprosoft.carina.grid.util.HttpClient;
  */
 public class STF {
     private static Logger LOGGER = Logger.getLogger(STF.class.getName());
-    
+
     private static final String STF_URL = "STF_URL";
     private static final String STF_TOKEN = "STF_TOKEN";
     private static final String STF_ENABLED = "enableStf";
@@ -54,9 +54,9 @@ public class STF {
         String authToken = System.getProperty(STF_TOKEN);
         LOGGER.info("*********************************");
         if (!StringUtils.isEmpty(serviceURL) && !StringUtils.isEmpty(authToken)) {
-            LOGGER.info("Credentials for STF: " + serviceURL + " / " + authToken);            
+            LOGGER.info("Credentials for STF: " + serviceURL + " / " + authToken);
             this.client = new STFClientImpl(serviceURL, authToken);
-            int status = this.client.getAllDevices().getStatus(); 
+            int status = this.client.getAllDevices().getStatus();
             if (status == 200) {
                 isConnected = true;
                 LOGGER.info("STF connection established");
@@ -157,11 +157,11 @@ public class STF {
     public static boolean returnDevice(String udid, Map<String, Object> requestedCapability) {
         // it seems like return and remote disconnect guarantee that device becomes free
         // asap
-    	boolean status = true;
-    	if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
-    		status = INSTANCE.client.remoteDisconnectDevice(udid);
-    	}
-        return  status && INSTANCE.client.returnDevice(udid);
+        boolean status = true;
+        if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
+            status = INSTANCE.client.remoteDisconnectDevice(udid);
+        }
+        return status && INSTANCE.client.returnDevice(udid);
     }
 
     /**
