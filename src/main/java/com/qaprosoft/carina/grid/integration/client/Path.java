@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Qaprosoft (http://www.qaprosoft.com).
+ * Copyright 2013-2020 Qaprosoft (http://www.qaprosoft.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@ package com.qaprosoft.carina.grid.integration.client;
 
 public enum Path {
 
-    DEVICES_PATH("/api/v1/devices"),
-    DEVICES_ITEM_PATH("/api/v1/devices/%s"),
-    USER_DEVICES_PATH("/api/v1/user/devices"),
-    USER_DEVICES_BY_ID_PATH("/api/v1/user/devices/%s"),
-    USER_DEVICES_REMOTE_CONNECT_PATH("/api/v1/user/devices/%s/remoteConnect"),
+    STF_DEVICES_PATH("/api/v1/devices"),
+    STF_DEVICES_ITEM_PATH("/api/v1/devices/%s"),
+    STF_USER_DEVICES_PATH("/api/v1/user/devices"),
+    STF_USER_DEVICES_BY_ID_PATH("/api/v1/user/devices/%s"),
+    STF_USER_DEVICES_REMOTE_CONNECT_PATH("/api/v1/user/devices/%s/remoteConnect"),
     APPIUM_STATUS("/status"),
     APPIUM_START_RECORDING_SCREEN_PATH("/session/%s/appium/start_recording_screen"),
     APPIUM_STOP_RECORDING_SCREEN_PATH("/session/%s/appium/stop_recording_screen");

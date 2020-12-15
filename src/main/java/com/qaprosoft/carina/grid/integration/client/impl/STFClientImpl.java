@@ -38,14 +38,14 @@ public class STFClientImpl implements STFClient {
 
     @Override
     public HttpClient.Response<Devices> getAllDevices() {
-        return HttpClient.uri(Path.DEVICES_PATH, serviceURL)
+        return HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
                   .withAuthorization(buildAuthToken(authToken))
                   .get(Devices.class);
     }
 
     @Override
     public HttpClient.Response<Device> getDevice(String udid) {
-        return HttpClient.uri(Path.DEVICES_ITEM_PATH, serviceURL, udid)
+        return HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, serviceURL, udid)
                          .withAuthorization(buildAuthToken(authToken))
                          .get(Device.class);
     }
@@ -54,7 +54,7 @@ public class STFClientImpl implements STFClient {
     public boolean reserveDevice(String serial, long timeout) {
         Map<String, String> entity = new HashMap<>();
         entity.put("serial", serial);
-        HttpClient.Response response = HttpClient.uri(Path.USER_DEVICES_PATH, serviceURL)
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_PATH, serviceURL)
                          .withAuthorization(buildAuthToken(authToken))
                          .post(Void.class, entity);
         return response.getStatus() == 200;
@@ -62,7 +62,7 @@ public class STFClientImpl implements STFClient {
 
     @Override
     public boolean returnDevice(String serial) {
-        HttpClient.Response response = HttpClient.uri(Path.USER_DEVICES_BY_ID_PATH, serviceURL, serial)
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, serviceURL, serial)
                                                  .withAuthorization(buildAuthToken(authToken))
                                                  .delete(Void.class);
         return response.getStatus() == 200;
@@ -70,14 +70,14 @@ public class STFClientImpl implements STFClient {
 
     @Override
     public HttpClient.Response<RemoteConnectUserDevice> remoteConnectDevice(String serial) {
-        return HttpClient.uri(Path.USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
+        return HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
                          .withAuthorization(buildAuthToken(authToken))
                          .post(RemoteConnectUserDevice.class, null);
     }
 
     @Override
     public boolean remoteDisconnectDevice(String serial) {
-        HttpClient.Response response = HttpClient.uri(Path.USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
                                                  .withAuthorization(buildAuthToken(authToken))
                                                  .post(Void.class, null);
         return response.getStatus() == 200;
@@ -85,7 +85,7 @@ public class STFClientImpl implements STFClient {
 
     @Override
     public boolean isConnected() {
-		HttpClient.Response response = HttpClient.uri(Path.DEVICES_PATH, serviceURL)
+		HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
                                                  .withAuthorization(buildAuthToken(authToken))
                                                  .get(Devices.class);
         return response.getStatus() == 200;

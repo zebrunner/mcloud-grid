@@ -16,7 +16,6 @@
 package com.qaprosoft.carina.grid.integration;
 
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.qaprosoft.carina.grid.integration.client.AppiumClient;
