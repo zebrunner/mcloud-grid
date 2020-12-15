@@ -65,7 +65,7 @@ public class Appium {
         if (message.length() > 128) {
             message = message.substring(0, 128);
         }
-        LOGGER.info("video base64 string: " + message);
+        LOGGER.info("video base64 string: " + message + "...");
         return videoContent;
     }
 
