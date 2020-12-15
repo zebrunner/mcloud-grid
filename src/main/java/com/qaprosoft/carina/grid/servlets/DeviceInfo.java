@@ -29,8 +29,8 @@ import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.web.servlet.RegistryBasedServlet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.qaprosoft.carina.commons.models.RemoteDevice;
 import com.qaprosoft.carina.grid.integration.STF;
+import com.qaprosoft.carina.grid.models.RemoteDevice;
 import com.qaprosoft.carina.grid.models.stf.STFDevice;
 
 /**
