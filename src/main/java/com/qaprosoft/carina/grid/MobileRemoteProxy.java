@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 QaProSoft (http://www.qaprosoft.com).
+ * Copyright 2013-2020 QaProSoft (http://www.qaprosoft.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,21 +65,20 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
 
         if (!hasCapability(requestedCapability)) {
-            LOGGER.fine("Node " + this + " has no matching capability");
+            LOGGER.fine("Node " + this + " has no matching capability!");
             return null;
         }
 
         // any slot left at all?
         if (getTotalUsed() >= config.maxSession) {
-            LOGGER.fine("Node " + this + " has no free slots");
+            LOGGER.fine("Node " + this + " has no free slots!");
             return null;
         }
 
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
-
             // Check if device is busy in STF
-            if (STF.isSTFRequired(testslot.getCapabilities(), requestedCapability)
+            if (STF.isRequired(testslot.getCapabilities(), requestedCapability)
                     && !STF.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
                 return null;
             }
@@ -99,7 +98,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+        if (STF.isRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
             LOGGER.info("STF reserve device: " + udid);
             STF.reserveDevice(udid, session.getRequestedCapabilities());
         }
@@ -119,7 +118,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // unable to start recording after Session due to the:
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
 
-        if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+        if (STF.isRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
             String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
             LOGGER.info("STF return device: " + udid);
             STF.returnDevice(udid, session.getRequestedCapabilities());
@@ -231,7 +230,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // get existing slot capabilities from session
         slotCapabilities.putAll(session.getSlot().getCapabilities());
 
-        if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+        if (STF.isRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
             // get remoteURL from STF device and add into custom slotCapabilities map
             String remoteURL = null;
             STFDevice stfDevice = STF.getDevice(udid);

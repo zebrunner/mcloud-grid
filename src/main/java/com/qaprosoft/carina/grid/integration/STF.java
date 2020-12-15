@@ -41,10 +41,9 @@ public class STF {
     private static final String STF_URL = "STF_URL";
     private static final String STF_TOKEN = "STF_TOKEN";
     private static final String STF_ENABLED = "enableStf";
-
     private static final Long STF_TIMEOUT = 3600L;
 
-    private static boolean running = false;
+    private static boolean isConnected = false;
 
     private STFClient client;
 
@@ -54,23 +53,24 @@ public class STF {
         String serviceURL = System.getProperty(STF_URL);
         String authToken = System.getProperty(STF_TOKEN);
         LOGGER.info("*********************************");
-        LOGGER.info("Credentials for STF: " + serviceURL + " / " + authToken);
         if (!StringUtils.isEmpty(serviceURL) && !StringUtils.isEmpty(authToken)) {
+            LOGGER.info("Credentials for STF: " + serviceURL + " / " + authToken);            
             this.client = new STFClientImpl(serviceURL, authToken);
-            if (this.client.getAllDevices().getStatus() == 200) {
-                running = true;
+            int status = this.client.getAllDevices().getStatus(); 
+            if (status == 200) {
+                isConnected = true;
                 LOGGER.info("STF connection established");
             } else {
-                LOGGER.info("STF connection error");
+                throw new RuntimeException("Unable to start hub due to the STF connection error! Code: " + status);
             }
         } else {
-            LOGGER.info("Set STF_URL and STF_TOKEN to use STF integration");
+            LOGGER.warning("Set STF_URL and STF_TOKEN to use STF integration");
         }
         LOGGER.info("*********************************");
     }
 
-    public static boolean isRunning() {
-        return running;
+    public static boolean isConnected() {
+        return isConnected;
     }
 
     /**
@@ -81,25 +81,29 @@ public class STF {
      * @return returns availability status
      */
     public static boolean isDeviceAvailable(String udid) {
-        boolean available = false;
-        if (isRunning()) {
-            try {
-                HttpClient.Response<Devices> rs = INSTANCE.client.getAllDevices();
-                if (rs.getStatus() == 200) {
-                    for (STFDevice device : rs.getObject().getDevices()) {
-                        if (udid.equals(device.getSerial())) {
-                            available = device.getPresent() && device.getReady() && !device.getUsing()
-                                    && device.getOwner() == null;
-                            break;
-                        }
-                    }
-                } else {
-                    LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status: " + rs.getStatus());
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status via udid: " + udid, e);
-            }
+        if (!isConnected()) {
+            return false;
         }
+
+        boolean available = false;
+
+        try {
+            HttpClient.Response<Devices> rs = INSTANCE.client.getAllDevices();
+            if (rs.getStatus() == 200) {
+                for (STFDevice device : rs.getObject().getDevices()) {
+                    if (udid.equals(device.getSerial())) {
+                        available = device.getPresent() && device.getReady() && !device.getUsing()
+                                && device.getOwner() == null;
+                        break;
+                    }
+                }
+            } else {
+                LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status: " + rs.getStatus());
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status via udid: " + udid, e);
+        }
+
         return available;
     }
 
@@ -111,17 +115,20 @@ public class STF {
      * @return STF device
      */
     public static STFDevice getDevice(String udid) {
-    	STFDevice device = null;
-        if (isRunning()) {
-            try {
-                HttpClient.Response<Device> rs = INSTANCE.client.getDevice(udid);
-                if (rs.getStatus() == 200) {
-                    device = rs.getObject().getDevice();
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Unable to get device HTTP status via udid: " + udid, e);
-            }
+        if (!isConnected()) {
+            return null;
         }
+
+        STFDevice device = null;
+        try {
+            HttpClient.Response<Device> rs = INSTANCE.client.getDevice(udid);
+            if (rs.getStatus() == 200) {
+                device = rs.getObject().getDevice();
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Unable to get device HTTP status via udid: " + udid, e);
+        }
+
         return device;
     }
 
@@ -166,22 +173,17 @@ public class STF {
      *            - requested capabilities
      * @return if STF required
      */
-    public static boolean isSTFRequired(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
-        boolean status = true;
+    public static boolean isRequired(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
+        boolean status = isConnected();
 
-        // STF integration not established
-        if (status && !STF.isRunning()) {
-            status = false;
-        }
-
-        // User may pass desired capability enableStf=false for local run
+        // User may pass desired capability "enableStf=false" to disable integration
         if (status && (requestedCapability.containsKey(STF_ENABLED))) {
             status = (requestedCapability.get(STF_ENABLED) instanceof Boolean)
                     ? (Boolean) requestedCapability.get(STF_ENABLED)
                     : Boolean.valueOf((String) requestedCapability.get(STF_ENABLED));
         }
 
-        // Appium node should contain UDID capability to be identified in STF
+        // Appium node must have UDID capability to be identified in STF
         if (status && !nodeCapability.containsKey("udid")) {
             status = false;
         }
