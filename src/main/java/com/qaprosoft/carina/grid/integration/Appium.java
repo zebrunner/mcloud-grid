@@ -16,6 +16,7 @@
 package com.qaprosoft.carina.grid.integration;
 
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.qaprosoft.carina.grid.integration.client.AppiumClient;
@@ -65,7 +66,7 @@ public class Appium {
         if (message.length() > 128) {
             message = message.substring(0, 128);
         }
-        LOGGER.info("video base64 string: " + message + "...");
+        LOGGER.finest("video base64 string: " + message + "...");
         return videoContent;
     }
 

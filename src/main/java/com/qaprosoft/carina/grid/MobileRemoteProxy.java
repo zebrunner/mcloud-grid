@@ -48,9 +48,9 @@ import com.qaprosoft.carina.grid.models.stf.STFDevice;
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
-    
+
     private static final String ENABLE_VIDEO = "enableVideo";
-    
+
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
     }
@@ -78,17 +78,17 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
 
-			// Check if device is busy in STF
-			if (STF.isSTFRequired(testslot.getCapabilities(), requestedCapability)
-					&& !STF.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
-				return null;
-			}
-            
+            // Check if device is busy in STF
+            if (STF.isSTFRequired(testslot.getCapabilities(), requestedCapability)
+                    && !STF.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
+                return null;
+            }
+
             TestSession session = testslot.getNewSession(requestedCapability);
 
-			if (session != null) {
-				return session;
-			}
+            if (session != null) {
+                return session;
+            }
         }
         return null;
     }
@@ -96,107 +96,108 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public void beforeSession(TestSession session) {
         String sessionId = getExternalSessionId(session);
-        LOGGER.log(Level.FINEST, "beforeSession sessionId:" + sessionId);
-        
+        LOGGER.finest("beforeSession sessionId: " + sessionId);
+
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
-        	LOGGER.info("STF reserve device: " + udid);
+            LOGGER.info("STF reserve device: " + udid);
             STF.reserveDevice(udid, session.getRequestedCapabilities());
         }
-        
-		if (!StringUtils.isEmpty(udid)) {
-			// this is our mobile Android or iOS device
-			session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
-		}
-		
+
+        if (!StringUtils.isEmpty(udid)) {
+            // this is our mobile Android or iOS device
+            session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
+        }
+
     }
-    
+
     @Override
     public void afterSession(TestSession session) {
         String sessionId = getExternalSessionId(session);
-        LOGGER.log(Level.FINEST, "afterSession sessionId:" + sessionId);
-        
+        LOGGER.finest("afterSession sessionId: " + sessionId);
+
         // unable to start recording after Session due to the:
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
-        
+
         if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
-        	String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        	LOGGER.info("STF return device: " + udid);
+            String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
+            LOGGER.info("STF return device: " + udid);
             STF.returnDevice(udid, session.getRequestedCapabilities());
         }
-        
-        
+
         /*
          * 3. Upload generated video file to S3 compatible storage (asynchronously)
-         *      desired location in bucket: 
-         * 4. remove local file if upload is ok 
+         * desired location in bucket:
+         * 4. remove local file if upload is ok
          */
 
     }
-    
+
     @Override
     public void afterCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.afterCommand(session, request, response);
 
         // ExternalKey is defined ONLY after first valid command so we can start recording
         String sessionId = getExternalSessionId(session);
-        LOGGER.log(Level.FINEST, "afterCommand sessionId:" + sessionId);
-        
+        LOGGER.finest("afterCommand sessionId: " + sessionId);
+
         // double check that external key not empty
-        if (!isRecording(sessionId) && !sessionId.isEmpty()) {
+        if (!isRecording(sessionId) && !sessionId.isEmpty() && !"DELETE".equals(request.getMethod())) {
             if (isVideoEnabled(session)) {
                 recordingSessions.add(sessionId);
-                LOGGER.info("start recording sessionId:" + getExternalSessionId(session));
-                startRecording(sessionId, session.getSlot().getRemoteURL().toString());
+                LOGGER.info("start recording sessionId: " + getExternalSessionId(session));
+                startRecording(sessionId, session.getSlot().getRemoteURL().toString(), session);
             }
         }
     }
-    
+
     public void beforeCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.beforeCommand(session, request, response);
         String sessionId = getExternalSessionId(session);
-        LOGGER.log(Level.FINEST, "afterCommand sessionId:" + sessionId);
-        
-        //TODO: try to add more conditions to make sure it is DELETE session call 
+        LOGGER.finest("afterCommand sessionId: " + sessionId);
+
+        // TODO: try to add more conditions to make sure it is DELETE session call
         // DELETE /wd/hub/session/5e6960c5-b82b-4e68-a24d-508c3d98dc53
         if ("DELETE".equals(request.getMethod())) {
-            LOGGER.info(sessionId + " is recording? " + isRecording(sessionId));
-            if (isRecording(sessionId)) {
+            boolean isRecording = isRecording(sessionId);
+            LOGGER.finest("recording for " + sessionId + ": " + isRecording);
+            if (isRecording) {
                 recordingSessions.remove(sessionId);
-                
+
                 String appiumUrl = session.getSlot().getRemoteURL().toString();
-                // Do stopRecordingScreen call to appium using predefined args for Android and iOS: 
+                // Do stopRecordingScreen call to appium using predefined args for Android and iOS:
                 // http://appium.io/docs/en/commands/device/recording-screen/stop-recording-screen/
                 String data = Appium.stopRecording(appiumUrl, sessionId);
-                
+
                 // Convert base64 encoded result string into the mp4 file (use sessionId to make filename unique)
                 String filePath = sessionId + ".mp4";
                 File file = null;
-                
+
                 try {
-                    LOGGER.info("Saving video artifact: " + filePath);
+                    LOGGER.finest("Saving video artifact: " + filePath);
                     file = new File(filePath);
                     FileUtils.writeByteArrayToFile(file, Base64.getDecoder().decode(data));
                     LOGGER.info("Saved video artifact: " + filePath);
                 } catch (IOException e) {
                     LOGGER.log(Level.SEVERE, "Error has been occurred during video artifact generation: " + filePath, e);
                 }
-            }            
+            }
         }
-        
-      }    
-    
+
+    }
+
     private boolean isRecording(String sessionId) {
         return recordingSessions.contains(sessionId);
     }
-    
-    private void startRecording(String sessionId, String appiumUrl) {
-        
-        //TODO: organize smart params setup via properties and capabilities
+
+    private void startRecording(String sessionId, String appiumUrl, TestSession session) {
+        // TODO: organize smart params setup via system properties and capabilities
+        Map<String, Object> caps = session.getRequestedCapabilities();
+
         Map<String, String> options = new HashMap<>();
         options.put("options.forceRestart", "true");
         options.put("options.timeLimit", "1800");
-        
+
         options.put("options.bitRate", "1000000");
         options.put("options.bugReport", "true");
 
@@ -217,39 +218,39 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
          * options.bugReport string (Android Only) Set it to true in order to display additional information on the video overlay, such as a
          * timestamp, that is helpful in videos captured to illustrate bugs. This option is only supported since API level 27 (Android O).
          */
-        
+
         // do start_recording_screen call to appium using predefined args for Android and iOS
         // http://appium.io/docs/en/commands/device/recording-screen/start-recording-screen/
         Appium.startRecording(appiumUrl, sessionId, options);
     }
-    
-	private Map<String, Object> getSlotCapabilities(TestSession session, String udid) {
-		//obligatory create new map as original object is UnmodifiableMap
-		Map<String, Object> slotCapabilities = new HashMap<String, Object>();
-		
-		// get existing slot capabilities from session
-		slotCapabilities.putAll(session.getSlot().getCapabilities());
 
-		if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
-			// get remoteURL from STF device and add into custom slotCapabilities map
-			String remoteURL = null;
-			STFDevice stfDevice = STF.getDevice(udid);
-			if (stfDevice != null) {
-				LOGGER.info("Identified '" + stfDevice.getModel() + "' device by udid: " + udid);
-				remoteURL = (String) stfDevice.getRemoteConnectUrl();
-				LOGGER.info("Identified remoteURL '" + remoteURL + "' by udid: " + udid);
-				slotCapabilities.put("remoteURL", remoteURL);
-			}
-		}
+    private Map<String, Object> getSlotCapabilities(TestSession session, String udid) {
+        // obligatory create new map as original object is UnmodifiableMap
+        Map<String, Object> slotCapabilities = new HashMap<String, Object>();
 
-		return slotCapabilities;
-	}
+        // get existing slot capabilities from session
+        slotCapabilities.putAll(session.getSlot().getCapabilities());
+
+        if (STF.isSTFRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+            // get remoteURL from STF device and add into custom slotCapabilities map
+            String remoteURL = null;
+            STFDevice stfDevice = STF.getDevice(udid);
+            if (stfDevice != null) {
+                LOGGER.info("Identified '" + stfDevice.getModel() + "' device by udid: " + udid);
+                remoteURL = (String) stfDevice.getRemoteConnectUrl();
+                LOGGER.info("Identified remoteURL '" + remoteURL + "' by udid: " + udid);
+                slotCapabilities.put("remoteURL", remoteURL);
+            }
+        }
+
+        return slotCapabilities;
+    }
 
     private String getExternalSessionId(TestSession session) {
         // external key if exists correlates with valid appium sessionId. Internal key is unique uuid value inside hub
         return session.getExternalKey() != null ? session.getExternalKey().getKey() : "";
     }
-    
+
     private boolean isVideoEnabled(TestSession session) {
         boolean isEnabled = false;
         if (session.getRequestedCapabilities().containsKey(ENABLE_VIDEO)) {
