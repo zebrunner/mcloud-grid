@@ -78,7 +78,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
             // Check if device is busy in STF
-            if (STF.isRequired(testslot.getCapabilities(), requestedCapability)
+            if (STF.isEnabled(testslot.getCapabilities(), requestedCapability)
                     && !STF.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
                 return null;
             }
@@ -98,7 +98,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        if (STF.isRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+        if (STF.isEnabled(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
             LOGGER.info("STF reserve device: " + udid);
             STF.reserveDevice(udid, session.getRequestedCapabilities());
         }
@@ -118,7 +118,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // unable to start recording after Session due to the:
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
 
-        if (STF.isRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+        if (STF.isEnabled(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
             String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
             LOGGER.info("STF return device: " + udid);
             STF.returnDevice(udid, session.getRequestedCapabilities());
@@ -230,7 +230,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // get existing slot capabilities from session
         slotCapabilities.putAll(session.getSlot().getCapabilities());
 
-        if (STF.isRequired(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+        if (STF.isEnabled(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
             // get remoteURL from STF device and add into custom slotCapabilities map
             String remoteURL = null;
             STFDevice stfDevice = STF.getDevice(udid);

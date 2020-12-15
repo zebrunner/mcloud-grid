@@ -38,11 +38,14 @@ import com.qaprosoft.carina.grid.util.HttpClient;
 public class STF {
     private static Logger LOGGER = Logger.getLogger(STF.class.getName());
 
-    private static final String STF_URL = "STF_URL";
-    private static final String STF_TOKEN = "STF_TOKEN";
-    private static final String STF_ENABLED = "enableStf";
-    private static final Long STF_TIMEOUT = 3600L;
-
+    private static final String STF_URL = System.getProperty("STF_URL");
+    private static final String STF_TOKEN = System.getProperty("STF_TOKEN");
+    
+    // Max time is seconds for reserving devices in STF
+    private static final Long STF_TIMEOUT = Long.parseLong(System.getProperty("STF_TIMEOUT"));
+    
+    private static final String ENABLE_STF = "enableStf";
+    
     private static boolean isConnected = false;
 
     private STFClient client;
@@ -50,21 +53,19 @@ public class STF {
     public final static STF INSTANCE = new STF();
 
     private STF() {
-        String serviceURL = System.getProperty(STF_URL);
-        String authToken = System.getProperty(STF_TOKEN);
         LOGGER.info("*********************************");
-        if (!StringUtils.isEmpty(serviceURL) && !StringUtils.isEmpty(authToken)) {
-            LOGGER.info("Credentials for STF: " + serviceURL + " / " + authToken);
-            this.client = new STFClientImpl(serviceURL, authToken);
+        if (!StringUtils.isEmpty(STF_URL) && !StringUtils.isEmpty(STF_TOKEN)) {
+            LOGGER.info("Credentials for STF: " + STF_URL + "/" + STF_TOKEN);
+            this.client = new STFClientImpl(STF_URL, STF_TOKEN);
             int status = this.client.getAllDevices().getStatus();
             if (status == 200) {
                 isConnected = true;
-                LOGGER.info("STF connection established");
+                LOGGER.info("STF connection established.");
             } else {
                 throw new RuntimeException("Unable to start hub due to the STF connection error! Code: " + status);
             }
         } else {
-            LOGGER.warning("Set STF_URL and STF_TOKEN to use STF integration");
+            LOGGER.warning("Set STF_URL and STF_TOKEN to use STF integration!");
         }
         LOGGER.info("*********************************");
     }
@@ -165,7 +166,7 @@ public class STF {
     }
 
     /**
-     * Checks STF required status according to capabilities.
+     * Checks if STF integration enabled according to isConnected() result and capabilities.
      * 
      * @param nodeCapability
      *            - Selenium node capability
@@ -173,14 +174,14 @@ public class STF {
      *            - requested capabilities
      * @return if STF required
      */
-    public static boolean isRequired(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
+    public static boolean isEnabled(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
         boolean status = isConnected();
 
         // User may pass desired capability "enableStf=false" to disable integration
-        if (status && (requestedCapability.containsKey(STF_ENABLED))) {
-            status = (requestedCapability.get(STF_ENABLED) instanceof Boolean)
-                    ? (Boolean) requestedCapability.get(STF_ENABLED)
-                    : Boolean.valueOf((String) requestedCapability.get(STF_ENABLED));
+        if (status && (requestedCapability.containsKey(ENABLE_STF))) {
+            status = (requestedCapability.get(ENABLE_STF) instanceof Boolean)
+                    ? (Boolean) requestedCapability.get(ENABLE_STF)
+                    : Boolean.valueOf((String) requestedCapability.get(ENABLE_STF));
         }
 
         // Appium node must have UDID capability to be identified in STF
