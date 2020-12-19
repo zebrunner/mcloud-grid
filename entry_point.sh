@@ -34,7 +34,7 @@ function shutdown {
     echo "shutdown complete"
 }
 
-java ${JAVA_OPTS} -DSTF_URL=$STF_URL -DSTF_TOKEN=$STF_TOKEN -DSTF_TIMEOUT=$STF_TIMEOUT -cp /opt/selenium/carina-grid-1.0.jar:/opt/selenium/carina-grid-jar-with-dependencies.jar \
+java ${JAVA_OPTS} -DSTF_URL=$STF_URL -DSTF_TOKEN=$STF_TOKEN -DSTF_TIMEOUT=$STF_TIMEOUT -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
   org.openqa.grid.selenium.GridLauncherV3 \
   -role hub \
   -servlets com.qaprosoft.carina.grid.servlets.DeviceInfo,com.qaprosoft.carina.grid.servlets.ProxyInfo \
