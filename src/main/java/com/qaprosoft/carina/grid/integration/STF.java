@@ -42,7 +42,7 @@ public class STF {
     private static final String STF_TOKEN = System.getProperty("STF_TOKEN");
     
     // Max time is seconds for reserving devices in STF
-    private static final Long STF_TIMEOUT = Long.parseLong(System.getProperty("STF_TIMEOUT"));
+    private static final long STF_TIMEOUT = Long.valueOf(System.getProperty("STF_TIMEOUT"));
     
     private static final String ENABLE_STF = "enableStf";
     
