@@ -1,2 +1,2 @@
-# carina-grid
-Customized selenium-hub
+# mcloud-grid
+Enhanced Zebrunner Device Farm selenium grid
