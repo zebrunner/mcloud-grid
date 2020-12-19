@@ -35,9 +35,9 @@ RUN mkdir /opt/selenium
 COPY generate_config \
     entry_point.sh \
     /opt/bin/
-COPY target/carina-grid-jar-with-dependencies.jar \
+COPY target/mcloud-grid-jar-with-dependencies.jar \
     /opt/selenium
-COPY target/carina-grid-1.0.jar \
+COPY target/mcloud-grid-1.0.jar \
     /opt/selenium
 # Running this command as sudo just to avoid the message:
 # To run a command as administrator (user "root"), use "sudo <command>". See "man sudo_root" for details.

@@ -5,7 +5,7 @@
 <artifactId>mcloud-grid</artifactId>
 <version>1.0</version>
 <packaging>jar</packaging>
-<name>Carina Grid</name>
+<name>Zebrunner Device Farm Grid</name>
 <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
@@ -112,7 +112,7 @@
                 <descriptorRefs>
                     <descriptorRef>jar-with-dependencies</descriptorRef>
                 </descriptorRefs>
-                <finalName>carina-grid</finalName>
+                <finalName>mcloud-grid</finalName>
             </configuration>
         </plugin>
         <plugin>
