@@ -46,8 +46,6 @@ public class STF {
     
     private static final String ENABLE_STF = "enableStf";
     
-    private static boolean isConnected = false;
-
     private STFClient client;
 
     public final static STF INSTANCE = new STF();
@@ -59,7 +57,6 @@ public class STF {
             this.client = new STFClientImpl(STF_URL, STF_TOKEN);
             int status = this.client.getAllDevices().getStatus();
             if (status == 200) {
-                isConnected = true;
                 LOGGER.info("STF connection established.");
             } else {
                 throw new RuntimeException("Unable to start hub due to the STF connection error! Code: " + status);
@@ -71,7 +68,7 @@ public class STF {
     }
 
     public static boolean isConnected() {
-        return isConnected;
+        return INSTANCE.client.isConnected();
     }
 
     /**

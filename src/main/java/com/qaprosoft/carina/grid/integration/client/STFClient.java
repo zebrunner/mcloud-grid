@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2019 Qaprosoft (http://www.qaprosoft.com).
+ * Copyright 2013-2020 Qaprosoft (http://www.qaprosoft.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import com.qaprosoft.carina.grid.models.stf.RemoteConnectUserDevice;
 import com.qaprosoft.carina.grid.util.HttpClient;
 
 public interface STFClient {
-
     HttpClient.Response<Devices> getAllDevices();
 
     HttpClient.Response<Device> getDevice(String udid);

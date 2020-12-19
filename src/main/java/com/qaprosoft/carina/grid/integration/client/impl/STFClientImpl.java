@@ -35,7 +35,7 @@ public class STFClientImpl implements STFClient {
         this.serviceURL = serviceURL;
         this.authToken = authToken;
     }
-
+    
     @Override
     public HttpClient.Response<Devices> getAllDevices() {
         return HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)

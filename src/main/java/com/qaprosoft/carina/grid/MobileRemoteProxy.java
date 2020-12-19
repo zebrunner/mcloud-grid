@@ -53,6 +53,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
+        
+        LOGGER.fine("STF connected: " + STF.isConnected());
     }
 
     @Override
