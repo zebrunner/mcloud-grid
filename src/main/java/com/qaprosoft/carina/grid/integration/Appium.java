@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import com.qaprosoft.carina.grid.integration.client.AppiumClient;
-import com.qaprosoft.carina.grid.integration.client.impl.AppiumClientImpl;
 
 /**
  * Singleton for Appium client.
@@ -33,7 +32,7 @@ public class Appium {
     public final static Appium INSTANCE = new Appium();
 
     private Appium() {
-        this.client = new AppiumClientImpl();
+        this.client = new AppiumClient();
     }
 
     public static boolean isRunning(String appiumUrl) {
