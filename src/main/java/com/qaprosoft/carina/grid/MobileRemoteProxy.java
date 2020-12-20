@@ -66,26 +66,31 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
-
         LOGGER.fine("Trying to create a new session on node " + this);
 
         if (isDown()) {
             return null;
         }
-
+        
         if (!hasCapability(requestedCapability)) {
-            LOGGER.fine("Node " + this + " has no matching capability!");
+            LOGGER.fine("Node '" + this + "' has no matching capability!");
             return null;
         }
 
         // any slot left at all?
         if (getTotalUsed() >= config.maxSession) {
-            LOGGER.fine("Node " + this + " has no free slots!");
+            LOGGER.fine("Node '" + this + "' has no free slots!");
             return null;
         }
 
         // init new STF client per each session request
-        STFClient client = getSTFClient(requestedCapability);
+        STFClient client;
+        try {
+            client = getSTFClient(requestedCapability);
+        } catch (Exception e) {
+            LOGGER.severe("Node '" + this + "' can't establish required STF connection!");
+            return null;           
+        }
         
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
@@ -300,15 +305,17 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      * @return if STF required
      */
     private boolean isSTFEnabled(Map<String, Object> requestedCapability) {
-        boolean status = true;
+        boolean isEnabled = true;
 
         // User may pass desired capability "enableStf=false" to disable integration
         if (requestedCapability.containsKey(ENABLE_STF)) {
-            status = (requestedCapability.get(ENABLE_STF) instanceof Boolean)
+            isEnabled = (requestedCapability.get(ENABLE_STF) instanceof Boolean)
                     ? (Boolean) requestedCapability.get(ENABLE_STF)
                     : Boolean.valueOf((String) requestedCapability.get(ENABLE_STF));
         }
+        
+        LOGGER.finest("STF enabled: " + isEnabled);
 
-        return status;
+        return isEnabled;
     }
 }

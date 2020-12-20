@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.qaprosoft.carina.grid.Platform;
 import com.qaprosoft.carina.grid.models.stf.Device;
 import com.qaprosoft.carina.grid.models.stf.Devices;
@@ -48,7 +50,8 @@ public class STFClient {
         this.timeout = timeout;
         this.isEnabled = isEnabled;
         
-        if (isEnabled) {
+        if (isEnabled && !StringUtils.isEmpty(authToken)) {
+            LOGGER.finest(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
             // do an extra verification call to make sure enabled connection might be established
             HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
                     .withAuthorization(buildAuthToken(authToken))
@@ -56,13 +59,13 @@ public class STFClient {
     
             int status = response.getStatus();
             if (status == 200) {
-                LOGGER.info("STF connection established.");
+                LOGGER.fine("STF connection successfully established.");
             } else {
-                this.isEnabled = false;
-                LOGGER.severe("STF connection not established! Error code: " + status);
+                throw new RuntimeException(String.format("Required STF connection not stablished! URL: '%s'; Token: '%s'; Error code: %d", serviceURL, authToken, status));
             }
         } else {
-            LOGGER.info("STF integration disabled.");
+            LOGGER.fine("STF integration disabled.");
+            this.isEnabled = false;
         }
     }
     
