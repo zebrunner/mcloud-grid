@@ -84,13 +84,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
 
         // init new STF client per each session request
-        STFClient client;
-        try {
-            client = getSTFClient(requestedCapability);
-        } catch (Exception e) {
-            LOGGER.severe("Node '" + this + "' can't establish required STF connection!");
-            return null;           
-        }
+        STFClient client = getSTFClient(requestedCapability);
         
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
@@ -114,6 +108,26 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
         }
         return null;
+    }
+    
+    @Override
+    public boolean hasCapability(Map<String, Object> requestedCapability) {
+        // verify that require STF connection can be established trying to init STF client 
+        try {
+            getSTFClient(requestedCapability);
+        } catch (Exception e) {
+            // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
+            LOGGER.severe("Node '" + this + "' can't establish required STF connection!");
+            return false;           
+        }
+        
+        for (TestSlot slot : getTestSlots()) {
+            if (slot.matches(requestedCapability)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     @Override
@@ -168,6 +182,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
     }
 
+    @Override
     public void beforeCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.beforeCommand(session, request, response);
         String sessionId = getExternalSessionId(session);
