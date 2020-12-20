@@ -15,25 +15,192 @@
  *******************************************************************************/
 package com.qaprosoft.carina.grid.integration.client;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.qaprosoft.carina.grid.Platform;
 import com.qaprosoft.carina.grid.models.stf.Device;
 import com.qaprosoft.carina.grid.models.stf.Devices;
 import com.qaprosoft.carina.grid.models.stf.RemoteConnectUserDevice;
+import com.qaprosoft.carina.grid.models.stf.STFDevice;
 import com.qaprosoft.carina.grid.util.HttpClient;
 
-public interface STFClient {
+@SuppressWarnings("rawtypes")
+public class STFClient {
+    private static Logger LOGGER = Logger.getLogger(STFClient.class.getName());
 
-    HttpClient.Response<Devices> getAllDevices();
+    private String serviceURL;
+    private String authToken;
+    private long timeout;
+    
+    private boolean isEnabled;
 
-    HttpClient.Response<Device> getDevice(String udid);
+    public STFClient(String serviceURL, String authToken, long timeout) {
+        this(serviceURL, authToken, timeout, true);
+    }
+    
+    public STFClient(String serviceURL, String authToken, long timeout, boolean isEnabled) {
+        this.serviceURL = serviceURL;
+        this.authToken = authToken;
+        this.timeout = timeout;
+        this.isEnabled = isEnabled;
+        
+        if (isEnabled) {
+            // do an extra verification call to make sure enabled connection might be established
+            HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
+                    .withAuthorization(buildAuthToken(authToken))
+                    .get(Devices.class);
+    
+            int status = response.getStatus();
+            if (status == 200) {
+                LOGGER.info("STF connection established.");
+            } else {
+                this.isEnabled = false;
+                LOGGER.severe("STF connection not established! Error code: " + status);
+            }
+        } else {
+            LOGGER.info("STF integration disabled.");
+        }
+    }
+    
+    public boolean isEnabled() {
+        return isEnabled;
+    }
+    
+    /**
+     * Checks availability status in STF.
+     * 
+     * @param udid
+     *            - device UDID
+     * @return returns availability status
+     */
+    public boolean isDeviceAvailable(String udid) {
+        boolean available = false;
 
-    boolean reserveDevice(String serial, long timeout);
+        try {
+            HttpClient.Response<Devices> rs = getAllDevices();
+            if (rs.getStatus() == 200) {
+                for (STFDevice device : rs.getObject().getDevices()) {
+                    if (udid.equals(device.getSerial())) {
+                        available = device.getPresent() && device.getReady() && !device.getUsing()
+                                && device.getOwner() == null;
+                        break;
+                    }
+                }
+            } else {
+                LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status: " + rs.getStatus());
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Unable to get devices status HTTP status via udid: " + udid, e);
+        }
 
-    boolean returnDevice(String serial);
+        return available;
+    }
+    
+    /**
+     * Gets STF device info.
+     * 
+     * @param udid
+     *            - device UDID
+     * @return STF device
+     */
+    public STFDevice getDevice(String udid) {
+        if (!this.isEnabled) {
+            return null;
+        }
+        
+        STFDevice device = null;
+        try {
+            HttpClient.Response<Device> rs = HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, serviceURL, udid)
+                    .withAuthorization(buildAuthToken(authToken))
+                    .get(Device.class);
+            if (rs.getStatus() == 200) {
+                device = rs.getObject().getDevice();
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Unable to get device HTTP status via udid: " + udid, e);
+        }
 
-    HttpClient.Response<RemoteConnectUserDevice> remoteConnectDevice(String serial);
+        return device;
+    }
+    
+    /**
+     * Connect to remote device.
+     * 
+     * @param udid
+     *            - device UDID
+     * @return status of connected device
+     */
+    public boolean reserveDevice(String udid, Map<String, Object> requestedCapability) {
+        if (!isEnabled) {
+            return false;
+        }
+        boolean status = reserveDevice(udid, TimeUnit.SECONDS.toMillis(this.timeout));
+        if (status && Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
+            status = remoteConnectDevice(udid).getStatus() == 200;
+        }
+        return status;
+    }
+    
+    /**
+     * Disconnect STF device.
+     * 
+     * @param udid
+     *            - device UDID
+     * @return status of returned device
+     */
+    public boolean returnDevice(String udid, Map<String, Object> requestedCapability) {
+        if (!isEnabled) {
+            return false;
+        }
+        // it seems like return and remote disconnect guarantee that device becomes free asap
+        boolean status = true;
+        if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
+            status = remoteDisconnectDevice(udid);
+        }
+        return status && returnDevice(udid);
+    }
+    
+    private HttpClient.Response<Devices> getAllDevices() {
+        return HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
+                  .withAuthorization(buildAuthToken(authToken))
+                  .get(Devices.class);
+    }
 
-    boolean remoteDisconnectDevice(String serial);
+    private boolean reserveDevice(String serial, long timeout) {
+        Map<String, String> entity = new HashMap<>();
+        entity.put("serial", serial);
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_PATH, serviceURL)
+                         .withAuthorization(buildAuthToken(authToken))
+                         .post(Void.class, entity);
+        return response.getStatus() == 200;
+    }
 
-    boolean isConnected();
+    private boolean returnDevice(String serial) {
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, serviceURL, serial)
+                                                 .withAuthorization(buildAuthToken(authToken))
+                                                 .delete(Void.class);
+        return response.getStatus() == 200;
+    }
+
+    private HttpClient.Response<RemoteConnectUserDevice> remoteConnectDevice(String serial) {
+        return HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
+                         .withAuthorization(buildAuthToken(authToken))
+                         .post(RemoteConnectUserDevice.class, null);
+    }
+
+    private boolean remoteDisconnectDevice(String serial) {
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
+                                                 .withAuthorization(buildAuthToken(authToken))
+                                                 .post(Void.class, null);
+        return response.getStatus() == 200;
+    }
+
+    private String buildAuthToken(String authToken) {
+        return "Bearer " + authToken;
+    }
 
 }

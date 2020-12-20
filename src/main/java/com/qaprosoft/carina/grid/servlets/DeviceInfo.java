@@ -16,22 +16,14 @@
 package com.qaprosoft.carina.grid.servlets;
 
 import java.io.IOException;
-import java.util.Map;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
-import org.openqa.grid.internal.ExternalSessionKey;
 import org.openqa.grid.internal.GridRegistry;
-import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.web.servlet.RegistryBasedServlet;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.qaprosoft.carina.grid.integration.STF;
-import com.qaprosoft.carina.grid.models.RemoteDevice;
-import com.qaprosoft.carina.grid.models.stf.STFDevice;
 
 /**
  * Servlet that retrieves information about STF device.
@@ -65,35 +57,37 @@ public class DeviceInfo extends RegistryBasedServlet {
         response.setCharacterEncoding("UTF-8");
         response.setStatus(HttpStatus.SC_NOT_FOUND);
 
-        String id = request.getParameter("session");
-        if (id != null) {
-            TestSession session = this.getRegistry().getExistingSession(ExternalSessionKey.fromString(id));
-            if (session != null) {
-                Map<String, Object> cap = session.getSlot().getCapabilities();
-                if (cap.containsKey("udid")) {
-                    RemoteDevice device = new RemoteDevice();
-                    device.setName((String) cap.get("deviceName"));
-                    device.setOs((String) cap.get("platformName"));
-                    device.setOsVersion((String) cap.get("platformVersion"));
-                    device.setType((String) cap.get("deviceType"));
-                    device.setUdid((String) cap.get("udid"));
-                    if(cap.containsKey("vnc")) {
-                    		device.setVnc((String) cap.get("vnc"));
-                    }
-                    if(cap.containsKey("proxy_port")) {
-                    		device.setProxyPort(String.valueOf(cap.get("proxy_port")));
-                    }
-
-                    STFDevice stfDevice = STF.getDevice(device.getUdid());
-                    if (stfDevice != null) {
-                        device.setRemoteURL((String) stfDevice.getRemoteConnectUrl());
-                    }
-
-                    response.setStatus(HttpStatus.SC_OK);
-                    response.getWriter().print(new ObjectMapper().writeValueAsString(device));
-                    response.getWriter().close();
-                }
-            }
-        }
+        /*
+         * String id = request.getParameter("session");
+         * if (id != null) {
+         * TestSession session = this.getRegistry().getExistingSession(ExternalSessionKey.fromString(id));
+         * if (session != null) {
+         * Map<String, Object> cap = session.getSlot().getCapabilities();
+         * if (cap.containsKey("udid")) {
+         * RemoteDevice device = new RemoteDevice();
+         * device.setName((String) cap.get("deviceName"));
+         * device.setOs((String) cap.get("platformName"));
+         * device.setOsVersion((String) cap.get("platformVersion"));
+         * device.setType((String) cap.get("deviceType"));
+         * device.setUdid((String) cap.get("udid"));
+         * if(cap.containsKey("vnc")) {
+         * device.setVnc((String) cap.get("vnc"));
+         * }
+         * if(cap.containsKey("proxy_port")) {
+         * device.setProxyPort(String.valueOf(cap.get("proxy_port")));
+         * }
+         * 
+         * STFDevice stfDevice = STF.getDevice(device.getUdid());
+         * if (stfDevice != null) {
+         * device.setRemoteURL((String) stfDevice.getRemoteConnectUrl());
+         * }
+         * 
+         * response.setStatus(HttpStatus.SC_OK);
+         * response.getWriter().print(new ObjectMapper().writeValueAsString(device));
+         * response.getWriter().close();
+         * }
+         * }
+         * }
+         */
     }
 }

@@ -37,7 +37,7 @@ import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 
 import com.qaprosoft.carina.grid.integration.Appium;
-import com.qaprosoft.carina.grid.integration.STF;
+import com.qaprosoft.carina.grid.integration.client.STFClient;
 import com.qaprosoft.carina.grid.models.stf.STFDevice;
 
 /**
@@ -48,8 +48,17 @@ import com.qaprosoft.carina.grid.models.stf.STFDevice;
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
+    
+    private final String STF_URL = System.getProperty("STF_URL");
+    private final String STF_TOKEN = System.getProperty("STF_TOKEN");
+    
+    // Max time is seconds for reserving devices in STF
+    private final long STF_TIMEOUT = Long.parseLong(System.getProperty("STF_TIMEOUT"), 10);
 
+    private static final String ENABLE_STF = "enableStf";
     private static final String ENABLE_VIDEO = "enableVideo";
+    
+    private static final String STF_CLIENT = "STF_CLIENT";
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
@@ -75,15 +84,25 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return null;
         }
 
+        // init new STF client per each session request
+        STFClient client = getSTFClient(requestedCapability);
+        
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
+
+            if (client.isEnabled() && !testslot.getCapabilities().containsKey("udid")) {
+                // Appium node must have UDID capability to be identified in STF
+                return null;
+            }
+            
             // Check if device is busy in STF
-            if (STF.isEnabled(testslot.getCapabilities(), requestedCapability)
-                    && !STF.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
+            if (client.isEnabled() && !client.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
                 return null;
             }
 
             TestSession session = testslot.getNewSession(requestedCapability);
+            // remember current STF client in test session object
+            session.put(STF_CLIENT, client);
 
             if (session != null) {
                 return session;
@@ -98,16 +117,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        if (STF.isEnabled(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
+        if (!StringUtils.isEmpty(udid)) {        
             LOGGER.info("STF reserve device: " + udid);
-            STF.reserveDevice(udid, session.getRequestedCapabilities());
+            STFClient client = (STFClient) session.get(STF_CLIENT);
+            if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
+                // this is our slot object for Zebrunner Mobile Farm Device (Android or iOS)
+                session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
+            }
         }
-
-        if (!StringUtils.isEmpty(udid)) {
-            // this is our mobile Android or iOS device
-            session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
-        }
-
     }
 
     @Override
@@ -118,18 +135,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // unable to start recording after Session due to the:
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
 
-        if (STF.isEnabled(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
-            String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-            LOGGER.info("STF return device: " + udid);
-            STF.returnDevice(udid, session.getRequestedCapabilities());
-        }
-
+        STFClient client = (STFClient) session.get(STF_CLIENT);
+        String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
+        client.returnDevice(udid, session.getRequestedCapabilities());
+        
         /*
          * 3. Upload generated video file to S3 compatible storage (asynchronously)
          * desired location in bucket:
          * 4. remove local file if upload is ok
          */
-
     }
 
     @Override
@@ -230,16 +244,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // get existing slot capabilities from session
         slotCapabilities.putAll(session.getSlot().getCapabilities());
 
-        if (STF.isEnabled(session.getSlot().getCapabilities(), session.getRequestedCapabilities())) {
-            // get remoteURL from STF device and add into custom slotCapabilities map
-            String remoteURL = null;
-            STFDevice stfDevice = STF.getDevice(udid);
-            if (stfDevice != null) {
-                LOGGER.info("Identified '" + stfDevice.getModel() + "' device by udid: " + udid);
-                remoteURL = (String) stfDevice.getRemoteConnectUrl();
-                LOGGER.info("Identified remoteURL '" + remoteURL + "' by udid: " + udid);
-                slotCapabilities.put("remoteURL", remoteURL);
-            }
+        // get remoteURL from STF device and put into custom slotCapabilities map
+        String remoteURL = null;
+        STFClient client = (STFClient) session.get(STF_CLIENT);
+        STFDevice stfDevice = client.getDevice(udid);
+        if (stfDevice != null) {
+            LOGGER.info("Identified '" + stfDevice.getModel() + "' device by udid: " + udid);
+            remoteURL = (String) stfDevice.getRemoteConnectUrl();
+            LOGGER.info("Identified remoteURL '" + remoteURL + "' by udid: " + udid);
+            slotCapabilities.put("remoteURL", remoteURL);
         }
 
         return slotCapabilities;
@@ -260,5 +273,43 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         return isEnabled;
     }
+    
+    private STFClient getSTFClient(Map<String, Object> requestedCapability) {
+        String token = this.STF_TOKEN;
+        long timeout = this.STF_TIMEOUT;
+        
+        //analyze requestedCapability and if STF_TOKEN exists return new stf client with upated token
+        if (requestedCapability.containsKey("STF_TOKEN")) {
+            token = requestedCapability.get(STF_TOKEN).toString();
+        }
+        
+        if (requestedCapability.containsKey("STF_TIMEOUT")) {
+            timeout = Long.parseLong(requestedCapability.get(STF_TOKEN).toString());
+        }
+        
+        boolean isEnabled = isSTFEnabled(requestedCapability);
+        return new STFClient(STF_URL, token, timeout, isEnabled);
+    }
+    
+    /**
+     * Checks if STF integration enabled according to capabilities.
+     * 
+     * @param nodeCapability
+     *            - Selenium node capability
+     * @param requestedCapability
+     *            - requested capabilities
+     * @return if STF required
+     */
+    private boolean isSTFEnabled(Map<String, Object> requestedCapability) {
+        boolean status = true;
 
+        // User may pass desired capability "enableStf=false" to disable integration
+        if (requestedCapability.containsKey(ENABLE_STF)) {
+            status = (requestedCapability.get(ENABLE_STF) instanceof Boolean)
+                    ? (Boolean) requestedCapability.get(ENABLE_STF)
+                    : Boolean.valueOf((String) requestedCapability.get(ENABLE_STF));
+        }
+
+        return status;
+    }
 }
