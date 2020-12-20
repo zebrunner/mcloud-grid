@@ -138,6 +138,7 @@ public class STFClient {
         if (!isEnabled) {
             return false;
         }
+        
         boolean status = reserveDevice(udid, TimeUnit.SECONDS.toMillis(this.timeout));
         if (status && Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
             status = remoteConnectDevice(udid).getStatus() == 200;
@@ -156,6 +157,7 @@ public class STFClient {
         if (!isEnabled) {
             return false;
         }
+        
         // it seems like return and remote disconnect guarantee that device becomes free asap
         boolean status = true;
         if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
@@ -187,12 +189,14 @@ public class STFClient {
     }
 
     private HttpClient.Response<RemoteConnectUserDevice> remoteConnectDevice(String serial) {
+        LOGGER.info("STF reserve device: " + serial);
         return HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
                          .withAuthorization(buildAuthToken(authToken))
                          .post(RemoteConnectUserDevice.class, null);
     }
 
     private boolean remoteDisconnectDevice(String serial) {
+        LOGGER.info("STF return device: " + serial);
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
                                                  .withAuthorization(buildAuthToken(authToken))
                                                  .post(Void.class, null);

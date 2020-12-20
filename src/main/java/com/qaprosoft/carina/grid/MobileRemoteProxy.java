@@ -118,7 +118,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         if (!StringUtils.isEmpty(udid)) {        
-            LOGGER.info("STF reserve device: " + udid);
             STFClient client = (STFClient) session.get(STF_CLIENT);
             if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
                 // this is our slot object for Zebrunner Mobile Farm Device (Android or iOS)
