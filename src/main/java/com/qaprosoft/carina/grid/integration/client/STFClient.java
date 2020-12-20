@@ -51,7 +51,7 @@ public class STFClient {
         this.isEnabled = isEnabled;
         
         if (isEnabled && !StringUtils.isEmpty(authToken)) {
-            LOGGER.finest(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
+            LOGGER.fine(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
             // do an extra verification call to make sure enabled connection might be established
             HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
                     .withAuthorization(buildAuthToken(authToken))
@@ -61,7 +61,9 @@ public class STFClient {
             if (status == 200) {
                 LOGGER.fine("STF connection successfully established.");
             } else {
-                throw new RuntimeException(String.format("Required STF connection not stablished! URL: '%s'; Token: '%s'; Error code: %d", serviceURL, authToken, status));
+                LOGGER.log(Level.SEVERE, String.format("Required STF connection not established!\n URL: '%s'; Token: '%s'; Error code: %d",
+                        serviceURL, authToken, status));
+                throw new RuntimeException("Unable to connect to STF!");
             }
         } else {
             LOGGER.fine("STF integration disabled.");
@@ -192,14 +194,14 @@ public class STFClient {
     }
 
     private HttpClient.Response<RemoteConnectUserDevice> remoteConnectDevice(String serial) {
-        LOGGER.info("STF reserve device: " + serial);
+        LOGGER.fine("STF reserve device: " + serial);
         return HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
                          .withAuthorization(buildAuthToken(authToken))
                          .post(RemoteConnectUserDevice.class, null);
     }
 
     private boolean remoteDisconnectDevice(String serial) {
-        LOGGER.info("STF return device: " + serial);
+        LOGGER.fine("STF return device: " + serial);
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
                                                  .withAuthorization(buildAuthToken(authToken))
                                                  .post(Void.class, null);
