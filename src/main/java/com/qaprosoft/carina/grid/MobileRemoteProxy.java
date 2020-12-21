@@ -39,6 +39,7 @@ import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import com.qaprosoft.carina.grid.integration.Appium;
 import com.qaprosoft.carina.grid.integration.client.STFClient;
 import com.qaprosoft.carina.grid.models.stf.STFDevice;
+import com.qaprosoft.carina.grid.s3.S3Uploader;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
@@ -157,11 +158,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         client.returnDevice(udid, session.getRequestedCapabilities());
         
-        /*
-         * 3. Upload generated video file to S3 compatible storage (asynchronously)
-         * desired location in bucket:
-         * 4. remove local file if upload is ok
-         */
     }
 
     @Override
@@ -213,6 +209,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 } catch (IOException e) {
                     LOGGER.log(Level.SEVERE, "Error has been occurred during video artifact generation: " + filePath, e);
                 }
+                
+                S3Uploader.getInstance().uploadArtifact(sessionId, file);
+                
+                file.delete();
             }
         }
 
