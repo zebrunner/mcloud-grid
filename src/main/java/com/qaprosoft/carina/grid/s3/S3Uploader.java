@@ -3,7 +3,6 @@ package com.qaprosoft.carina.grid.s3;
 import java.io.File;
 import java.net.URI;
 import java.time.Duration;
-import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -19,18 +18,17 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 public class S3Uploader {
-    private static final Logger LOGGER = Logger.getLogger(S3Uploader.class.getName());
+    //TODO: think about multi tenants per single selenium-hub (should we support it or not)?
+    private final static String TENANT = System.getenv("S3_TENANT");
     
-    private final static String TENANT = System.getProperty("S3_TENANT");
-    
-    private final static String REGION = System.getProperty("S3_REGION");
-    private final static String BUCKET = System.getProperty("S3_BUCKET");
-    private final static String ENDPOINT = System.getProperty("S3_ENDPOINT");
-    private final static String ACCESS_KEY = System.getProperty("S3_ACCESS_KEY_ID");
-    private final static String ACCESS_SECRET = System.getProperty("S3_SECRET");
+    private final static String REGION = System.getenv("S3_REGION");
+    private final static String BUCKET = System.getenv("S3_BUCKET");
+    private final static String ENDPOINT = System.getenv("S3_ENDPOINT");
+    private final static String ACCESS_KEY = System.getenv("S3_ACCESS_KEY_ID");
+    private final static String ACCESS_SECRET = System.getenv("S3_SECRET");
     
     
-    private static final String VIDEO_KEY_FORMAT = "artifacts/test-sessions/runs/%s/video.mp4";
+    private static final String VIDEO_KEY_FORMAT = "artifacts/test-sessions/%s/video.mp4";
     
     private final S3AsyncClient s3Client; 
     private final static S3Uploader INSTANCE = new S3Uploader();
@@ -70,6 +68,7 @@ public class S3Uploader {
             key = TENANT + '/' + String.format(VIDEO_KEY_FORMAT, sessionId);
         }
 
+        System.out.println("key: " + key);
         PutObjectRequest request = PutObjectRequest.builder()
                                                    .contentLength(file.length())
                                                    .key(key)
@@ -78,9 +77,13 @@ public class S3Uploader {
 
         s3Client.putObject(request, AsyncRequestBody.fromFile(file)).whenComplete((msg, ex) -> {
             if (ex != null) {
-                LOGGER.severe(String.format("Unable to put object to S3! File: %s", file));
+                System.out.println(String.format("Unable to put object to S3! File: %s", file));
+                System.out.println(msg);
+                ex.printStackTrace();
             } else {
-                LOGGER.finest(String.format("File uploaded to S3. File: %s", file));
+                System.out.println(msg);
+                System.out.println(String.format("File uploaded to S3. File: %s; eTag: %s", file, msg.eTag()));
+                // file.delete();
             }
         });
         

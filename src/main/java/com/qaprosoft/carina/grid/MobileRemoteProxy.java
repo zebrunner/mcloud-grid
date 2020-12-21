@@ -211,8 +211,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 }
                 
                 S3Uploader.getInstance().uploadArtifact(sessionId, file);
-                
-                file.delete();
             }
         }
 
