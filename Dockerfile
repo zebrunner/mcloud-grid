@@ -7,6 +7,11 @@ LABEL authors=Qaprosoft
 
 EXPOSE 4444
 
+# STF integration
+ENV STF_URL ""
+ENV STF_TOKEN ""
+ENV STF_TIMEOUT 3600
+
 # As integer, maps to "maxSession"
 ENV GRID_MAX_SESSION 5
 # As a boolean, maps to "throwOnCapabilityNotPresent"
@@ -24,18 +29,15 @@ ENV GRID_DEBUG false
 ENV GRID_PROXY com.qaprosoft.carina.grid.MobileRemoteProxy
 # Capability matcher
 ENV GRID_CAPABILITY_MATCHER com.qaprosoft.carina.grid.MobileCapabilityMatcher
-# STF integration
-ENV STF_URL ""
-ENV STF_TOKEN ""
 
 RUN mkdir /opt/selenium
 
 COPY generate_config \
     entry_point.sh \
     /opt/bin/
-COPY target/carina-grid-jar-with-dependencies.jar \
+COPY target/mcloud-grid-jar-with-dependencies.jar \
     /opt/selenium
-COPY target/carina-grid-1.0.jar \
+COPY target/mcloud-grid-1.0.jar \
     /opt/selenium
 # Running this command as sudo just to avoid the message:
 # To run a command as administrator (user "root"), use "sudo <command>". See "man sudo_root" for details.
