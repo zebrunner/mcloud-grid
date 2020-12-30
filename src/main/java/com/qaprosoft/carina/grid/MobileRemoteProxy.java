@@ -50,11 +50,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
     
-    private final String STF_URL = System.getProperty("STF_URL");
-    private final String STF_TOKEN = System.getProperty("STF_TOKEN");
+    private final String STF_URL = System.getenv("STF_URL");
+    private final String STF_TOKEN = System.getenv("STF_TOKEN");
     
     // Max time is seconds for reserving devices in STF
-    private final long STF_TIMEOUT = Long.parseLong(System.getProperty("STF_TIMEOUT"), 10);
+    private final long STF_TIMEOUT = Long.parseLong(System.getenv("STF_TIMEOUT"), 10);
 
     private static final String ENABLE_STF = "enableStf";
     private static final String ENABLE_VIDEO = "enableVideo";

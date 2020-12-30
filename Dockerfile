@@ -1,5 +1,5 @@
 FROM openjdk:11
-LABEL authors=Qaprosoft
+LABEL authors=Zebrunner
 
 #========================
 # Selenium Configuration
