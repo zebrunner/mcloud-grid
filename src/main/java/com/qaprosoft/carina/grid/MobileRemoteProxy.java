@@ -221,33 +221,20 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     private void startRecording(String sessionId, String appiumUrl, TestSession session) {
-        // TODO: organize smart params setup via system properties and capabilities
-        Map<String, Object> caps = session.getRequestedCapabilities();
-
+        // TODO: organize overriding video options via capabilitities. Think about putting all options.* one more time if exist
         Map<String, String> options = new HashMap<>();
-        options.put("options.forceRestart", "true");
-        options.put("options.timeLimit", "1800");
-
-        options.put("options.bitRate", "1000000");
-        options.put("options.bugReport", "true");
-
-        /*
-         * options.videoType string (iOS Only) The format of the screen capture to be recorded. Available formats are the output of ffmpeg -codecs
-         * such as libx264 and mpeg4. Defaults to mpeg4.
-         * options.videoQuality string (iOS Only) The video encoding quality (low, medium, high, photo - defaults to medium).
-         * options.videoFps string (iOS Only) The Frames Per Second rate of the recorded video. Change this value if the resulting video is too slow
-         * or too fast. Defaults to 10. This can decrease the resulting file size.
-         * options.videoScale string (iOS Only) The scaling value to apply. Read https://trac.ffmpeg.org/wiki/Scaling for possible values. Example
-         * value of 720p scaling is '1280:720'. This can decrease/increase the resulting file size. No scale is applied by default.
-         * 
-         * options.bitRate string (Android Only) The video bit rate for the video, in megabits per second. 4 Mbp/s(4000000) is by default for Android
-         * API level below 27. 20 Mb/s(20000000) for API level 27 and above.
-         * options.videoSize string (Android Only) The format is widthxheight. The default value is the device's native display resolution (if
-         * supported), 1280x720 if not. For best results, use a size supported by your device's Advanced Video Coding (AVC) encoder. For example,
-         * "1280x720"
-         * options.bugReport string (Android Only) Set it to true in order to display additional information on the video overlay, such as a
-         * timestamp, that is helpful in videos captured to illustrate bugs. This option is only supported since API level 27 (Android O).
-         */
+        if (Platform.ANDROID.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
+            options.put("options.forceRestart", "true");
+            options.put("options.timeLimit", "1800");
+            options.put("options.bitRate", "1000000");
+            options.put("options.bugReport", "true");
+        } else if (Platform.IOS.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
+            options.put("options.videoType", "libx264");
+            options.put("options.videoQuality", "medium");
+            options.put("options.videoFps", "10");
+            options.put("options.videoScale", "-2:720");
+            options.put("options.videoType", "libx264");
+        }
 
         // do start_recording_screen call to appium using predefined args for Android and iOS
         // http://appium.io/docs/en/commands/device/recording-screen/start-recording-screen/
