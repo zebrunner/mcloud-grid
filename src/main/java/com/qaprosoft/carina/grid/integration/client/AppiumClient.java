@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2020 Qaprosoft (http://www.qaprosoft.com).
+ * Copyright 2013-2021 Qaprosoft (http://www.qaprosoft.com).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,13 @@
  *******************************************************************************/
 package com.qaprosoft.carina.grid.integration.client;
 
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qaprosoft.carina.grid.models.appium.Recording;
 import com.qaprosoft.carina.grid.models.appium.Status;
 import com.qaprosoft.carina.grid.util.HttpClient;
@@ -29,21 +31,20 @@ public class AppiumClient {
 
     private static Logger LOGGER = Logger.getLogger(AppiumClient.class.getName());
 
-    public AppiumClient() {
-    }
-
     public void startRecordingScreen(String appiumUrl, String sessionId, Map<String, String> options) {
-        HttpClient.uri(Path.APPIUM_START_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Void.class, options);
+        Map<String, Object> map = Collections.singletonMap("options", options);
+        String recordOptions = "";
+        try {
+            recordOptions = new ObjectMapper().writeValueAsString(map);
+        } catch (JsonProcessingException e) {
+            LOGGER.log(Level.SEVERE, "Unable to parse record options!", e);
+        }
+        
+        HttpClient.uri(Path.APPIUM_START_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Void.class, recordOptions);
     }
 
     public String stopRecordingScreen(String appiumUrl, String sessionId) {
-        Map<String, String> entity = new HashMap<>();
-        entity.put("remotePath", "");
-        entity.put("username", "");
-        entity.put("password", "");
-        entity.put("method", "PUT");
-
-        Response<Recording> response = HttpClient.uri(Path.APPIUM_STOP_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Recording.class, entity);
+        Response<Recording> response = HttpClient.uri(Path.APPIUM_STOP_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Recording.class, null);
 
         String result = null;
         if (response.getStatus() == 200) {
