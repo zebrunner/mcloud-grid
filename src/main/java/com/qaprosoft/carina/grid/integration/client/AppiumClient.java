@@ -16,12 +16,11 @@
 package com.qaprosoft.carina.grid.integration.client;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.qaprosoft.carina.grid.models.appium.Recording;
 import com.qaprosoft.carina.grid.models.appium.Status;
 import com.qaprosoft.carina.grid.util.HttpClient;
@@ -32,14 +31,9 @@ public class AppiumClient {
     private static Logger LOGGER = Logger.getLogger(AppiumClient.class.getName());
 
     public void startRecordingScreen(String appiumUrl, String sessionId, Map<String, String> options) {
-        Map<String, Object> map = Collections.singletonMap("options", options);
-        String recordOptions = "";
-        try {
-            recordOptions = new ObjectMapper().writeValueAsString(map);
-        } catch (JsonProcessingException e) {
-            LOGGER.log(Level.SEVERE, "Unable to parse record options!", e);
-        }
-        
+        Map<String, Object> recordOptions = new HashMap<>();
+        recordOptions.put("options", options);
+        LOGGER.log(Level.FINEST, "video recording options: " + recordOptions);
         HttpClient.uri(Path.APPIUM_START_RECORDING_SCREEN_PATH, appiumUrl, sessionId).post(Void.class, recordOptions);
     }
 
