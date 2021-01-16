@@ -15,7 +15,6 @@
  *******************************************************************************/
 package com.qaprosoft.carina.grid.integration.client;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
