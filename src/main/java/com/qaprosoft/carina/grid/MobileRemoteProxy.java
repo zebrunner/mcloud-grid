@@ -224,16 +224,16 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // TODO: organize overriding video options via capabilitities. Think about putting all options.* one more time if exist
         Map<String, String> options = new HashMap<>();
         if (Platform.ANDROID.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
-            options.put("options.forceRestart", "true");
-            options.put("options.timeLimit", "1800");
-            options.put("options.bitRate", "1000000");
-            options.put("options.bugReport", "true");
+            options.put("forceRestart", "true");
+            options.put("timeLimit", "1800");
+            options.put("bitRate", "1000000");
+            options.put("bugReport", "true");
         } else if (Platform.IOS.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
-            options.put("options.videoType", "libx264");
-            options.put("options.videoQuality", "medium");
-            options.put("options.videoFps", "10");
-            options.put("options.videoScale", "-2:720");
-            options.put("options.videoType", "libx264");
+            options.put("videoType", "libx264");
+            options.put("videoQuality", "medium");
+            options.put("videoFps", "10");
+            options.put("videoScale", "-2:720");
+            options.put("videoType", "libx264");
         }
 
         // do start_recording_screen call to appium using predefined args for Android and iOS
