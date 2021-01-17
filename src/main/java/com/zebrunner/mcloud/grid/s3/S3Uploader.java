@@ -18,9 +18,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 public class S3Uploader {
-    //TODO: think about multi tenants per single selenium-hub (should we support it or not)?
     private final static String TENANT = System.getenv("S3_TENANT");
-    
     private final static String REGION = System.getenv("S3_REGION");
     private final static String BUCKET = System.getenv("S3_BUCKET");
     private final static String ENDPOINT = System.getenv("S3_ENDPOINT");
@@ -83,7 +81,7 @@ public class S3Uploader {
             } else {
                 System.out.println(msg);
                 System.out.println(String.format("File uploaded to S3. File: %s; eTag: %s", file, msg.eTag()));
-                // file.delete();
+                file.delete();
             }
         });
         
