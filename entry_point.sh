@@ -37,7 +37,7 @@ function shutdown {
 java ${JAVA_OPTS} -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
   org.openqa.grid.selenium.GridLauncherV3 \
   -role hub \
-  -servlets com.qaprosoft.carina.grid.servlets.ProxyInfo \
+  -servlets com.zebrunner.carina.grid.servlets.ProxyInfo \
   -hubConfig $CONF \
   ${SE_OPTS} &
 NODE_PID=$!

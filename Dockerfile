@@ -26,9 +26,9 @@ ENV GRID_TIMEOUT 30000
 # Debug
 ENV GRID_DEBUG false
 # Proxy
-ENV GRID_PROXY com.qaprosoft.carina.grid.MobileRemoteProxy
+ENV GRID_PROXY com.zebrunner.carina.grid.MobileRemoteProxy
 # Capability matcher
-ENV GRID_CAPABILITY_MATCHER com.qaprosoft.carina.grid.MobileCapabilityMatcher
+ENV GRID_CAPABILITY_MATCHER com.zebrunner.carina.grid.MobileCapabilityMatcher
 
 RUN mkdir /opt/selenium
 
