@@ -288,7 +288,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
         
         if (requestedCapability.containsKey("STF_TIMEOUT")) {
-            timeout = Long.parseLong(requestedCapability.get(STF_TOKEN).toString());
+            timeout = Long.parseLong(requestedCapability.get("STF_TIMEOUT").toString());
         }
         
         boolean isEnabled = isSTFEnabled(requestedCapability);
