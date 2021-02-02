@@ -61,7 +61,7 @@ public class STFClient {
             if (status == 200) {
                 LOGGER.fine("STF connection successfully established.");
             } else {
-                LOGGER.log(Level.SEVERE, String.format("Required STF connection not established!\n URL: '%s'; Token: '%s'; Error code: %d",
+                LOGGER.log(Level.SEVERE, String.format("Required STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
                         serviceURL, authToken, status));
                 throw new RuntimeException("Unable to connect to STF!");
             }
