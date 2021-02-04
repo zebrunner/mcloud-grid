@@ -204,7 +204,7 @@ public class STFClient {
         LOGGER.fine("STF return device: " + serial);
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, serviceURL, serial)
                                                  .withAuthorization(buildAuthToken(authToken))
-                                                 .post(Void.class, null);
+                                                 .delete(Void.class);
         return response.getStatus() == 200;
     }
 

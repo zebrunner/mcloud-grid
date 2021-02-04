@@ -15,10 +15,11 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.util;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -32,12 +33,17 @@ import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 import com.zebrunner.mcloud.grid.integration.client.Path;
 
+import net.jodah.failsafe.Failsafe;
+import net.jodah.failsafe.RetryPolicy;
+
 public class HttpClient {
 
 	private static Logger LOGGER = Logger.getLogger(HttpClient.class.getName());
 
     private static final Integer CONNECT_TIMEOUT = 60000;
     private static final Integer READ_TIMEOUT = 60000;
+    private static final Integer RETRY_DELAY = 10000;
+    private static final Integer MAX_RETRY_COUNT = 3;
 
     private static Client client;
 
@@ -121,20 +127,36 @@ public class HttpClient {
             }
         }
 
+        @SuppressWarnings("unchecked")
         private <R> Response<R> execute(Class<R> responseClass, Function<WebResource.Builder, ClientResponse> methodBuilder) {
-            Response<R> rs = new Response<>();
+            RetryPolicy<Object> retryPolicy = new RetryPolicy<>()
+                    .withDelay(Duration.ofMillis(RETRY_DELAY))
+                    .withMaxRetries(MAX_RETRY_COUNT)
+                    .handleResultIf(result -> result != null && ((Response<R>) result).getStatus() / 100 != 2)
+                    .onRetry(e -> LOGGER.log(
+                            Level.SEVERE,
+                            String.format("HTTP call failed. Failure #%d. Retrying. %s", e.getAttemptCount(), errorMessage != null ? errorMessage : ""),
+                            e.getLastFailure()))
+                    .onRetriesExceeded(e -> LOGGER.log(
+                            Level.SEVERE,
+                            String.format("Failed to connect. Max retries exceeded. %s", errorMessage != null ? errorMessage : ""),
+                            e.getFailure()));
+
             try {
-                ClientResponse response = methodBuilder.apply(builder);
-                int status = response.getStatus();
-                rs.setStatus(status);
-                if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
-                    rs.setObject(response.getEntity(responseClass));
-                }
+                return Failsafe.with(retryPolicy).get(() -> {
+                    Response<R> rs = new Response<>();
+                    ClientResponse response = methodBuilder.apply(builder);
+                    int status = response.getStatus();
+                    rs.setStatus(status);
+                    if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
+                        rs.setObject(response.getEntity(responseClass));
+                    }
+                    return rs;
+                });
             } catch (Exception e) {
-                String message = errorMessage == null ? e.getMessage() : e.getMessage() + ". " + errorMessage;
-                LOGGER.log(Level.SEVERE, message, e);
+                // do nothing
             }
-            return rs;
+            return new Response<>();
         }
 
         public Executor onFailure(String message) {
