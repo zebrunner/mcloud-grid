@@ -188,9 +188,10 @@ public class STFClient {
     }
 
     private boolean reserveDevice(String serial) {
-        Map<String, String> entity = new HashMap<>();
+        Map<String, Object> entity = new HashMap<>();
         entity.put("serial", serial);
-        entity.put("timeout", String.valueOf(TimeUnit.SECONDS.toMillis(this.timeout))); // 3600 sec by default
+        entity.put("timeout", TimeUnit.SECONDS.toMillis(this.timeout)); // 3600 sec by default
+        
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_PATH, serviceURL)
                          .withAuthorization(buildAuthToken(authToken))
                          .post(Void.class, entity);
