@@ -197,20 +197,26 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 // http://appium.io/docs/en/commands/device/recording-screen/stop-recording-screen/
                 String data = Appium.stopRecording(appiumUrl, sessionId);
 
-                // Convert base64 encoded result string into the mp4 file (use sessionId to make filename unique)
-                String filePath = sessionId + ".mp4";
-                File file = null;
+                if (data != null) {
+                    // Convert base64 encoded result string into the mp4 file (use sessionId to make filename unique)
+                    String filePath = sessionId + ".mp4";
+                    File file = null;
 
-                try {
-                    LOGGER.finest("Saving video artifact: " + filePath);
-                    file = new File(filePath);
-                    FileUtils.writeByteArrayToFile(file, Base64.getDecoder().decode(data));
-                    LOGGER.info("Saved video artifact: " + filePath);
-                } catch (IOException e) {
-                    LOGGER.log(Level.SEVERE, "Error has been occurred during video artifact generation: " + filePath, e);
+                    try {
+                        LOGGER.finest("Saving video artifact: " + filePath);
+                        file = new File(filePath);
+                        FileUtils.writeByteArrayToFile(file, Base64.getDecoder().decode(data));
+                        LOGGER.info("Saved video artifact: " + filePath);
+                    } catch (IOException e) {
+                        LOGGER.log(Level.SEVERE, "Error has been occurred during video artifact generation: " + filePath, e);
+                    }
+
+                    S3Uploader.getInstance().uploadArtifact(sessionId, file);
                 }
-                
-                S3Uploader.getInstance().uploadArtifact(sessionId, file);
+                else {
+                    LOGGER.log(Level.SEVERE,
+                            "Error has been occurred during termination of video session recording. Video is not saved for session: " + sessionId);
+                }
             }
         }
 
