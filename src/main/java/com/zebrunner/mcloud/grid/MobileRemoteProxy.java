@@ -54,9 +54,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private final String STF_TOKEN = System.getenv("STF_TOKEN");
     
     // Max time is seconds for reserving devices in STF
-    private final long STF_TIMEOUT = Long.parseLong(System.getenv("STF_TIMEOUT"), 10);
+    private final String STF_TIMEOUT = System.getenv("STF_TIMEOUT");
 
-    private static final String ENABLE_STF = "enableStf";
     private static final String ENABLE_VIDEO = "enableVideo";
     
     private static final String STF_CLIENT = "STF_CLIENT";
@@ -90,7 +89,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
 
-            if (client.isEnabled() && !testslot.getCapabilities().containsKey("udid")) {
+            if (!testslot.getCapabilities().containsKey("udid")) {
                 // Appium node must have UDID capability to be identified in STF
                 return null;
             }
@@ -112,26 +111,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
     
     @Override
-    public boolean hasCapability(Map<String, Object> requestedCapability) {
-        // verify that require STF connection can be established trying to init STF client 
-        try {
-            getSTFClient(requestedCapability);
-        } catch (Exception e) {
-            // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
-            LOGGER.severe("Node '" + this + "' can't establish required STF connection!");
-            return false;           
-        }
-        
-        for (TestSlot slot : getTestSlots()) {
-            if (slot.matches(requestedCapability)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    @Override
     public void beforeSession(TestSession session) {
         String sessionId = getExternalSessionId(session);
         LOGGER.finest("beforeSession sessionId: " + sessionId);
@@ -140,7 +119,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         if (!StringUtils.isEmpty(udid)) {        
             STFClient client = (STFClient) session.get(STF_CLIENT);
             if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
-                // this is our slot object for Zebrunner Mobile Farm Device (Android or iOS)
+                // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
                 session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
             }
         }
@@ -286,42 +265,18 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     
     private STFClient getSTFClient(Map<String, Object> requestedCapability) {
         String token = this.STF_TOKEN;
-        long timeout = this.STF_TIMEOUT;
+        String timeout = this.STF_TIMEOUT;
         
-        //analyze requestedCapability and if STF_TOKEN exists return new stf client with upated token
         if (requestedCapability.containsKey("STF_TOKEN")) {
             token = requestedCapability.get(STF_TOKEN).toString();
         }
         
         if (requestedCapability.containsKey("STF_TIMEOUT")) {
-            timeout = Long.parseLong(requestedCapability.get("STF_TIMEOUT").toString());
+            timeout = requestedCapability.get("STF_TIMEOUT").toString();
         }
-        
-        boolean isEnabled = isSTFEnabled(requestedCapability);
-        return new STFClient(STF_URL, token, timeout, isEnabled);
+
+        // adjust client integration settings using capabilitites if needed
+        return new STFClient(STF_URL, token, Long.parseLong(timeout));
     }
     
-    /**
-     * Checks if STF integration enabled according to capabilities.
-     * 
-     * @param nodeCapability
-     *            - Selenium node capability
-     * @param requestedCapability
-     *            - requested capabilities
-     * @return if STF required
-     */
-    private boolean isSTFEnabled(Map<String, Object> requestedCapability) {
-        boolean isEnabled = true;
-
-        // User may pass desired capability "enableStf=false" to disable integration
-        if (requestedCapability.containsKey(ENABLE_STF)) {
-            isEnabled = (requestedCapability.get(ENABLE_STF) instanceof Boolean)
-                    ? (Boolean) requestedCapability.get(ENABLE_STF)
-                    : Boolean.valueOf((String) requestedCapability.get(ENABLE_STF));
-        }
-        
-        LOGGER.finest("STF enabled: " + isEnabled);
-
-        return isEnabled;
-    }
 }
