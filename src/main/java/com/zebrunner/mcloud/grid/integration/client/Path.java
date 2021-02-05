@@ -17,6 +17,7 @@ package com.zebrunner.mcloud.grid.integration.client;
 
 public enum Path {
 
+    STF_USER_PATH("/api/v1/user"),
     STF_DEVICES_PATH("/api/v1/devices"),
     STF_DEVICES_ITEM_PATH("/api/v1/devices/%s"),
     STF_USER_DEVICES_PATH("/api/v1/user/devices"),

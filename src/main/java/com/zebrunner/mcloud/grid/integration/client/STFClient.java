@@ -38,41 +38,34 @@ public class STFClient {
     private String authToken;
     private long timeout;
     
-    private boolean isEnabled;
-
     public STFClient(String serviceURL, String authToken, long timeout) {
-        this(serviceURL, authToken, timeout, true);
-    }
-    
-    public STFClient(String serviceURL, String authToken, long timeout, boolean isEnabled) {
         this.serviceURL = serviceURL;
         this.authToken = authToken;
         this.timeout = timeout;
-        this.isEnabled = isEnabled;
         
-        if (isEnabled && !StringUtils.isEmpty(authToken)) {
+        if (isEnabled()) {
+            //TODO: get User object from response and put into the log the name and maybe extra useful info like "lastUsedDevice"
             LOGGER.fine(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
-            // do an extra verification call to make sure enabled connection might be established
-            HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
+            HttpClient.Response response = HttpClient.uri(Path.STF_USER_PATH, serviceURL)
                     .withAuthorization(buildAuthToken(authToken))
-                    .get(Devices.class);
+                    .get(Void.class);
     
             int status = response.getStatus();
             if (status == 200) {
                 LOGGER.fine("STF connection successfully established.");
             } else {
-                LOGGER.log(Level.SEVERE, String.format("Required STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
-                        serviceURL, authToken, status));
-                throw new RuntimeException("Unable to connect to STF!");
+                String error = String.format("STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
+                        serviceURL, authToken, status);
+                LOGGER.log(Level.SEVERE, error);
+                throw new RuntimeException(error);
             }
         } else {
             LOGGER.fine("STF integration disabled.");
-            this.isEnabled = false;
         }
     }
     
     public boolean isEnabled() {
-        return isEnabled;
+        return (!StringUtils.isEmpty(this.serviceURL) && !StringUtils.isEmpty(this.authToken));
     }
     
     /**
@@ -113,7 +106,7 @@ public class STFClient {
      * @return STF device
      */
     public STFDevice getDevice(String udid) {
-        if (!this.isEnabled) {
+        if (!isEnabled()) {
             return null;
         }
         
@@ -140,11 +133,11 @@ public class STFClient {
      * @return status of connected device
      */
     public boolean reserveDevice(String udid, Map<String, Object> requestedCapability) {
-        if (!isEnabled) {
+        if (!isEnabled()) {
             return false;
         }
         
-        boolean status = reserveDevice(udid, TimeUnit.SECONDS.toMillis(this.timeout));
+        boolean status = reserveDevice(udid);
         if (status && Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
             status = remoteConnectDevice(udid).getStatus() == 200;
         }
@@ -159,7 +152,7 @@ public class STFClient {
      * @return status of returned device
      */
     public boolean returnDevice(String udid, Map<String, Object> requestedCapability) {
-        if (!isEnabled) {
+        if (!isEnabled()) {
             return false;
         }
         
@@ -177,9 +170,10 @@ public class STFClient {
                   .get(Devices.class);
     }
 
-    private boolean reserveDevice(String serial, long timeout) {
+    private boolean reserveDevice(String serial) {
         Map<String, String> entity = new HashMap<>();
         entity.put("serial", serial);
+        entity.put("timeout", String.valueOf(TimeUnit.SECONDS.toMillis(this.timeout))); // 3600 sec by default
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_PATH, serviceURL)
                          .withAuthorization(buildAuthToken(authToken))
                          .post(Void.class, entity);
