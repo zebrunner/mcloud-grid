@@ -59,12 +59,12 @@ public class Appium {
      */
     public static String stopRecording(String appiumUrl, String sessionId) {
         String videoContent = INSTANCE.client.stopRecordingScreen(appiumUrl, sessionId);
-        
-        String message = videoContent;
-        if (message.length() > 128) {
-            message = message.substring(0, 128);
+
+        if (videoContent != null) {
+            LOGGER.finest(
+                    String.format("video base64 string: %s", videoContent.length() > 128 ? videoContent.substring(0, 128) + "..." : videoContent));
         }
-        LOGGER.finest("video base64 string: " + message + "...");
+
         return videoContent;
     }
 
