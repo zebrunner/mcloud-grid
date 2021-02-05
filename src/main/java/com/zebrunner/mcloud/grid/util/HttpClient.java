@@ -16,6 +16,7 @@
 package com.zebrunner.mcloud.grid.util;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -76,15 +77,29 @@ public class HttpClient {
 
     public static class Executor {
 
-        private WebResource.Builder builder;
+        private WebResource webResource;
         private String errorMessage;
         private String url;
         private HttpMethod httpMethod;
+        private String mediaType;
+        private String acceptType;
+        private Map<String, String> headers = new HashMap<>();
 
         public Executor(WebResource webResource) {
-            builder = webResource.type(MediaType.APPLICATION_JSON)
-                                 .accept(MediaType.APPLICATION_JSON);
             url = webResource.getURI().toString();
+            this.webResource = webResource;
+        }
+
+        public WebResource.Builder prepareBuilder() {
+            WebResource.Builder builder = webResource.type(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON);
+            if (mediaType != null) {
+                builder.type(mediaType);
+            }
+            if (acceptType != null) {
+                builder.type(acceptType);
+            }
+            headers.keySet().stream().forEach(k -> builder.header(k, headers.get(k)));
+            return builder;
         }
 
         public <R> Response<R> get(Class<R> responseClass) {
@@ -107,12 +122,12 @@ public class HttpClient {
         }
 
         public Executor type(String mediaType) {
-            builder.type(mediaType);
+            this.mediaType = mediaType;
             return this;
         }
 
-        public Executor accept(String mediaType) {
-            builder.accept(mediaType);
+        public Executor accept(String acceptType) {
+            this.acceptType = acceptType;
             return this;
         }
 
@@ -121,16 +136,16 @@ public class HttpClient {
         }
 
         public Executor withAuthorization(String authToken, String project) {
-            initHeaders(builder, authToken, project);
+            initHeaders(authToken, project);
             return this;
         }
 
-        private static void initHeaders(WebResource.Builder builder, String authToken, String project) {
+        private void initHeaders(String authToken, String project) {
             if (!StringUtils.isEmpty(authToken)) {
-                builder.header("Authorization", authToken);
+                headers.put("Authorization", authToken);
             }
             if (!StringUtils.isEmpty(project)) {
-                builder.header("Project", project);
+                headers.put("Project", project);
             }
         }
 
@@ -159,7 +174,7 @@ public class HttpClient {
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
                     Response<R> rs = new Response<>();
-                    ClientResponse response = methodBuilder.apply(builder);
+                    ClientResponse response = methodBuilder.apply(prepareBuilder());
                     int status = response.getStatus();
                     rs.setStatus(status);
                     if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
