@@ -38,34 +38,44 @@ public class STFClient {
     private String authToken;
     private long timeout;
     
+    private boolean isConnected = false;
+    
     public STFClient(String serviceURL, String authToken, long timeout) {
         this.serviceURL = serviceURL;
         this.authToken = authToken;
         this.timeout = timeout;
         
-        if (isEnabled()) {
-            //TODO: get User object from response and put into the log the name and maybe extra useful info like "lastUsedDevice"
-            LOGGER.fine(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
-            HttpClient.Response response = HttpClient.uri(Path.STF_USER_PATH, serviceURL)
-                    .withAuthorization(buildAuthToken(authToken))
-                    .get(Void.class);
-    
-            int status = response.getStatus();
-            if (status == 200) {
-                LOGGER.fine("STF connection successfully established.");
-            } else {
-                String error = String.format("STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
-                        serviceURL, authToken, status);
-                LOGGER.log(Level.SEVERE, error);
-                throw new RuntimeException(error);
-            }
-        } else {
-            LOGGER.fine("STF integration disabled.");
-        }
+      //TODO: do get request using STF_USER_PATH and return User object from response.
+        
+      /*
+       * if (isEnabled()) {
+       * //TODO: do get request using STF_USER_PATH and return User object from response.
+       * LOGGER.log(Level.SEVERE, String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
+       * HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
+       * .withAuthorization(buildAuthToken(authToken))
+       * .get(Devices.class);
+       * 
+       * int status = response.getStatus();
+       * if (status == 200) {
+       * LOGGER.log(Level.SEVERE, "STF connection successfully established.");
+       * } else {
+       * String error = String.format("STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
+       * serviceURL, authToken, status);
+       * LOGGER.log(Level.SEVERE, error);
+       * throw new RuntimeException(error);
+       * }
+       * } else {
+       * LOGGER.fine("STF integration disabled.");
+       * }
+       */
     }
     
     public boolean isEnabled() {
         return (!StringUtils.isEmpty(this.serviceURL) && !StringUtils.isEmpty(this.authToken));
+    }
+    
+    public boolean isConnected() {
+        return this.isConnected;
     }
     
     /**
@@ -141,6 +151,10 @@ public class STFClient {
         if (status && Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
             status = remoteConnectDevice(udid).getStatus() == 200;
         }
+        
+        if (status) {
+            this.isConnected = true;
+        }
         return status;
     }
     
@@ -153,6 +167,9 @@ public class STFClient {
      */
     public boolean returnDevice(String udid, Map<String, Object> requestedCapability) {
         if (!isEnabled()) {
+            return false;
+        }
+        if (!isConnected()) {
             return false;
         }
         
