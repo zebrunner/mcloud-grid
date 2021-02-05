@@ -25,6 +25,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.seleniumhq.jetty9.http.HttpMethod;
 
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
@@ -77,21 +78,27 @@ public class HttpClient {
 
         private WebResource.Builder builder;
         private String errorMessage;
+        private String url;
+        private HttpMethod httpMethod;
 
         public Executor(WebResource webResource) {
             builder = webResource.type(MediaType.APPLICATION_JSON)
                                  .accept(MediaType.APPLICATION_JSON);
+            url = webResource.getURI().toString();
         }
 
         public <R> Response<R> get(Class<R> responseClass) {
+            this.httpMethod = HttpMethod.GET;
             return execute(responseClass, builder -> builder.get(ClientResponse.class));
         }
 
         public <R> Response<R> post(Class<R> responseClass, Object requestEntity) {
+            this.httpMethod = HttpMethod.POST;
             return execute(responseClass, builder -> builder.post(ClientResponse.class, requestEntity));
         }
 
         public <R> Response<R> put(Class<R> responseClass, Object requestEntity) {
+            this.httpMethod = HttpMethod.PUT;
             return execute(responseClass, builder -> builder.put(ClientResponse.class, requestEntity));
         }
 
@@ -135,11 +142,18 @@ public class HttpClient {
                     .handleResultIf(result -> result != null && ((Response<R>) result).getStatus() / 100 != 2)
                     .onRetry(e -> LOGGER.log(
                             Level.SEVERE,
-                            String.format("HTTP call failed. Failure #%d. Retrying. %s", e.getAttemptCount(), errorMessage != null ? errorMessage : ""),
+                            String.format("HTTP call '%s' failed with status '%s'. Failure #%d. Retrying. %s", 
+                                    getEndpoint(),
+                                    ((Response<R>) e.getLastResult()) == null ? "n/a" : ((Response<R>) e.getLastResult()).getStatus(),
+                                    e.getAttemptCount(),
+                                    errorMessage != null ? errorMessage : ""),
                             e.getLastFailure()))
                     .onRetriesExceeded(e -> LOGGER.log(
                             Level.SEVERE,
-                            String.format("Failed to connect. Max retries exceeded. %s", errorMessage != null ? errorMessage : ""),
+                            String.format("HTTP call '%s' failed with status '%s'. Max retries exceeded. %s",
+                                    getEndpoint(),
+                                    ((Response<R>) e.getResult()) == null ? "n/a" : ((Response<R>) e.getResult()).getStatus(),
+                                    errorMessage != null ? errorMessage : ""),
                             e.getFailure()));
 
             try {
@@ -162,6 +176,10 @@ public class HttpClient {
         public Executor onFailure(String message) {
             this.errorMessage = message;
             return this;
+        }
+
+        private String getEndpoint() {
+            return String.format("%s %s", httpMethod.toString(), url);
         }
 
     }
