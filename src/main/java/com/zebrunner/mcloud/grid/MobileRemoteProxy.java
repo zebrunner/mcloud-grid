@@ -50,14 +50,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
     
-    private final String STF_URL = System.getenv("STF_URL");
-    private final String STF_TOKEN = System.getenv("STF_TOKEN");
-    
-    // Max time is seconds for reserving devices in STF
-    private final String STF_TIMEOUT = System.getenv("STF_TIMEOUT");
-
     private static final String ENABLE_VIDEO = "enableVideo";
     
+    
+    private final String URL = System.getenv("STF_URL");
+    private final String TOKEN = System.getenv("STF_TOKEN");
+    
+    // Max time is seconds for reserving devices in STF
+    private final String TIMEOUT = System.getenv("STF_TIMEOUT");
+
     private static final String STF_CLIENT = "STF_CLIENT";
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
@@ -264,11 +265,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
     
     private STFClient getSTFClient(Map<String, Object> requestedCapability) {
-        String token = this.STF_TOKEN;
-        String timeout = this.STF_TIMEOUT;
+        String token = this.TOKEN;
+        String timeout = this.TIMEOUT;
         
         if (requestedCapability.containsKey("STF_TOKEN")) {
-            token = requestedCapability.get(STF_TOKEN).toString();
+            token = requestedCapability.get("STF_TOKEN").toString();
         }
         
         if (requestedCapability.containsKey("STF_TIMEOUT")) {
@@ -276,7 +277,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
 
         // adjust client integration settings using capabilitites if needed
-        return new STFClient(STF_URL, token, Long.parseLong(timeout));
+        return new STFClient(URL, token, Long.parseLong(timeout));
     }
     
 }
