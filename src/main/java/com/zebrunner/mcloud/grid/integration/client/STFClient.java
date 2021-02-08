@@ -28,6 +28,7 @@ import com.zebrunner.mcloud.grid.models.stf.Device;
 import com.zebrunner.mcloud.grid.models.stf.Devices;
 import com.zebrunner.mcloud.grid.models.stf.RemoteConnectUserDevice;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
+import com.zebrunner.mcloud.grid.models.stf.User;
 import com.zebrunner.mcloud.grid.util.HttpClient;
 
 @SuppressWarnings("rawtypes")
@@ -45,29 +46,34 @@ public class STFClient {
         this.authToken = authToken;
         this.timeout = timeout;
         
-      //TODO: do get request using STF_USER_PATH and return User object from response.
-        
-      /*
-       * if (isEnabled()) {
-       * //TODO: do get request using STF_USER_PATH and return User object from response.
-       * LOGGER.log(Level.SEVERE, String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
-       * HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
-       * .withAuthorization(buildAuthToken(authToken))
-       * .get(Devices.class);
-       * 
-       * int status = response.getStatus();
-       * if (status == 200) {
-       * LOGGER.log(Level.SEVERE, "STF connection successfully established.");
-       * } else {
-       * String error = String.format("STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
-       * serviceURL, authToken, status);
-       * LOGGER.log(Level.SEVERE, error);
-       * throw new RuntimeException(error);
-       * }
-       * } else {
-       * LOGGER.fine("STF integration disabled.");
-       * }
-       */
+        if (isEnabled()) {
+            LOGGER.fine(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
+            // do an extra verification call to make sure enabled connection might be established
+            HttpClient.Response<User> response = HttpClient.uri(Path.STF_USER_PATH, serviceURL)
+                    .withAuthorization(buildAuthToken(authToken))
+                    .get(User.class);
+
+            int status = response.getStatus();
+            if (status == 200) {
+                LOGGER.fine("STF connection successfully established.");
+                User user = (User) response.getObject();
+                if (user.getSuccess()) {
+                    String msg = String.format("User (privilege is '%s') %s (%s) was sucessfully logged in.", user.getUser()
+                            .getPrivilege(),
+                            user.getUser().getName(), user.getUser().getEmail());
+                    LOGGER.fine(msg);
+                } else {
+                    LOGGER.log(Level.SEVERE, String.format("Not authenticated at STF successfully! URL: '%s'; Token: '%s';", serviceURL, authToken));
+                    throw new RuntimeException("Not authenticated at STF!");
+                }
+            } else {
+                LOGGER.log(Level.SEVERE, String.format("Required STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
+                        serviceURL, authToken, status));
+                throw new RuntimeException("Unable to connect to STF!");
+            }
+        } else {
+            LOGGER.fine("STF integration disabled.");
+        }
     }
     
     public boolean isEnabled() {
