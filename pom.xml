@@ -1,161 +1,154 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-<modelVersion>4.0.0</modelVersion>
-<groupId>com.zebrunner</groupId>
-<artifactId>mcloud-grid</artifactId>
-<version>1.0</version>
-<packaging>jar</packaging>
-<name>Zebrunner Device Farm Selenium Grid</name>
-<properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
-    <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
-    <maven-source-plugin.version>3.0.1</maven-source-plugin.version>
-    <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
-    <selenium.version>3.141.59</selenium.version>
-    <commons-logging.version>1.2</commons-logging.version>
-    <commons-io.version>2.5</commons-io.version>
-    <commons-lang3.version>3.5</commons-lang3.version>
-    <jackson-databind.version>2.9.10.1</jackson-databind.version>
-    <httpclient.version>4.5.9</httpclient.version>
-    <genson.version>0.99</genson.version>
-    <jersey-bundle.version>1.19.4</jersey-bundle.version>
-    <lombok.version>1.18.10</lombok.version>
-    <testng.version>7.0.0</testng.version>
-</properties>
-<repositories>
-    <repository>
-        <id>qaprosoft_snapshots</id>
-        <name>Qaprosoft Snapshots</name>
-        <url>https://ci.qaprosoft.com/nexus/content/repositories/snapshots/</url>
-        <releases>
-            <enabled>false</enabled>
-        </releases>
-        <snapshots>
-            <enabled>true</enabled>
-        </snapshots>
-    </repository>
-</repositories>
-<dependencies>
-    <dependency>
-        <groupId>org.seleniumhq.selenium</groupId>
-        <artifactId>selenium-server</artifactId>
-        <version>${selenium.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>org.seleniumhq.selenium</groupId>
-        <artifactId>selenium-api</artifactId>
-        <version>${selenium.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>commons-logging</groupId>
-        <artifactId>commons-logging</artifactId>
-        <version>${commons-logging.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>${commons-io.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-lang3</artifactId>
-        <version>${commons-lang3.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>${jackson-databind.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>${httpclient.version}</version>
-    </dependency>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://maven.apache.org/POM/4.0.0"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.zebrunner</groupId>
+	<artifactId>mcloud-grid</artifactId>
+	<version>1.0</version>
+	<packaging>jar</packaging>
+	<name>Zebrunner Device Farm (Selenium Grid)</name>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
+		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
+		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
+		<selenium.version>3.141.59</selenium.version>
+		<commons-logging.version>1.2</commons-logging.version>
+		<commons-io.version>2.5</commons-io.version>
+		<commons-lang3.version>3.5</commons-lang3.version>
+		<jackson-databind.version>2.9.10.7</jackson-databind.version>
+		<httpclient.version>4.5.9</httpclient.version>
+		<genson.version>0.99</genson.version>
+		<jersey-bundle.version>1.19.4</jersey-bundle.version>
+		<lombok.version>1.18.10</lombok.version>
+		<testng.version>7.0.0</testng.version>
+	</properties>
+	<dependencies>
 		<dependency>
-		    <groupId>com.owlike</groupId>
-		    <artifactId>genson</artifactId>
-		    <version>${genson.version}</version>
+			<groupId>org.seleniumhq.selenium</groupId>
+			<artifactId>selenium-server</artifactId>
+			<version>${selenium.version}</version>
 		</dependency>
 		<dependency>
-		    <groupId>com.sun.jersey</groupId>
-		    <artifactId>jersey-bundle</artifactId>
-		    <version>${jersey-bundle.version}</version>
+			<groupId>org.seleniumhq.selenium</groupId>
+			<artifactId>selenium-api</artifactId>
+			<version>${selenium.version}</version>
 		</dependency>
 		<dependency>
-		    <groupId>org.projectlombok</groupId>
-		    <artifactId>lombok</artifactId>
-		    <version>${lombok.version}</version>
-		    <scope>provided</scope>
+			<groupId>commons-logging</groupId>
+			<artifactId>commons-logging</artifactId>
+			<version>${commons-logging.version}</version>
 		</dependency>
-<!-- https://mvnrepository.com/artifact/software.amazon.awssdk/s3 -->
-<dependency>
-    <groupId>software.amazon.awssdk</groupId>
-    <artifactId>s3</artifactId>
-    <version>2.15.50</version>
-</dependency>
-<!-- https://mvnrepository.com/artifact/software.amazon.awssdk/netty-nio-client -->
-<dependency>
-    <groupId>software.amazon.awssdk</groupId>
-    <artifactId>netty-nio-client</artifactId>
-    <version>2.15.50</version>
-</dependency>
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<version>${commons-io.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-lang3</artifactId>
+			<version>${commons-lang3.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>${jackson-databind.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient</artifactId>
+			<version>${httpclient.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.owlike</groupId>
+			<artifactId>genson</artifactId>
+			<version>${genson.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.sun.jersey</groupId>
+			<artifactId>jersey-bundle</artifactId>
+			<version>${jersey-bundle.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>${lombok.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/software.amazon.awssdk/s3 -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.15.50</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/software.amazon.awssdk/netty-nio-client -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>netty-nio-client</artifactId>
+			<version>2.15.50</version>
+		</dependency>
 
-<!--     implementation("software.amazon.awssdk:netty-nio-client") -->
+		<!-- https://mvnrepository.com/artifact/net.jodah/failsafe -->
+		<dependency>
+			<groupId>net.jodah</groupId>
+			<artifactId>failsafe</artifactId>
+			<version>2.4.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>javax.annotation</groupId>
+			<artifactId>javax.annotation-api</artifactId>
+			<version>1.2</version>
+		</dependency>
 		
-    <dependency>
-        <groupId>org.testng</groupId>
-        <artifactId>testng</artifactId>
-        <version>${testng.version}</version>
-        <scope>test</scope>
-    </dependency>
+		<dependency>
+			<groupId>org.testng</groupId>
+			<artifactId>testng</artifactId>
+			<version>${testng.version}</version>
+			<scope>test</scope>
+		</dependency>
 
-	<!-- https://mvnrepository.com/artifact/net.jodah/failsafe -->
-	<dependency>
-		<groupId>net.jodah</groupId>
-		<artifactId>failsafe</artifactId>
-		<version>2.4.0</version>
-	</dependency>
-
-</dependencies>
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>${maven-compiler-plugin.version}</version>
-            <configuration>
-                <release>11</release>
-            </configuration>
-        </plugin>
-        <plugin>
-            <artifactId>maven-assembly-plugin</artifactId>
-            <version>${maven-assembly-plugin.version}</version>
-            <configuration>
-                <descriptorRefs>
-                    <descriptorRef>jar-with-dependencies</descriptorRef>
-                </descriptorRefs>
-                <finalName>mcloud-grid</finalName>
-            </configuration>
-        </plugin>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-source-plugin</artifactId>
-            <version>${maven-source-plugin.version}</version>
-            <executions>
-                <execution>
-                    <id>attach-sources</id>
-                    <goals>
-                        <goal>jar</goal>
-                    </goals>
-                </execution>
-            </executions>
-        </plugin>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>${maven-javadoc-plugin.version}</version>
-        </plugin>
-    </plugins>
-</build>
+	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>${maven-compiler-plugin.version}</version>
+				<configuration>
+					<release>11</release>
+				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>${maven-assembly-plugin.version}</version>
+				<configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<finalName>mcloud-grid</finalName>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>${maven-source-plugin.version}</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>${maven-javadoc-plugin.version}</version>
+			</plugin>
+		</plugins>
+	</build>
 </project>

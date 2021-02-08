@@ -21,8 +21,6 @@ import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.zebrunner.mcloud.grid.MobileCapabilityMatcher;
-
 public class MobileCapabilityMatcherTest {
     private MobileCapabilityMatcher matcher = new MobileCapabilityMatcher();
 

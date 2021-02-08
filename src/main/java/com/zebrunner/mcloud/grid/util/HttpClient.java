@@ -132,20 +132,13 @@ public class HttpClient {
         }
 
         public Executor withAuthorization(String authToken) {
-            return withAuthorization(authToken, null);
-        }
-
-        public Executor withAuthorization(String authToken, String project) {
-            initHeaders(authToken, project);
+            initHeaders(authToken);
             return this;
         }
 
-        private void initHeaders(String authToken, String project) {
+        private void initHeaders(String authToken) {
             if (!StringUtils.isEmpty(authToken)) {
                 headers.put("Authorization", authToken);
-            }
-            if (!StringUtils.isEmpty(project)) {
-                headers.put("Project", project);
             }
         }
 

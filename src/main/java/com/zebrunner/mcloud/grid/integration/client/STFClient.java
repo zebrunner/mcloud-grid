@@ -39,19 +39,14 @@ public class STFClient {
     private String authToken;
     private long timeout;
     
-    private boolean isEnabled;
-
-    public STFClient(String serviceURL, String authToken, long timeout) {
-        this(serviceURL, authToken, timeout, true);
-    }
+    private boolean isConnected = false;
     
-    public STFClient(String serviceURL, String authToken, long timeout, boolean isEnabled) {
+    public STFClient(String serviceURL, String authToken, long timeout) {
         this.serviceURL = serviceURL;
         this.authToken = authToken;
         this.timeout = timeout;
-        this.isEnabled = isEnabled;
         
-        if (isEnabled && !StringUtils.isEmpty(authToken)) {
+        if (isEnabled()) {
             LOGGER.fine(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
             // do an extra verification call to make sure enabled connection might be established
             HttpClient.Response<User> response = HttpClient.uri(Path.STF_USER_PATH, serviceURL)
@@ -78,12 +73,15 @@ public class STFClient {
             }
         } else {
             LOGGER.fine("STF integration disabled.");
-            this.isEnabled = false;
         }
     }
     
     public boolean isEnabled() {
-        return isEnabled;
+        return (!StringUtils.isEmpty(this.serviceURL) && !StringUtils.isEmpty(this.authToken));
+    }
+    
+    public boolean isConnected() {
+        return this.isConnected;
     }
     
     /**
@@ -124,7 +122,7 @@ public class STFClient {
      * @return STF device
      */
     public STFDevice getDevice(String udid) {
-        if (!this.isEnabled) {
+        if (!isEnabled()) {
             return null;
         }
         
@@ -151,13 +149,17 @@ public class STFClient {
      * @return status of connected device
      */
     public boolean reserveDevice(String udid, Map<String, Object> requestedCapability) {
-        if (!isEnabled) {
+        if (!isEnabled()) {
             return false;
         }
         
-        boolean status = reserveDevice(udid, TimeUnit.SECONDS.toMillis(this.timeout));
+        boolean status = reserveDevice(udid);
         if (status && Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapability))) {
             status = remoteConnectDevice(udid).getStatus() == 200;
+        }
+        
+        if (status) {
+            this.isConnected = true;
         }
         return status;
     }
@@ -170,7 +172,10 @@ public class STFClient {
      * @return status of returned device
      */
     public boolean returnDevice(String udid, Map<String, Object> requestedCapability) {
-        if (!isEnabled) {
+        if (!isEnabled()) {
+            return false;
+        }
+        if (!isConnected()) {
             return false;
         }
         
@@ -188,9 +193,11 @@ public class STFClient {
                   .get(Devices.class);
     }
 
-    private boolean reserveDevice(String serial, long timeout) {
-        Map<String, String> entity = new HashMap<>();
+    private boolean reserveDevice(String serial) {
+        Map<String, Object> entity = new HashMap<>();
         entity.put("serial", serial);
+        entity.put("timeout", TimeUnit.SECONDS.toMillis(this.timeout)); // 3600 sec by default
+        
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_PATH, serviceURL)
                          .withAuthorization(buildAuthToken(authToken))
                          .post(Void.class, entity);
