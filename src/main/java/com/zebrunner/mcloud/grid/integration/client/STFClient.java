@@ -28,6 +28,7 @@ import com.zebrunner.mcloud.grid.models.stf.Device;
 import com.zebrunner.mcloud.grid.models.stf.Devices;
 import com.zebrunner.mcloud.grid.models.stf.RemoteConnectUserDevice;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
+import com.zebrunner.mcloud.grid.models.stf.User;
 import com.zebrunner.mcloud.grid.util.HttpClient;
 
 @SuppressWarnings("rawtypes")
@@ -53,13 +54,23 @@ public class STFClient {
         if (isEnabled && !StringUtils.isEmpty(authToken)) {
             LOGGER.fine(String.format("Trying to verify connection to '%s' using '%s' token...", serviceURL, authToken));
             // do an extra verification call to make sure enabled connection might be established
-            HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_PATH, serviceURL)
+            HttpClient.Response<User> response = HttpClient.uri(Path.STF_USER_PATH, serviceURL)
                     .withAuthorization(buildAuthToken(authToken))
-                    .get(Devices.class);
-    
+                    .get(User.class);
+
             int status = response.getStatus();
             if (status == 200) {
                 LOGGER.fine("STF connection successfully established.");
+                User user = (User) response.getObject();
+                if (user.getSuccess()) {
+                    String msg = String.format("User (privilege is '%s') %s (%s) was sucessfully logged in.", user.getUser()
+                            .getPrivilege(),
+                            user.getUser().getName(), user.getUser().getEmail());
+                    LOGGER.fine(msg);
+                } else {
+                    LOGGER.log(Level.SEVERE, String.format("Not authenticated at STF successfully! URL: '%s'; Token: '%s';", serviceURL, authToken));
+                    throw new RuntimeException("Not authenticated at STF!");
+                }
             } else {
                 LOGGER.log(Level.SEVERE, String.format("Required STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
                         serviceURL, authToken, status));

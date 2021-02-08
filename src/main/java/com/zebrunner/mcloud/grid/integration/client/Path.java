@@ -17,6 +17,8 @@ package com.zebrunner.mcloud.grid.integration.client;
 
 public enum Path {
 
+    EMPTY(""),
+    STF_USER_PATH("/api/v1/user"),
     STF_DEVICES_PATH("/api/v1/devices"),
     STF_DEVICES_ITEM_PATH("/api/v1/devices/%s"),
     STF_USER_DEVICES_PATH("/api/v1/user/devices"),
@@ -24,7 +26,9 @@ public enum Path {
     STF_USER_DEVICES_REMOTE_CONNECT_PATH("/api/v1/user/devices/%s/remoteConnect"),
     APPIUM_STATUS("/status"),
     APPIUM_START_RECORDING_SCREEN_PATH("/session/%s/appium/start_recording_screen"),
-    APPIUM_STOP_RECORDING_SCREEN_PATH("/session/%s/appium/stop_recording_screen");
+    APPIUM_STOP_RECORDING_SCREEN_PATH("/session/%s/appium/stop_recording_screen"),
+    APPIUM_GET_LOG_TYPES_PATH("/session/%s/log/types"),
+    APPIUM_GET_LOGS_PATH("/session/%s/log");
     
     private final String relativePath;
 
