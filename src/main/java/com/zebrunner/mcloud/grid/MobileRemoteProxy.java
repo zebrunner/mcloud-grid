@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
@@ -38,6 +39,8 @@ import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 
 import com.zebrunner.mcloud.grid.integration.Appium;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
+import com.zebrunner.mcloud.grid.models.appium.LogTypes.LogType;
+import com.zebrunner.mcloud.grid.models.appium.LogValue;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.s3.S3Uploader;
 
@@ -49,9 +52,10 @@ import com.zebrunner.mcloud.grid.s3.S3Uploader;
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
+    private static final Set<String> logsSet = new HashSet<>();
     
     private static final String ENABLE_VIDEO = "enableVideo";
-    
+    private static final String ENABLE_LOG = "enableLog";
     
     private final String URL = System.getenv("STF_URL");
     private final String TOKEN = System.getenv("STF_TOKEN");
@@ -167,6 +171,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // TODO: try to add more conditions to make sure it is DELETE session call
         // DELETE /wd/hub/session/5e6960c5-b82b-4e68-a24d-508c3d98dc53
         if ("DELETE".equals(request.getMethod())) {
+            // saving of video recording
             boolean isRecording = isRecording(sessionId);
             LOGGER.finest("recording for " + sessionId + ": " + isRecording);
             if (isRecording) {
@@ -198,8 +203,16 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             "Error has been occurred during termination of video session recording. Video is not saved for session: " + sessionId);
                 }
             }
-        }
 
+            // saving of session logs
+            boolean isLogEnabled = isLogEnabled(session);
+            LOGGER.finest("Is log enabled for " + sessionId + ": " + isLogEnabled);
+            if (isLogEnabled) {
+                String appiumUrl = session.getSlot().getRemoteURL().toString();
+                saveSessionLogs(appiumUrl, sessionId, LogType.server, "session.log");
+                saveSessionLogs(appiumUrl, sessionId, LogType.logcat, "android.log");
+            }
+        }
     }
 
     private boolean isRecording(String sessionId) {
@@ -264,6 +277,36 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         return isEnabled;
     }
     
+    private boolean isLogEnabled(TestSession session) {
+        boolean isEnabled = false;
+        if (session.getRequestedCapabilities().containsKey(ENABLE_LOG)) {
+            isEnabled = (session.getRequestedCapabilities().get(ENABLE_LOG) instanceof Boolean)
+                    ? (Boolean) session.getRequestedCapabilities().get(ENABLE_LOG)
+                    : Boolean.valueOf((String) session.getRequestedCapabilities().get(ENABLE_LOG));
+        }
+
+        return isEnabled;
+    }
+
+    private void saveSessionLogs(String appiumUrl, String sessionId, LogType logType, String fileName) {
+        List<LogValue> logs = Appium.getLogs(appiumUrl, sessionId, logType);
+        if (logs != null && !logs.isEmpty()) {
+            File file = null;
+            try {
+                LOGGER.finest("Saving log entries to: " + fileName);
+                file = new File(fileName);
+                for (LogValue l : logs) {
+                    FileUtils.writeByteArrayToFile(file, l.toString().getBytes(), true);
+                }
+                LOGGER.info("Saved log entries to: " + fileName);
+            } catch (IOException e) {
+                LOGGER.log(Level.SEVERE, "Error has been occurred during log entries saving to " + fileName, e);
+            }
+
+            S3Uploader.getInstance().uploadArtifact(sessionId, file);
+        }
+    }
+
     private STFClient getSTFClient(Map<String, Object> requestedCapability) {
         String token = this.TOKEN;
         String timeout = this.TIMEOUT;

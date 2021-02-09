@@ -15,10 +15,13 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.integration;
 
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
 import com.zebrunner.mcloud.grid.integration.client.AppiumClient;
+import com.zebrunner.mcloud.grid.models.appium.LogTypes.LogType;
+import com.zebrunner.mcloud.grid.models.appium.LogValue;
 
 /**
  * Singleton for Appium client.
@@ -66,6 +69,22 @@ public class Appium {
         }
 
         return videoContent;
+    }
+
+    /**
+     * Returns logs of chosen type for the sessionId
+     * 
+     * @param appiumUrl
+     * @param sessionId
+     * @param logType
+     * @return List of found log entries
+     */
+    public static List<LogValue> getLogs(String appiumUrl, String sessionId, LogType logType) {
+        List<LogValue> logs = INSTANCE.client.getLogs(appiumUrl, sessionId, logType);
+        if (logs != null) {
+            LOGGER.finest(String.format("Found %d log entries of type '%s' for session %s", logs.size(), logType.toString(), sessionId));
+        }
+        return logs;
     }
 
 }
