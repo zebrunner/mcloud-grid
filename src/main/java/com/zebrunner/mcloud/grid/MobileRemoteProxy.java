@@ -213,7 +213,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
             // saving of session logs
             boolean isLogEnabled = isLogEnabled(session);
-            LOGGER.finest("Is log enabled for " + sessionId + ": " + isLogEnabled);
+            LOGGER.finest("log saving enabled for " + sessionId + ": " + isLogEnabled);
             if (isLogEnabled) {
                 String appiumUrl = session.getSlot().getRemoteURL().toString();
                 saveSessionLogsForPlatform(appiumUrl, session);

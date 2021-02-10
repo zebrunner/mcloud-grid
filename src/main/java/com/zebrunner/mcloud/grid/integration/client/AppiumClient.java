@@ -75,7 +75,7 @@ public class AppiumClient {
         if (response.getStatus() == 200) {
             result = response.getObject().getValue();
         } else {
-            LOGGER.log(Level.SEVERE, "Appium response is unsuccessful for get logs call: " + response.getStatus());
+            LOGGER.log(Level.SEVERE, String.format("Appium response is unsuccessful for get log call (type=%s): %s", logType, response.getStatus()));
         }
         return result;
     }
