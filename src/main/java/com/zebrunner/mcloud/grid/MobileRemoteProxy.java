@@ -333,7 +333,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 LOGGER.log(Level.SEVERE, "Error has been occurred during log entries saving to " + fileName, e);
             }
 
-            S3Uploader.getInstance().uploadArtifact(sessionId, file);
+            try {
+                S3Uploader.getInstance().uploadArtifact(sessionId, file);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, String.format("Exception during uploading file '%s' to S3", fileName), e);
+            }
         }
     }
 
