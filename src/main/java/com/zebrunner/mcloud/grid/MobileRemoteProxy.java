@@ -58,8 +58,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             "server", "session.log");
 
     private final static Map<String, String> DEFAULT_LOGS_MAPPING_IOS = ImmutableMap.of(
-            "syslog", "ios.log",
-            "server", "session.log");
+            "syslog", "ios.log");
+    // "server", "session.log");
 
     private static final String ENABLE_VIDEO = "enableVideo";
     private static final String ENABLE_LOG = "enableLog";
@@ -327,7 +327,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 LOGGER.finest("Saving log entries to: " + locFileName);
                 file = new File(locFileName);
                 for (LogValue l : logs) {
-                    FileUtils.writeByteArrayToFile(file, l.toString().getBytes(), true);
+                    FileUtils.writeByteArrayToFile(file, l.toString().concat(System.lineSeparator()).getBytes(), true);
                 }
                 LOGGER.info("Saved log entries to: " + locFileName);
             } catch (IOException e) {
