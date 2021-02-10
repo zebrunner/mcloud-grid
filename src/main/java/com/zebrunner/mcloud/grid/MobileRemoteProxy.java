@@ -203,7 +203,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                         LOGGER.log(Level.SEVERE, "Error has been occurred during video artifact generation: " + filePath, e);
                     }
 
-                    S3Uploader.getInstance().uploadArtifact(sessionId, file);
+                    S3Uploader.getInstance().uploadArtifact(sessionId, file, S3Uploader.VIDEO_S3_FILENAME);
                 }
                 else {
                     LOGGER.log(Level.SEVERE,
@@ -321,20 +321,21 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private void saveSessionLogs(String appiumUrl, String sessionId, String logType, String fileName) {
         List<LogValue> logs = Appium.getLogs(appiumUrl, sessionId, logType);
         if (logs != null && !logs.isEmpty()) {
+            String locFileName = String.format("%s_%s", sessionId, fileName);
             File file = null;
             try {
-                LOGGER.finest("Saving log entries to: " + fileName);
-                file = new File(fileName);
+                LOGGER.finest("Saving log entries to: " + locFileName);
+                file = new File(locFileName);
                 for (LogValue l : logs) {
                     FileUtils.writeByteArrayToFile(file, l.toString().getBytes(), true);
                 }
-                LOGGER.info("Saved log entries to: " + fileName);
+                LOGGER.info("Saved log entries to: " + locFileName);
             } catch (IOException e) {
-                LOGGER.log(Level.SEVERE, "Error has been occurred during log entries saving to " + fileName, e);
+                LOGGER.log(Level.SEVERE, "Error has been occurred during log entries saving to " + locFileName, e);
             }
 
             try {
-                S3Uploader.getInstance().uploadArtifact(sessionId, file);
+                S3Uploader.getInstance().uploadArtifact(sessionId, file, fileName);
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, String.format("Exception during uploading file '%s' to S3", fileName), e);
             }

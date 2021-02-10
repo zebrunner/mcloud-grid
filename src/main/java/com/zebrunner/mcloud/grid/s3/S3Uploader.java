@@ -26,7 +26,8 @@ public class S3Uploader {
     private final static String ACCESS_SECRET = System.getenv("S3_SECRET");
     
     
-    private static final String VIDEO_KEY_FORMAT = "artifacts/test-sessions/%s/video.mp4";
+    private static final String S3_KEY_FORMAT = "artifacts/test-sessions/%s/%s";
+    public static final String VIDEO_S3_FILENAME = "video.mp4";
     
     private final S3AsyncClient s3Client; 
     private final static S3Uploader INSTANCE = new S3Uploader();
@@ -59,11 +60,11 @@ public class S3Uploader {
         return INSTANCE;
     }
     
-    public void uploadArtifact(String sessionId, File file) {
+    public void uploadArtifact(String sessionId, File file, String s3FileName) {
         
-        String key = String.format(VIDEO_KEY_FORMAT, sessionId);
+        String key = String.format(S3_KEY_FORMAT, sessionId, s3FileName);
         if (!StringUtils.isEmpty(TENANT)) {
-            key = TENANT + '/' + String.format(VIDEO_KEY_FORMAT, sessionId);
+            key = TENANT + '/' + String.format(S3_KEY_FORMAT, sessionId, s3FileName);
         }
 
         System.out.println("key: " + key);
