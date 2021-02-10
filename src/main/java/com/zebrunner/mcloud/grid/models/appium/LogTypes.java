@@ -40,8 +40,14 @@ public class LogTypes {
     private int status;
 
     public enum LogType {
+        // android
         logcat,
         bugreport,
+        // ios
+        syslog,
+        crashlog,
+        performance,
+        // common
         server;
     }
 

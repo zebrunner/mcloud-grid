@@ -37,6 +37,7 @@ import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 
+import com.google.common.collect.ImmutableMap;
 import com.zebrunner.mcloud.grid.integration.Appium;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.appium.LogTypes.LogType;
@@ -52,8 +53,15 @@ import com.zebrunner.mcloud.grid.s3.S3Uploader;
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
-    private static final Set<String> logsSet = new HashSet<>();
     
+    private final static Map<LogType, String> DEFAULT_LOGS_MAPPING_ANDROID = ImmutableMap.of(
+            LogType.logcat, "android.log",
+            LogType.server, "session.log");
+
+    private final static Map<LogType, String> DEFAULT_LOGS_MAPPING_IOS = ImmutableMap.of(
+            LogType.syslog, "ios.log",
+            LogType.server, "session.log");
+
     private static final String ENABLE_VIDEO = "enableVideo";
     private static final String ENABLE_LOG = "enableLog";
     
@@ -209,8 +217,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             LOGGER.finest("Is log enabled for " + sessionId + ": " + isLogEnabled);
             if (isLogEnabled) {
                 String appiumUrl = session.getSlot().getRemoteURL().toString();
-                saveSessionLogs(appiumUrl, sessionId, LogType.server, "session.log");
-                saveSessionLogs(appiumUrl, sessionId, LogType.logcat, "android.log");
+                saveSessionLogsForPlatform(appiumUrl, session);
             }
         }
     }
@@ -286,6 +293,30 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
 
         return isEnabled;
+    }
+
+    private void saveSessionLogsForPlatform(String appiumUrl, TestSession session) {
+        String sessionId = getExternalSessionId(session);
+        List<LogType> logTypes = Appium.getLogTypes(appiumUrl, sessionId);
+        if (logTypes != null) {
+            if (Platform.ANDROID.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
+                DEFAULT_LOGS_MAPPING_ANDROID.forEach((k, v) -> {
+                    if(logTypes.contains(k)) {
+                        saveSessionLogs(appiumUrl, sessionId, k, v);
+                    } else {
+                        LOGGER.warning(String.format("Logs of type '%s' are missing for session %s", k.toString(), sessionId));
+                    }
+                });
+            } else if (Platform.IOS.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
+                DEFAULT_LOGS_MAPPING_IOS.forEach((k, v) -> {
+                    if (logTypes.contains(k)) {
+                        saveSessionLogs(appiumUrl, sessionId, k, v);
+                    } else {
+                        LOGGER.warning(String.format("Logs of type '%s' are missing for session %s", k.toString(), sessionId));
+                    }
+                });
+            }
+        }
     }
 
     private void saveSessionLogs(String appiumUrl, String sessionId, LogType logType, String fileName) {
