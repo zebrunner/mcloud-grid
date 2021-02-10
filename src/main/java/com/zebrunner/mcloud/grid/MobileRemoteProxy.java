@@ -40,7 +40,6 @@ import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import com.google.common.collect.ImmutableMap;
 import com.zebrunner.mcloud.grid.integration.Appium;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
-import com.zebrunner.mcloud.grid.models.appium.LogTypes.LogType;
 import com.zebrunner.mcloud.grid.models.appium.LogValue;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.s3.S3Uploader;
@@ -54,13 +53,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
     
-    private final static Map<LogType, String> DEFAULT_LOGS_MAPPING_ANDROID = ImmutableMap.of(
-            LogType.logcat, "android.log",
-            LogType.server, "session.log");
+    private final static Map<String, String> DEFAULT_LOGS_MAPPING_ANDROID = ImmutableMap.of(
+            "logcat", "android.log",
+            "server", "session.log");
 
-    private final static Map<LogType, String> DEFAULT_LOGS_MAPPING_IOS = ImmutableMap.of(
-            LogType.syslog, "ios.log",
-            LogType.server, "session.log");
+    private final static Map<String, String> DEFAULT_LOGS_MAPPING_IOS = ImmutableMap.of(
+            "syslog", "ios.log",
+            "server", "session.log");
 
     private static final String ENABLE_VIDEO = "enableVideo";
     private static final String ENABLE_LOG = "enableLog";
@@ -297,7 +296,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     private void saveSessionLogsForPlatform(String appiumUrl, TestSession session) {
         String sessionId = getExternalSessionId(session);
-        List<LogType> logTypes = Appium.getLogTypes(appiumUrl, sessionId);
+        List<String> logTypes = Appium.getLogTypes(appiumUrl, sessionId);
         if (logTypes != null) {
             if (Platform.ANDROID.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
                 DEFAULT_LOGS_MAPPING_ANDROID.forEach((k, v) -> {
@@ -319,7 +318,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
     }
 
-    private void saveSessionLogs(String appiumUrl, String sessionId, LogType logType, String fileName) {
+    private void saveSessionLogs(String appiumUrl, String sessionId, String logType, String fileName) {
         List<LogValue> logs = Appium.getLogs(appiumUrl, sessionId, logType);
         if (logs != null && !logs.isEmpty()) {
             File file = null;

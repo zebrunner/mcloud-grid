@@ -22,7 +22,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.zebrunner.mcloud.grid.models.appium.LogTypes;
-import com.zebrunner.mcloud.grid.models.appium.LogTypes.LogType;
 import com.zebrunner.mcloud.grid.models.appium.LogValue;
 import com.zebrunner.mcloud.grid.models.appium.Logs;
 import com.zebrunner.mcloud.grid.models.appium.Recording;
@@ -53,11 +52,11 @@ public class AppiumClient {
         return result;
     }
 
-    public List<LogType> getAvailableLogTypes(String appiumUrl, String sessionId) {
+    public List<String> getAvailableLogTypes(String appiumUrl, String sessionId) {
         Response<LogTypes> response = HttpClient.uri(Path.APPIUM_GET_LOG_TYPES_PATH, appiumUrl, sessionId)
                 .get(LogTypes.class);
 
-        List<LogType> result = null;
+        List<String> result = null;
         if (response.getStatus() == 200) {
             result = response.getObject().getValue();
         } else {
@@ -66,9 +65,9 @@ public class AppiumClient {
         return result;
     }
 
-    public List<LogValue> getLogs(String appiumUrl, String sessionId, LogType logType) {
+    public List<LogValue> getLogs(String appiumUrl, String sessionId, String logType) {
         Map<String, Object> json = new HashMap<>();
-        json.put("type", logType.toString());
+        json.put("type", logType);
         Response<Logs> response = HttpClient.uri(Path.APPIUM_GET_LOGS_PATH, appiumUrl, sessionId)
                 .post(Logs.class, json);
 

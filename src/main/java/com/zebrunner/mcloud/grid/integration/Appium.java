@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import com.zebrunner.mcloud.grid.integration.client.AppiumClient;
-import com.zebrunner.mcloud.grid.models.appium.LogTypes.LogType;
 import com.zebrunner.mcloud.grid.models.appium.LogValue;
 
 /**
@@ -80,7 +79,7 @@ public class Appium {
      * @param logType
      * @return List of found log entries
      */
-    public static List<LogValue> getLogs(String appiumUrl, String sessionId, LogType logType) {
+    public static List<LogValue> getLogs(String appiumUrl, String sessionId, String logType) {
         List<LogValue> logs = INSTANCE.client.getLogs(appiumUrl, sessionId, logType);
         if (logs != null) {
             LOGGER.finest(String.format("Found %d log entries of type '%s' for session %s", logs.size(), logType.toString(), sessionId));
@@ -95,8 +94,8 @@ public class Appium {
      * @param sessionId
      * @return List of found log types
      */
-    public static List<LogType> getLogTypes(String appiumUrl, String sessionId) {
-        List<LogType> logTypes = INSTANCE.client.getAvailableLogTypes(appiumUrl, sessionId);
+    public static List<String> getLogTypes(String appiumUrl, String sessionId) {
+        List<String> logTypes = INSTANCE.client.getAvailableLogTypes(appiumUrl, sessionId);
         if (logTypes != null) {
             LOGGER.finest(String.format("Log types available for session %s: %s", sessionId, Arrays.toString(logTypes.toArray())));
         }

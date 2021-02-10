@@ -35,7 +35,7 @@ import lombok.Setter;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class LogTypes {
 
-    private List<LogType> value;
+    private List<String> value;
     private String sessionId;
     private int status;
 
