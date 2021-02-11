@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
@@ -36,8 +37,10 @@ import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 
+import com.google.common.collect.ImmutableMap;
 import com.zebrunner.mcloud.grid.integration.Appium;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
+import com.zebrunner.mcloud.grid.models.appium.LogValue;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.s3.S3Uploader;
 
@@ -50,8 +53,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     private static final Set<String> recordingSessions = new HashSet<>();
     
+    private final static Map<String, String> DEFAULT_LOGS_MAPPING_ANDROID = ImmutableMap.of(
+            "logcat", "android.log",
+            "server", "session.log");
+
+    private final static Map<String, String> DEFAULT_LOGS_MAPPING_IOS = ImmutableMap.of(
+            "syslog", "session.log");
+
     private static final String ENABLE_VIDEO = "enableVideo";
-    
+    private static final String ENABLE_LOG = "enableLog";
     
     private final String URL = System.getenv("STF_URL");
     private final String TOKEN = System.getenv("STF_TOKEN");
@@ -150,7 +160,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         // double check that external key not empty
         if (!isRecording(sessionId) && !sessionId.isEmpty() && !"DELETE".equals(request.getMethod())) {
-            if (isVideoEnabled(session)) {
+            if (isCapabilityEnabled(session, ENABLE_VIDEO)) {
                 recordingSessions.add(sessionId);
                 LOGGER.info("start recording sessionId: " + getExternalSessionId(session));
                 startRecording(sessionId, session.getSlot().getRemoteURL().toString(), session);
@@ -167,6 +177,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // TODO: try to add more conditions to make sure it is DELETE session call
         // DELETE /wd/hub/session/5e6960c5-b82b-4e68-a24d-508c3d98dc53
         if ("DELETE".equals(request.getMethod())) {
+            // saving of video recording
             boolean isRecording = isRecording(sessionId);
             LOGGER.finest("recording for " + sessionId + ": " + isRecording);
             if (isRecording) {
@@ -191,15 +202,22 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                         LOGGER.log(Level.SEVERE, "Error has been occurred during video artifact generation: " + filePath, e);
                     }
 
-                    S3Uploader.getInstance().uploadArtifact(sessionId, file);
+                    S3Uploader.getInstance().uploadArtifact(sessionId, file, S3Uploader.VIDEO_S3_FILENAME);
                 }
                 else {
                     LOGGER.log(Level.SEVERE,
                             "Error has been occurred during termination of video session recording. Video is not saved for session: " + sessionId);
                 }
             }
-        }
 
+            // saving of session logs
+            boolean isLogEnabled = isCapabilityEnabled(session, ENABLE_LOG);
+            LOGGER.finest("log saving enabled for " + sessionId + ": " + isLogEnabled);
+            if (isLogEnabled) {
+                String appiumUrl = session.getSlot().getRemoteURL().toString();
+                saveSessionLogsForPlatform(appiumUrl, session);
+            }
+        }
     }
 
     private boolean isRecording(String sessionId) {
@@ -253,17 +271,65 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         return session.getExternalKey() != null ? session.getExternalKey().getKey() : "";
     }
 
-    private boolean isVideoEnabled(TestSession session) {
+    private boolean isCapabilityEnabled(TestSession session, String capabilityName) {
         boolean isEnabled = false;
-        if (session.getRequestedCapabilities().containsKey(ENABLE_VIDEO)) {
-            isEnabled = (session.getRequestedCapabilities().get(ENABLE_VIDEO) instanceof Boolean)
-                    ? (Boolean) session.getRequestedCapabilities().get(ENABLE_VIDEO)
-                    : Boolean.valueOf((String) session.getRequestedCapabilities().get(ENABLE_VIDEO));
+        if (session.getRequestedCapabilities().containsKey(capabilityName)) {
+            isEnabled = (session.getRequestedCapabilities().get(capabilityName) instanceof Boolean)
+                    ? (Boolean) session.getRequestedCapabilities().get(capabilityName)
+                    : Boolean.valueOf((String) session.getRequestedCapabilities().get(capabilityName));
         }
 
         return isEnabled;
     }
     
+    private void saveSessionLogsForPlatform(String appiumUrl, TestSession session) {
+        String sessionId = getExternalSessionId(session);
+        List<String> logTypes = Appium.getLogTypes(appiumUrl, sessionId);
+        if (logTypes != null) {
+            if (Platform.ANDROID.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
+                DEFAULT_LOGS_MAPPING_ANDROID.forEach((k, v) -> {
+                    if(logTypes.contains(k)) {
+                        saveSessionLogs(appiumUrl, sessionId, k, v);
+                    } else {
+                        LOGGER.warning(String.format("Logs of type '%s' are missing for session %s", k.toString(), sessionId));
+                    }
+                });
+            } else if (Platform.IOS.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
+                DEFAULT_LOGS_MAPPING_IOS.forEach((k, v) -> {
+                    if (logTypes.contains(k)) {
+                        saveSessionLogs(appiumUrl, sessionId, k, v);
+                    } else {
+                        LOGGER.warning(String.format("Logs of type '%s' are missing for session %s", k.toString(), sessionId));
+                    }
+                });
+            }
+        }
+    }
+
+    private void saveSessionLogs(String appiumUrl, String sessionId, String logType, String fileName) {
+        List<LogValue> logs = Appium.getLogs(appiumUrl, sessionId, logType);
+        if (logs != null && !logs.isEmpty()) {
+            String locFileName = String.format("%s_%s", sessionId, fileName);
+            File file = null;
+            try {
+                LOGGER.finest("Saving log entries to: " + locFileName);
+                file = new File(locFileName);
+                for (LogValue l : logs) {
+                    FileUtils.writeByteArrayToFile(file, l.toString().concat(System.lineSeparator()).getBytes(), true);
+                }
+                LOGGER.info("Saved log entries to: " + locFileName);
+            } catch (IOException e) {
+                LOGGER.log(Level.SEVERE, "Error has been occurred during log entries saving to " + locFileName, e);
+            }
+
+            try {
+                S3Uploader.getInstance().uploadArtifact(sessionId, file, fileName);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, String.format("Exception during uploading file '%s' to S3", fileName), e);
+            }
+        }
+    }
+
     private STFClient getSTFClient(Map<String, Object> requestedCapability) {
         String token = this.TOKEN;
         String timeout = this.TIMEOUT;

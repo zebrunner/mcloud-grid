@@ -16,10 +16,14 @@
 package com.zebrunner.mcloud.grid.integration.client;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.zebrunner.mcloud.grid.models.appium.LogTypes;
+import com.zebrunner.mcloud.grid.models.appium.LogValue;
+import com.zebrunner.mcloud.grid.models.appium.Logs;
 import com.zebrunner.mcloud.grid.models.appium.Recording;
 import com.zebrunner.mcloud.grid.models.appium.Status;
 import com.zebrunner.mcloud.grid.util.HttpClient;
@@ -44,6 +48,34 @@ public class AppiumClient {
             result = ((Recording) response.getObject()).getValue();
         } else {
             LOGGER.log(Level.SEVERE, "Appium response is unsuccessful for stop recoding call: " + response.getStatus());
+        }
+        return result;
+    }
+
+    public List<String> getAvailableLogTypes(String appiumUrl, String sessionId) {
+        Response<LogTypes> response = HttpClient.uri(Path.APPIUM_GET_LOG_TYPES_PATH, appiumUrl, sessionId)
+                .get(LogTypes.class);
+
+        List<String> result = null;
+        if (response.getStatus() == 200) {
+            result = response.getObject().getValue();
+        } else {
+            LOGGER.log(Level.SEVERE, "Appium response is unsuccessful for get log types call: " + response.getStatus());
+        }
+        return result;
+    }
+
+    public List<LogValue> getLogs(String appiumUrl, String sessionId, String logType) {
+        Map<String, Object> json = new HashMap<>();
+        json.put("type", logType);
+        Response<Logs> response = HttpClient.uri(Path.APPIUM_GET_LOGS_PATH, appiumUrl, sessionId)
+                .post(Logs.class, json);
+
+        List<LogValue> result = null;
+        if (response.getStatus() == 200) {
+            result = response.getObject().getValue();
+        } else {
+            LOGGER.log(Level.SEVERE, String.format("Appium response is unsuccessful for get log call (type=%s): %s", logType, response.getStatus()));
         }
         return result;
     }
