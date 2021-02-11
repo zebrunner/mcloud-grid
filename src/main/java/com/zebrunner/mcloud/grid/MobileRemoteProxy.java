@@ -58,8 +58,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             "server", "session.log");
 
     private final static Map<String, String> DEFAULT_LOGS_MAPPING_IOS = ImmutableMap.of(
-            "syslog", "ios.log");
-    // "server", "session.log");
+            "syslog", "session.log");
 
     private static final String ENABLE_VIDEO = "enableVideo";
     private static final String ENABLE_LOG = "enableLog";
@@ -161,7 +160,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         // double check that external key not empty
         if (!isRecording(sessionId) && !sessionId.isEmpty() && !"DELETE".equals(request.getMethod())) {
-            if (isVideoEnabled(session)) {
+            if (isCapabilityEnabled(session, ENABLE_VIDEO)) {
                 recordingSessions.add(sessionId);
                 LOGGER.info("start recording sessionId: " + getExternalSessionId(session));
                 startRecording(sessionId, session.getSlot().getRemoteURL().toString(), session);
@@ -212,7 +211,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
 
             // saving of session logs
-            boolean isLogEnabled = isLogEnabled(session);
+            boolean isLogEnabled = isCapabilityEnabled(session, ENABLE_LOG);
             LOGGER.finest("log saving enabled for " + sessionId + ": " + isLogEnabled);
             if (isLogEnabled) {
                 String appiumUrl = session.getSlot().getRemoteURL().toString();
@@ -272,28 +271,17 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         return session.getExternalKey() != null ? session.getExternalKey().getKey() : "";
     }
 
-    private boolean isVideoEnabled(TestSession session) {
+    private boolean isCapabilityEnabled(TestSession session, String capabilityName) {
         boolean isEnabled = false;
-        if (session.getRequestedCapabilities().containsKey(ENABLE_VIDEO)) {
-            isEnabled = (session.getRequestedCapabilities().get(ENABLE_VIDEO) instanceof Boolean)
-                    ? (Boolean) session.getRequestedCapabilities().get(ENABLE_VIDEO)
-                    : Boolean.valueOf((String) session.getRequestedCapabilities().get(ENABLE_VIDEO));
+        if (session.getRequestedCapabilities().containsKey(capabilityName)) {
+            isEnabled = (session.getRequestedCapabilities().get(capabilityName) instanceof Boolean)
+                    ? (Boolean) session.getRequestedCapabilities().get(capabilityName)
+                    : Boolean.valueOf((String) session.getRequestedCapabilities().get(capabilityName));
         }
 
         return isEnabled;
     }
     
-    private boolean isLogEnabled(TestSession session) {
-        boolean isEnabled = false;
-        if (session.getRequestedCapabilities().containsKey(ENABLE_LOG)) {
-            isEnabled = (session.getRequestedCapabilities().get(ENABLE_LOG) instanceof Boolean)
-                    ? (Boolean) session.getRequestedCapabilities().get(ENABLE_LOG)
-                    : Boolean.valueOf((String) session.getRequestedCapabilities().get(ENABLE_LOG));
-        }
-
-        return isEnabled;
-    }
-
     private void saveSessionLogsForPlatform(String appiumUrl, TestSession session) {
         String sessionId = getExternalSessionId(session);
         List<String> logTypes = Appium.getLogTypes(appiumUrl, sessionId);
