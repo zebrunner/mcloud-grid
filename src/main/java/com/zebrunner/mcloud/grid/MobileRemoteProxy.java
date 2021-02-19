@@ -227,7 +227,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private void startRecording(String sessionId, String appiumUrl, TestSession session) {
         // TODO: organize overriding video options via capabilitities. Think about putting all options.* one more time if exist
         Map<String, String> options = new HashMap<>();
-        options.put("timeLimit", "3600"); // 1 hour as maximal video recording duration
+        // Unable to specify video recording time limit for more then 1800 sec due to the appium failure:
+        // [XCUITest] The timeLimit value must be in range [1, 1800] seconds. The value of '3600' has been passed instead.
+        options.put("timeLimit", "1800"); // 1 hour as maximal video recording duration
+        
         if (Platform.ANDROID.equals(Platform.fromCapabilities(session.getRequestedCapabilities()))) {
             options.put("forceRestart", "true");
             options.put("bitRate", "1000000");
