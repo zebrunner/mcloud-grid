@@ -127,15 +127,16 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        if (!StringUtils.isEmpty(udid)) {        
+        if (!StringUtils.isEmpty(udid)) {
+            if ("tvos".equalsIgnoreCase(session.getRequestedCapabilities().get("deviceType").toString())) {
+                //override platformName for the appium capabilities into tvOS
+                LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
+                session.getRequestedCapabilities().put("platformName", "tvOS");
+            }
+            
             STFClient client = (STFClient) session.get(STF_CLIENT);
             if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
                 // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
-                if ("tvos".equalsIgnoreCase(session.get("deviceType").toString())) {
-                    //override platformName for the appium capabilities into tvOS
-                    LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
-                    session.put("platformName", "tvOS");
-                }
                 session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
             }
         }
