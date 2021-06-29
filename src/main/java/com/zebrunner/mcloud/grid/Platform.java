@@ -28,6 +28,7 @@ public enum Platform {
     IOS,
     WINDOWS,
     MAC,
+    TVOS,
     LINUX;
 
     /**
