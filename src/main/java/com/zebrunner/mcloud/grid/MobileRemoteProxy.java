@@ -132,6 +132,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 //override platformName for the appium capabilities into tvOS
                 LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
                 session.getRequestedCapabilities().put("platformName", "tvOS");
+                session.getSlot().getCapabilities().put("platformName", "tvOS");
             }
             
             STFClient client = (STFClient) session.get(STF_CLIENT);
