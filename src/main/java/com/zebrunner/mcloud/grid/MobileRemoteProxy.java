@@ -265,7 +265,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         Object deviceType = session.getSlot().getCapabilities().get("deviceType");
         if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
             //override platformName in slot to register valid platform in reporting
-            slotCapabilities.put("platformName", "appletv");
+            slotCapabilities.put("platformName", "tvOS");
         }
 
         // get remoteURL from STF device and put into custom slotCapabilities map
