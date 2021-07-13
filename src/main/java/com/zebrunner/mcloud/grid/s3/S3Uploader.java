@@ -24,6 +24,7 @@ public class S3Uploader {
     private final static String ENDPOINT = System.getenv("S3_ENDPOINT");
     private final static String ACCESS_KEY = System.getenv("S3_ACCESS_KEY_ID");
     private final static String ACCESS_SECRET = System.getenv("S3_SECRET");
+    private final static String MAX_CONCURRENCY = System.getenv("MAX_CONCURRENCY");
     
     
     private static final String S3_KEY_FORMAT = "artifacts/test-sessions/%s/%s";
@@ -36,7 +37,7 @@ public class S3Uploader {
         StaticCredentialsProvider credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create(ACCESS_KEY, ACCESS_SECRET));
         SdkAsyncHttpClient httpClient = NettyNioAsyncHttpClient.builder()
                                                                .writeTimeout(Duration.ZERO)
-                                                               .maxConcurrency(8)
+                                                               .maxConcurrency(Integer.valueOf(MAX_CONCURRENCY))
                                                                .build();
 
         S3Configuration s3Configuration = S3Configuration.builder()
