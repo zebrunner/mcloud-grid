@@ -37,6 +37,7 @@ public class S3Uploader {
         StaticCredentialsProvider credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create(ACCESS_KEY, ACCESS_SECRET));
         SdkAsyncHttpClient httpClient = NettyNioAsyncHttpClient.builder()
                                                                .writeTimeout(Duration.ZERO)
+                                                               .connectionAcquisitionTimeout(Duration.ofSeconds(60))
                                                                .maxConcurrency(Integer.valueOf(MAX_CONCURRENCY))
                                                                .build();
 
