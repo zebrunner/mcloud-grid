@@ -127,7 +127,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        if (!StringUtils.isEmpty(udid)) {        
+        if (!StringUtils.isEmpty(udid)) {
+            Object deviceType = session.getRequestedCapabilities().get("deviceType");
+            if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
+                //override platformName for the appium capabilities into tvOS
+                LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
+                session.getRequestedCapabilities().put("platformName", "tvOS");
+            }
+            
             STFClient client = (STFClient) session.get(STF_CLIENT);
             if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
                 // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
@@ -254,6 +261,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         // get existing slot capabilities from session
         slotCapabilities.putAll(session.getSlot().getCapabilities());
+        
+        Object deviceType = session.getSlot().getCapabilities().get("deviceType");
+        if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
+            //override platformName in slot to register valid platform in reporting
+            slotCapabilities.put("platformName", "tvOS");
+        }
 
         // get remoteURL from STF device and put into custom slotCapabilities map
         String remoteURL = null;
