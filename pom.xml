@@ -23,7 +23,7 @@
 		<genson.version>0.99</genson.version>
 		<jersey-bundle.version>1.19.4</jersey-bundle.version>
 		<lombok.version>1.18.10</lombok.version>
-		<testng.version>7.0.0</testng.version>
+		<testng.version>7.4.0</testng.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -76,18 +76,6 @@
 			<artifactId>lombok</artifactId>
 			<version>${lombok.version}</version>
 			<scope>provided</scope>
-		</dependency>
-		<!-- https://mvnrepository.com/artifact/software.amazon.awssdk/s3 -->
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>s3</artifactId>
-			<version>2.15.50</version>
-		</dependency>
-		<!-- https://mvnrepository.com/artifact/software.amazon.awssdk/netty-nio-client -->
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>netty-nio-client</artifactId>
-			<version>2.15.50</version>
 		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/net.jodah/failsafe -->
