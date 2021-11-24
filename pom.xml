@@ -7,14 +7,14 @@
 	<artifactId>mcloud-grid</artifactId>
 	<version>1.0</version>
 	<packaging>jar</packaging>
-	<name>Zebrunner Device Farm (Selenium Grid)</name>
+	<name>MCloud - Zebrunner Device Farm (Selenium Grid)</name>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
 		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
 		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
 		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
-		<selenium.version>3.141.59</selenium.version>
+		<selenium.version>4.1.0</selenium.version>
 		<commons-logging.version>1.2</commons-logging.version>
 		<commons-io.version>2.5</commons-io.version>
 		<commons-lang3.version>3.5</commons-lang3.version>
@@ -26,11 +26,6 @@
 		<testng.version>7.4.0</testng.version>
 	</properties>
 	<dependencies>
-		<dependency>
-			<groupId>org.seleniumhq.selenium</groupId>
-			<artifactId>selenium-server</artifactId>
-			<version>${selenium.version}</version>
-		</dependency>
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-api</artifactId>
