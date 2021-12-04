@@ -15,3 +15,10 @@ Feel free to support the development with a [**donation**](https://www.paypal.co
 * [Carina Guide](http://zebrunner.github.io/carina)
 * [Demo Project](https://github.com/zebrunner/carina-demo)
 * [Telegram Channel](https://t.me/zebrunner)
+
+## Instructions
+To build project do
+```
+mvn -U clean compile assembly:single package
+docker build . -t zebrunner/mcloud-grid
+```
