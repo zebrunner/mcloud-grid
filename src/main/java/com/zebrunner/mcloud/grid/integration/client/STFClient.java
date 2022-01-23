@@ -99,6 +99,14 @@ public class STFClient {
             if (rs.getStatus() == 200) {
                 for (STFDevice device : rs.getObject().getDevices()) {
                     if (udid.equals(device.getSerial())) {
+                        // #54 try to check usage ownership by token to allow automation launch over occupied devices
+                        LOGGER.log(Level.INFO, "Device: " + device.toString());
+                        
+                        LOGGER.log(Level.INFO, "device.getPresent(): " + device.getPresent());
+                        LOGGER.log(Level.INFO, "device.getReady(): " + device.getReady());
+                        LOGGER.log(Level.INFO, "device.getUsing(): " + device.getUsing());
+                        LOGGER.log(Level.INFO, "device.getOwner(): " + device.getOwner());
+                        
                         available = device.getPresent() && device.getReady() && !device.getUsing()
                                 && device.getOwner() == null;
                         break;
