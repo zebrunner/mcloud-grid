@@ -104,10 +104,10 @@ public class STFClient {
                         
                         LOGGER.log(Level.INFO, "device.getPresent(): " + device.getPresent());
                         LOGGER.log(Level.INFO, "device.getReady(): " + device.getReady());
+                        LOGGER.log(Level.INFO, "device.getOwner(): " + device.getOwner());
                         
-                        boolean isOccupied = device.getOwner() == null;
                         boolean isAccessible = false;
-                        if (!isOccupied) {
+                        if (device.getOwner() == null) {
                             isAccessible = true;
                         } else {
                             // #54 try to check usage ownership by token to allow automation launch over occupied devices
@@ -115,7 +115,6 @@ public class STFClient {
                             // isAccessible should be tru if the same STF user occupied device
                             isAccessible = this.user.getUser().getName().equals(device.getOwner().getName());
                         }
-                        
                         LOGGER.log(Level.INFO, "isAccessible: " + isAccessible);
 
                         available = device.getPresent() && device.getReady() && isAccessible;
