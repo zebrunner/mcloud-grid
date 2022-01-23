@@ -104,7 +104,6 @@ public class STFClient {
                         
                         LOGGER.log(Level.INFO, "device.getPresent(): " + device.getPresent());
                         LOGGER.log(Level.INFO, "device.getReady(): " + device.getReady());
-                        LOGGER.log(Level.INFO, "device.getOwner(): " + device.getOwner());
                         
                         boolean isOccupied = device.getOwner() == null;
                         boolean isAccessible = false;
@@ -116,6 +115,8 @@ public class STFClient {
                             // isAccessible should be tru if the same STF user occupied device
                             isAccessible = this.user.getUser().getName().equals(device.getOwner().getName());
                         }
+                        
+                        LOGGER.log(Level.INFO, "isAccessible: " + isAccessible);
 
                         available = device.getPresent() && device.getReady() && isAccessible;
                         break;
