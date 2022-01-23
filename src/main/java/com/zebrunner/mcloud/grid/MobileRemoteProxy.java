@@ -106,13 +106,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return false;
         }
         
-        for (TestSlot slot : getTestSlots()) {
-            if (slot.matches(requestedCapability)) {
-                return true;
-            }
-        }
-
-        return false;
+        return super.hasCapability(requestedCapability);
     }
     
     @Override
