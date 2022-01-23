@@ -37,9 +37,11 @@ public class STFClient {
 
     private String serviceURL;
     private String authToken;
+    private User user;
     private long timeout;
     
     private boolean isConnected = false;
+    private boolean isOwned = false;
     
     public STFClient(String serviceURL, String authToken, long timeout) {
         this.serviceURL = serviceURL;
@@ -56,11 +58,11 @@ public class STFClient {
             int status = response.getStatus();
             if (status == 200) {
                 LOGGER.fine("STF connection successfully established.");
-                User user = (User) response.getObject();
-                if (user.getSuccess()) {
-                    String msg = String.format("User (privilege is '%s') %s (%s) was sucessfully logged in.", user.getUser()
+                this.user = (User) response.getObject();
+                if (this.user.getSuccess()) {
+                    String msg = String.format("User (privilege is '%s') %s (%s) was sucessfully logged in.", this.user.getUser()
                             .getPrivilege(),
-                            user.getUser().getName(), user.getUser().getEmail());
+                            this.user.getUser().getName(), this.user.getUser().getEmail());
                     LOGGER.fine(msg);
                 } else {
                     LOGGER.log(Level.SEVERE, String.format("Not authenticated at STF successfully! URL: '%s'; Token: '%s';", serviceURL, authToken));
@@ -99,8 +101,25 @@ public class STFClient {
             if (rs.getStatus() == 200) {
                 for (STFDevice device : rs.getObject().getDevices()) {
                     if (udid.equals(device.getSerial())) {
-                        available = device.getPresent() && device.getReady() && !device.getUsing()
-                                && device.getOwner() == null;
+                        LOGGER.log(Level.FINE, "this.user.getUser().getName(): " + this.user.getUser().getName());
+                        
+                        LOGGER.log(Level.FINE, "device.getPresent(): " + device.getPresent());
+                        LOGGER.log(Level.FINE, "device.getReady(): " + device.getReady());
+                        LOGGER.log(Level.FINE, "device.getOwner(): " + device.getOwner());
+                        
+                        boolean isAccessible = false;
+                        if (device.getOwner() == null) {
+                            isAccessible = true;
+                        } else {
+                            // #54 try to check usage ownership by token to allow automation launch over occupied devices
+                            LOGGER.log(Level.FINE, "device.getOwner().getName(): " + device.getOwner().getName());
+                            // isOwned should be true if the same STF user occupied device
+                            this.isOwned = this.user.getUser().getName().equals(device.getOwner().getName());
+                        }
+                        LOGGER.log(Level.FINE, "isAccessible: " + isAccessible);
+                        LOGGER.log(Level.FINE, "this.isOwned: " + this.isOwned);
+
+                        available = device.getPresent() && device.getReady() && (isAccessible || this.isOwned);
                         break;
                     }
                 }
@@ -194,6 +213,10 @@ public class STFClient {
     }
 
     private boolean reserveDevice(String serial) {
+        if (this.isOwned) {
+            LOGGER.log(Level.INFO, "already reserved manually by the same user");
+            return true;
+        }
         Map<String, Object> entity = new HashMap<>();
         entity.put("serial", serial);
         entity.put("timeout", TimeUnit.SECONDS.toMillis(this.timeout)); // 3600 sec by default
@@ -205,6 +228,10 @@ public class STFClient {
     }
 
     private boolean returnDevice(String serial) {
+        if (this.isOwned) {
+            LOGGER.log(Level.INFO, "no need to return device as it was reserved manually");
+            return true;
+        }
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, serviceURL, serial)
                                                  .withAuthorization(buildAuthToken(authToken))
                                                  .delete(Void.class);

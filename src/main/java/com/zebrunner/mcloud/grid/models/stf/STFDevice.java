@@ -46,7 +46,7 @@ public class STFDevice {
     private String model;
     private Network network;
     private Object operator;
-    private Object owner;
+    private STFUser owner;
     private Phone phone;
     private String platform;
     private String presenceChangedAt;
