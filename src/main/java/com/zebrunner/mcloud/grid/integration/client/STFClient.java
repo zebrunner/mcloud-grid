@@ -37,6 +37,7 @@ public class STFClient {
 
     private String serviceURL;
     private String authToken;
+    private User user;
     private long timeout;
     
     private boolean isConnected = false;
@@ -56,11 +57,11 @@ public class STFClient {
             int status = response.getStatus();
             if (status == 200) {
                 LOGGER.fine("STF connection successfully established.");
-                User user = (User) response.getObject();
-                if (user.getSuccess()) {
-                    String msg = String.format("User (privilege is '%s') %s (%s) was sucessfully logged in.", user.getUser()
+                this.user = (User) response.getObject();
+                if (this.user.getSuccess()) {
+                    String msg = String.format("User (privilege is '%s') %s (%s) was sucessfully logged in.", this.user.getUser()
                             .getPrivilege(),
-                            user.getUser().getName(), user.getUser().getEmail());
+                            this.user.getUser().getName(), this.user.getUser().getEmail());
                     LOGGER.fine(msg);
                 } else {
                     LOGGER.log(Level.SEVERE, String.format("Not authenticated at STF successfully! URL: '%s'; Token: '%s';", serviceURL, authToken));
@@ -100,15 +101,14 @@ public class STFClient {
                 for (STFDevice device : rs.getObject().getDevices()) {
                     if (udid.equals(device.getSerial())) {
                         // #54 try to check usage ownership by token to allow automation launch over occupied devices
-                        LOGGER.log(Level.INFO, "Device: " + device.toString());
                         
                         LOGGER.log(Level.INFO, "device.getPresent(): " + device.getPresent());
                         LOGGER.log(Level.INFO, "device.getReady(): " + device.getReady());
-                        LOGGER.log(Level.INFO, "device.getUsing(): " + device.getUsing());
                         LOGGER.log(Level.INFO, "device.getOwner(): " + device.getOwner());
+                        LOGGER.log(Level.INFO, "this.user.getUser().getName(): " + this.user.getUser().getName());
                         
-                        available = device.getPresent() && device.getReady() && !device.getUsing()
-                                && device.getOwner() == null;
+                        available = device.getPresent() && device.getReady()
+                                && (device.getOwner() == null || this.user.getUser().getName().equals(device.getOwner()));
                         break;
                     }
                 }
