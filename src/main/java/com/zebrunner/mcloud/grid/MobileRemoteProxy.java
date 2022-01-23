@@ -69,7 +69,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
 
         // init new STF client per each session request
-        STFClient client = getSTFClient(requestedCapability);
+        STFClient client = null;
+        try {
+            client = getSTFClient(requestedCapability);
+        } catch (Exception e) {
+            // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
+            LOGGER.severe("Node '" + this + "' can't establish STF connection! " + e.getMessage());
+            return null;
+        }
         
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {

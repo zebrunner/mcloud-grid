@@ -66,12 +66,12 @@ public class STFClient {
                     LOGGER.fine(msg);
                 } else {
                     LOGGER.log(Level.SEVERE, String.format("Not authenticated at STF successfully! URL: '%s'; Token: '%s';", serviceURL, authToken));
-                    throw new RuntimeException("Not authenticated at STF!");
+                    throw new RuntimeException("Not authenticated at STF! Error code: " + status);
                 }
             } else {
                 LOGGER.log(Level.SEVERE, String.format("Required STF connection not established! URL: '%s'; Token: '%s'; Error code: %d",
                         serviceURL, authToken, status));
-                throw new RuntimeException("Unable to connect to STF!");
+                throw new RuntimeException("Unable to connect to STF! Error code: " + status);
             }
         } else {
             LOGGER.fine("STF integration disabled.");
