@@ -41,6 +41,7 @@ public class STFClient {
     private long timeout;
     
     private boolean isConnected = false;
+    private boolean isOwned = false;
     
     public STFClient(String serviceURL, String authToken, long timeout) {
         this.serviceURL = serviceURL;
@@ -112,12 +113,13 @@ public class STFClient {
                         } else {
                             // #54 try to check usage ownership by token to allow automation launch over occupied devices
                             LOGGER.log(Level.INFO, "device.getOwner().getName(): " + device.getOwner().getName());
-                            // isAccessible should be tru if the same STF user occupied device
-                            isAccessible = this.user.getUser().getName().equals(device.getOwner().getName());
+                            // isOwned should be true if the same STF user occupied device
+                            this.isOwned = this.user.getUser().getName().equals(device.getOwner().getName());
                         }
                         LOGGER.log(Level.INFO, "isAccessible: " + isAccessible);
+                        LOGGER.log(Level.INFO, "this.isOwned: " + this.isOwned);
 
-                        available = device.getPresent() && device.getReady() && isAccessible;
+                        available = device.getPresent() && device.getReady() && (isAccessible || this.isOwned);
                         break;
                     }
                 }
@@ -211,6 +213,10 @@ public class STFClient {
     }
 
     private boolean reserveDevice(String serial) {
+        if (this.isOwned) {
+            LOGGER.log(Level.INFO, "already reserved manually by the same user");
+            return true;
+        }
         Map<String, Object> entity = new HashMap<>();
         entity.put("serial", serial);
         entity.put("timeout", TimeUnit.SECONDS.toMillis(this.timeout)); // 3600 sec by default
@@ -222,6 +228,10 @@ public class STFClient {
     }
 
     private boolean returnDevice(String serial) {
+        if (this.isOwned) {
+            LOGGER.log(Level.INFO, "no need to return device as it was reserved manually");
+            return true;
+        }
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, serviceURL, serial)
                                                  .withAuthorization(buildAuthToken(authToken))
                                                  .delete(Void.class);
