@@ -1,17 +1,15 @@
 FROM openjdk:11
 LABEL authors=Zebrunner
 
-#========================
-# Selenium Configuration
-#========================
-
 EXPOSE 4444
 
 # STF integration
 ENV STF_URL ""
 ENV STF_TOKEN ""
 ENV STF_TIMEOUT 3600
+ENV HTTP_CLIENT_RETRY_COUNT 1
 
+# Grid settings
 # As integer, maps to "maxSession"
 ENV GRID_MAX_SESSION 5
 # As a boolean, maps to "throwOnCapabilityNotPresent"
