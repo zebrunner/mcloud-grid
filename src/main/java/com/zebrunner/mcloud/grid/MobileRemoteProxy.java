@@ -104,7 +104,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         } catch (Exception e) {
             // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
             // Confirmed by testing that raising CapabilityNotPresentOnTheGridException is applicable only inside hasCapability method!
-            throw new CapabilityNotPresentOnTheGridException("MCloud grid can't establish STF connection! " + e.getMessage());
+            throw new CapabilityNotPresentOnTheGridException(e.getMessage());
         }
         
         return super.hasCapability(requestedCapability);
