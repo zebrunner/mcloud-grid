@@ -100,15 +100,14 @@ public class STFClient {
             if (rs.getStatus() == 200) {
                 for (STFDevice device : rs.getObject().getDevices()) {
                     if (udid.equals(device.getSerial())) {
-                        // #54 try to check usage ownership by token to allow automation launch over occupied devices
-                        
                         LOGGER.log(Level.INFO, "device.getPresent(): " + device.getPresent());
                         LOGGER.log(Level.INFO, "device.getReady(): " + device.getReady());
                         LOGGER.log(Level.INFO, "device.getOwner(): " + device.getOwner());
                         LOGGER.log(Level.INFO, "this.user.getUser().getName(): " + this.user.getUser().getName());
-                        
+
+                        // #54 try to check usage ownership by token to allow automation launch over occupied devices
                         available = device.getPresent() && device.getReady()
-                                && (device.getOwner() == null || this.user.getUser().getName().equals(device.getOwner()));
+                                && (device.getOwner() == null || this.user.getUser().getName().equals(device.getOwner().getName()));
                         break;
                     }
                 }
