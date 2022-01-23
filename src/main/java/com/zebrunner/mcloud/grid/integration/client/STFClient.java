@@ -101,23 +101,23 @@ public class STFClient {
             if (rs.getStatus() == 200) {
                 for (STFDevice device : rs.getObject().getDevices()) {
                     if (udid.equals(device.getSerial())) {
-                        LOGGER.log(Level.INFO, "this.user.getUser().getName(): " + this.user.getUser().getName());
+                        LOGGER.log(Level.FINE, "this.user.getUser().getName(): " + this.user.getUser().getName());
                         
-                        LOGGER.log(Level.INFO, "device.getPresent(): " + device.getPresent());
-                        LOGGER.log(Level.INFO, "device.getReady(): " + device.getReady());
-                        LOGGER.log(Level.INFO, "device.getOwner(): " + device.getOwner());
+                        LOGGER.log(Level.FINE, "device.getPresent(): " + device.getPresent());
+                        LOGGER.log(Level.FINE, "device.getReady(): " + device.getReady());
+                        LOGGER.log(Level.FINE, "device.getOwner(): " + device.getOwner());
                         
                         boolean isAccessible = false;
                         if (device.getOwner() == null) {
                             isAccessible = true;
                         } else {
                             // #54 try to check usage ownership by token to allow automation launch over occupied devices
-                            LOGGER.log(Level.INFO, "device.getOwner().getName(): " + device.getOwner().getName());
+                            LOGGER.log(Level.FINE, "device.getOwner().getName(): " + device.getOwner().getName());
                             // isOwned should be true if the same STF user occupied device
                             this.isOwned = this.user.getUser().getName().equals(device.getOwner().getName());
                         }
-                        LOGGER.log(Level.INFO, "isAccessible: " + isAccessible);
-                        LOGGER.log(Level.INFO, "this.isOwned: " + this.isOwned);
+                        LOGGER.log(Level.FINE, "isAccessible: " + isAccessible);
+                        LOGGER.log(Level.FINE, "this.isOwned: " + this.isOwned);
 
                         available = device.getPresent() && device.getReady() && (isAccessible || this.isOwned);
                         break;
