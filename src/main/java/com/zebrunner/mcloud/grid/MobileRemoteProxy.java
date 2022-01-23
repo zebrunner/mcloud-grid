@@ -21,6 +21,7 @@ import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.grid.common.RegistrationRequest;
+import org.openqa.grid.common.exception.CapabilityNotPresentOnTheGridException;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
@@ -97,22 +98,16 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     
     @Override
     public boolean hasCapability(Map<String, Object> requestedCapability) {
-        // verify that require STF connection can be established trying to init STF client 
+        // verify that required STF connection can be established trying to init STF client 
         try {
-            getSTFClient(requestedCapability); //temp STFClient to test authorization
+            getSTFClient(requestedCapability); // temp STFClient to test authorization
         } catch (Exception e) {
             // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
-            LOGGER.severe("Node '" + this + "' can't establish STF connection! " + e.getMessage());
-            return false;
+            // Confirmed by testing that raising CapabilityNotPresentOnTheGridException is applicable only inside hasCapability method!
+            throw new CapabilityNotPresentOnTheGridException("MCloud grid can't establish STF connection! " + e.getMessage());
         }
         
-        for (TestSlot slot : getTestSlots()) {
-            if (slot.matches(requestedCapability)) {
-                return true;
-            }
-        }
-
-        return false;
+        return super.hasCapability(requestedCapability);
     }
     
     @Override
