@@ -20,18 +20,22 @@ docker build . -t zebrunner/mcloud-grid:latest
 
 ### Run MCloud Grid
 ```
-docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 -e GRID_TIMEOUT=60000 -e GRID_BROWSER_TIMEOUT=60000 --name mcloud-grid zebrunner/mcloud-grid:latest
+docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
+		-e GRID_TIMEOUT=60000 -e GRID_BROWSER_TIMEOUT=60000 \
+		--name mcloud-grid zebrunner/mcloud-grid:latest
 ```
 
-### Supported env vars list for STF integration:
- * AUTHKEY
- * SECRET
- * RETHINKDB_PORT_28015_TCP
- * STF_URL
- * STF_TOKEN
- * STF_ROOT_GROUP_NAME
- * STF_ADMIN_NAME
- * STF_ADMIN_EMAIL
+### Env vars list for STF integration:
+```
+AUTHKEY
+SECRET
+RETHINKDB_PORT_28015_TCP
+STF_URL
+STF_TOKEN
+STF_ROOT_GROUP_NAME
+STF_ADMIN_NAME
+STF_ADMIN_EMAIL
+```
 
 ## Documentation and free support
 * [Zebrunner PRO](https://zebrunner.com)
