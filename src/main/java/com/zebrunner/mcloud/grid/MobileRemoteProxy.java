@@ -96,6 +96,26 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
     
     @Override
+    public boolean hasCapability(Map<String, Object> requestedCapability) {
+        // verify that require STF connection can be established trying to init STF client 
+        try {
+            getSTFClient(requestedCapability); //temp STFClient to test authorization
+        } catch (Exception e) {
+            // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
+            LOGGER.severe("Node '" + this + "' can't establish STF connection! " + e.getMessage());
+            return false;
+        }
+        
+        for (TestSlot slot : getTestSlots()) {
+            if (slot.matches(requestedCapability)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    
+    @Override
     public void beforeSession(TestSession session) {
         String sessionId = getExternalSessionId(session);
         LOGGER.finest("beforeSession sessionId: " + sessionId);
