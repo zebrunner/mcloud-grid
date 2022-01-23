@@ -21,6 +21,7 @@ import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.grid.common.RegistrationRequest;
+import org.openqa.grid.common.exception.CapabilityNotPresentOnTheGridException;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
@@ -103,7 +104,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         } catch (Exception e) {
             // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
             LOGGER.severe("Node '" + this + "' can't establish STF connection! " + e.getMessage());
-            return false;
+            throw new CapabilityNotPresentOnTheGridException(requestedCapability);
         }
         
         return super.hasCapability(requestedCapability);
