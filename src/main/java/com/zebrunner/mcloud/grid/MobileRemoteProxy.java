@@ -70,14 +70,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
 
         // init new STF client per each session request
-        STFClient client = null;
-        try {
-            client = getSTFClient(requestedCapability);
-        } catch (Exception e) {
-            // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
-            LOGGER.severe("Node '" + this + "' can't establish STF connection! " + e.getMessage());
-            throw new CapabilityNotPresentOnTheGridException("Node '" + this + "' can't establish STF connection! " + e.getMessage());
-        }
+        STFClient client = getSTFClient(requestedCapability);
         
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
@@ -101,6 +94,21 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
         }
         return null;
+    }
+    
+    @Override
+    public boolean hasCapability(Map<String, Object> requestedCapability) {
+        // verify that require STF connection can be established trying to init STF client 
+        try {
+            getSTFClient(requestedCapability); //temp STFClient to test authorization
+        } catch (Exception e) {
+            // as we have enabled GRID_THROW_ON_CAPABILITY_NOT_PRESENT by default we could raise exception without waiting 4 minutes
+            LOGGER.severe("Node '" + this + "' can't establish STF connection! " + e.getMessage());
+            // Confirmed by testing that raising CapabilityNotPresentOnTheGridException is applicable only inside hasCapability method!
+            throw new CapabilityNotPresentOnTheGridException("Node '" + this + "' can't establish STF connection! " + e.getMessage());
+        }
+        
+        return super.hasCapability(requestedCapability);
     }
     
     @Override
