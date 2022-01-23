@@ -25,7 +25,7 @@ docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
 		--name mcloud-grid zebrunner/mcloud-grid:latest
 ```
 
-### Env vars list for STF integration:
+### Env vars list for STF
 ```
 AUTHKEY
 SECRET
