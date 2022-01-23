@@ -45,7 +45,7 @@ public class HttpClient {
     private static final Integer CONNECT_TIMEOUT = 60000;
     private static final Integer READ_TIMEOUT = 60000;
     private static final Integer RETRY_DELAY = 10000;
-    private static final Integer MAX_RETRY_COUNT = 3;
+    private static final Integer MAX_RETRY_COUNT = 1; //TODO: parametrize it via env var. Default: 1
 
     private static Client client;
 
