@@ -45,7 +45,7 @@ public class HttpClient {
     private static final Integer CONNECT_TIMEOUT = 60000;
     private static final Integer READ_TIMEOUT = 60000;
     private static final Integer RETRY_DELAY = 10000;
-    private static final Integer MAX_RETRY_COUNT = 3; //TODO: #58: parametrize it via env var. Default: 1
+    private static final Integer HTTP_CLIENT_RETRY_COUNT = Integer.parseInt(System.getenv("HTTP_CLIENT_RETRY_COUNT"));
 
     private static Client client;
 
@@ -146,7 +146,7 @@ public class HttpClient {
         private <R> Response<R> execute(Class<R> responseClass, Function<WebResource.Builder, ClientResponse> methodBuilder) {
             RetryPolicy<Object> retryPolicy = new RetryPolicy<>()
                     .withDelay(Duration.ofMillis(RETRY_DELAY))
-                    .withMaxRetries(MAX_RETRY_COUNT)
+                    .withMaxRetries(HTTP_CLIENT_RETRY_COUNT)
                     .handleResultIf(result -> result != null && ((Response<R>) result).getStatus() / 100 != 2)
                     .onRetry(e -> LOGGER.log(
                             Level.SEVERE,
