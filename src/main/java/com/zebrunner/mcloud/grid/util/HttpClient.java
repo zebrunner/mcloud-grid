@@ -170,7 +170,7 @@ public class HttpClient {
                     ClientResponse response = methodBuilder.apply(prepareBuilder());
                     int status = response.getStatus();
                     rs.setStatus(status);
-                    if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
+                    if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && (status == 200 || status == 401)) {
                         rs.setObject(response.getEntity(responseClass));
                     }
                     return rs;
