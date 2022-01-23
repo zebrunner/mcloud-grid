@@ -100,14 +100,24 @@ public class STFClient {
             if (rs.getStatus() == 200) {
                 for (STFDevice device : rs.getObject().getDevices()) {
                     if (udid.equals(device.getSerial())) {
+                        LOGGER.log(Level.INFO, "this.user.getUser().getName(): " + this.user.getUser().getName());
+                        
                         LOGGER.log(Level.INFO, "device.getPresent(): " + device.getPresent());
                         LOGGER.log(Level.INFO, "device.getReady(): " + device.getReady());
                         LOGGER.log(Level.INFO, "device.getOwner(): " + device.getOwner());
-                        LOGGER.log(Level.INFO, "this.user.getUser().getName(): " + this.user.getUser().getName());
+                        
+                        boolean isOccupied = device.getOwner() == null;
+                        boolean isAccessible = false;
+                        if (!isOccupied) {
+                            isAccessible = true;
+                        } else {
+                            // #54 try to check usage ownership by token to allow automation launch over occupied devices
+                            LOGGER.log(Level.INFO, "device.getOwner().getName(): " + device.getOwner().getName());
+                            // isAccessible should be tru if the same STF user occupied device
+                            isAccessible = this.user.getUser().getName().equals(device.getOwner().getName());
+                        }
 
-                        // #54 try to check usage ownership by token to allow automation launch over occupied devices
-                        available = device.getPresent() && device.getReady()
-                                && (device.getOwner() == null || this.user.getUser().getName().equals(device.getOwner().getName()));
+                        available = device.getPresent() && device.getReady() && isAccessible;
                         break;
                     }
                 }
