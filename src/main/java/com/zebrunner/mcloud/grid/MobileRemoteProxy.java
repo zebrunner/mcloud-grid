@@ -101,6 +101,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             LOGGER.warning(String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
                                     response.getObject()));
                             return null;
+                        } else {
+                            LOGGER.info(String.format("Extra Appium health-check (/status-adb) successfully passed for device with udid=%s", udid));
                         }
                     }
                     break;
@@ -112,6 +114,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                                     String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
                                             response.getObject()));
                             return null;
+                        } else {
+                            LOGGER.info(String.format("Extra Appium health-check (/status-wda) successfully passed for device with udid=%s", udid));
                         }
                     }
                     break;
