@@ -8,6 +8,7 @@ ENV STF_URL ""
 ENV STF_TOKEN ""
 ENV STF_TIMEOUT 3600
 ENV HTTP_CLIENT_RETRY_COUNT 1
+ENV CHECK_APPIUM_STATUS false
 
 # Grid settings
 # As integer, maps to "maxSession"

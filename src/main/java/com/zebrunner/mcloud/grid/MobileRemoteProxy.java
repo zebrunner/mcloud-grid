@@ -90,40 +90,39 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
 
             // additional check if device is ready for session with custom Appium's status verification
-            try {
-                Platform platform = Platform.valueOf((String) testslot.getCapabilities().get("platform"));
-                Response<String> response;
-                switch (platform) {
-                case ANDROID:
-                    response = HttpClient.uri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get(String.class);
-                    if (response.getStatus() != 404) {
+            if (System.getenv("CHECK_APPIUM_STATUS") != null && Boolean.getBoolean(System.getenv("CHECK_APPIUM_STATUS"))) {
+                LOGGER.info("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
+                try {
+                    Platform platform = Platform.valueOf((String) testslot.getCapabilities().get("platform"));
+                    Response<String> response;
+                    switch (platform) {
+                    case ANDROID:
+                        response = HttpClient.uri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get(String.class);
                         if (response.getStatus() != 200) {
-                            LOGGER.warning(String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
+                            LOGGER.warning(String.format(
+                                    "Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
                                     response.getObject()));
                             return null;
-                        } else {
-                            LOGGER.info(String.format("Extra Appium health-check (/status-adb) successfully passed for device with udid=%s", udid));
                         }
-                    }
-                    break;
-                case IOS:
-                    response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
-                    if (response.getStatus() != 404) {
+                        LOGGER.info(String.format("Extra Appium health-check (/status-adb) successfully passed for device with udid=%s", udid));
+                        break;
+                    case IOS:
+                        response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
                         if (response.getStatus() != 200) {
                             LOGGER.warning(
-                                    String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
+                                    String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s",
+                                            udid,
                                             response.getObject()));
                             return null;
-                        } else {
-                            LOGGER.info(String.format("Extra Appium health-check (/status-wda) successfully passed for device with udid=%s", udid));
                         }
+                        LOGGER.info(String.format("Extra Appium health-check (/status-wda) successfully passed for device with udid=%s", udid));
+                        break;
+                    default:
+                        LOGGER.info(String.format("Current platform %s is not supported for extra Appium health-check", platform.toString()));
                     }
-                    break;
-                default:
-                    LOGGER.info(String.format("Current platform %s is not supported for extra Appium health-check", platform.toString()));
+                } catch (Exception e) {
+                    LOGGER.warning("Exception happened during extra health-check for Appium: " + e.getMessage());
                 }
-            } catch (Exception e) {
-                LOGGER.warning("Exception happened during extra health-check for Appium: " + e.getMessage());
             }
 
             TestSession session = testslot.getNewSession(requestedCapability);
