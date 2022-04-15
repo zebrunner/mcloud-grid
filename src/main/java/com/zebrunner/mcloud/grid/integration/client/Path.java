@@ -28,7 +28,9 @@ public enum Path {
     APPIUM_START_RECORDING_SCREEN_PATH("/session/%s/appium/start_recording_screen"),
     APPIUM_STOP_RECORDING_SCREEN_PATH("/session/%s/appium/stop_recording_screen"),
     APPIUM_GET_LOG_TYPES_PATH("/session/%s/log/types"),
-    APPIUM_GET_LOGS_PATH("/session/%s/log");
+    APPIUM_GET_LOGS_PATH("/session/%s/log"),
+    APPIUM_STATUS_WDA("/wd/hub/status-wda"),
+    APPIUM_STATUS_ADB("/wd/hub/status-adb");
     
     private final String relativePath;
 

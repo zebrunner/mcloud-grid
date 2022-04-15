@@ -27,8 +27,11 @@ import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 
+import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
+import com.zebrunner.mcloud.grid.util.HttpClient;
+import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
@@ -81,8 +84,42 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
             
             // Check if device is busy in STF
-            if (client.isEnabled() && !client.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
+            String udid = (String) testslot.getCapabilities().get("udid");
+            if (client.isEnabled() && !client.isDeviceAvailable(udid)) {
                 return null;
+            }
+
+            // additional check if device is ready for session with custom Appium's status verification
+            try {
+                Platform platform = Platform.valueOf((String) testslot.getCapabilities().get("platform"));
+                Response<String> response;
+                switch (platform) {
+                case ANDROID:
+                    response = HttpClient.uri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get(String.class);
+                    if (response.getStatus() != 404) {
+                        if (response.getStatus() != 200) {
+                            LOGGER.warning(String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
+                                    response.getObject()));
+                            return null;
+                        }
+                    }
+                    break;
+                case IOS:
+                    response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
+                    if (response.getStatus() != 404) {
+                        if (response.getStatus() != 200) {
+                            LOGGER.warning(
+                                    String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
+                                            response.getObject()));
+                            return null;
+                        }
+                    }
+                    break;
+                default:
+                    LOGGER.info(String.format("Current platform %s is not supported for extra Appium health-check", platform.toString()));
+                }
+            } catch (Exception e) {
+                LOGGER.warning("Exception happened during extra health-check for Appium: " + e.getMessage());
             }
 
             TestSession session = testslot.getNewSession(requestedCapability);
