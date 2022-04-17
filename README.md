@@ -1,7 +1,8 @@
 Zebrunner Device Farm - Selenium Hub
 ==================
 
-## Support Zebrunner CE
+Enhanced Selenium/Appium Grid for automating Android and iOS devices including TVs (Android, Tizen, Apple) and emulators/simulators.
+
 Feel free to support the development with a [**donation**](https://www.paypal.com/donate?hosted_button_id=JLQ4U468TWQPS) for the next improvements.
 
 <p align="center">
