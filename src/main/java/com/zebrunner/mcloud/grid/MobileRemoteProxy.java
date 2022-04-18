@@ -108,6 +108,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             return null;
                         }
                         LOGGER.info(String.format("Extra Appium health-check (/status-adb) successfully passed for device with udid=%s", udid));
+                        LOGGER.fine("/status-adb response content: " + response.getObject());
                         break;
                     case IOS:
                         response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
@@ -119,6 +120,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             return null;
                         }
                         LOGGER.info(String.format("Extra Appium health-check (/status-wda) successfully passed for device with udid=%s", udid));
+                        LOGGER.fine("/status-wda response content: " + response.getObject());
                         break;
                     default:
                         LOGGER.info(String.format("Current platform %s is not supported for extra Appium health-check", platform.toString()));
