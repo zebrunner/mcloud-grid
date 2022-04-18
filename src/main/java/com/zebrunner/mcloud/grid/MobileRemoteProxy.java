@@ -96,7 +96,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             if (this.CHECK_APPIUM_STATUS) {
                 LOGGER.info("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
                 try {
-                    Platform platform = Platform.valueOf((String) testslot.getCapabilities().get("platform"));
+                    Platform platform = Platform.fromCapabilities(testslot.getCapabilities());
                     Response<String> response;
                     switch (platform) {
                     case ANDROID:
