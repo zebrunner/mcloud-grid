@@ -48,6 +48,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private final String TIMEOUT = System.getenv("STF_TIMEOUT");
 
     private static final String STF_CLIENT = "STF_CLIENT";
+    
+    private final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
@@ -90,9 +92,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
 
             // additional check if device is ready for session with custom Appium's status verification
-            LOGGER.info("CHECK_APPIUM_STATUS: " + System.getenv("CHECK_APPIUM_STATUS"));
             
-            if (System.getenv("CHECK_APPIUM_STATUS") != null && Boolean.getBoolean(System.getenv("CHECK_APPIUM_STATUS"))) {
+            if (this.CHECK_APPIUM_STATUS) {
                 LOGGER.info("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
                 try {
                     Platform platform = Platform.valueOf((String) testslot.getCapabilities().get("platform"));
