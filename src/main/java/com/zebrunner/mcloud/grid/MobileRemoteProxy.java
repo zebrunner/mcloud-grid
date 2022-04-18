@@ -90,6 +90,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
 
             // additional check if device is ready for session with custom Appium's status verification
+            LOGGER.info("CHECK_APPIUM_STATUS: " + System.getenv("CHECK_APPIUM_STATUS"));
+            
             if (System.getenv("CHECK_APPIUM_STATUS") != null && Boolean.getBoolean(System.getenv("CHECK_APPIUM_STATUS"))) {
                 LOGGER.info("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
                 try {
@@ -123,6 +125,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 } catch (Exception e) {
                     LOGGER.warning("Exception happened during extra health-check for Appium: " + e.getMessage());
                 }
+            } else {
+                LOGGER.info("CHECK_APPIUM_STATUS is not enabled!");
             }
 
             TestSession session = testslot.getNewSession(requestedCapability);
