@@ -103,7 +103,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                         response = HttpClient.uri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get(String.class);
                         if (response.getStatus() != 200) {
                             LOGGER.warning(String.format(
-                                    "Device with udid %s is not ready for a session. Error status was recieved from Appium: %s", udid,
+                                    "Device with udid %s is not ready for a session. Error status was received from Appium (/status-adb): %s", udid,
                                     response.getObject()));
                             return null;
                         }
@@ -114,9 +114,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                         response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
                         if (response.getStatus() != 200) {
                             LOGGER.warning(
-                                    String.format("Device with udid %s is not ready for a session. Error status was recieved from Appium: %s",
-                                            udid,
-                                            response.getObject()));
+                                    String.format(
+                                            "Device with udid %s is not ready for a session. Error status was received from Appium (/status-wda): %s",
+                                            udid, response.getObject()));
                             return null;
                         }
                         LOGGER.info(String.format("Extra Appium health-check (/status-wda) successfully passed for device with udid=%s", udid));
