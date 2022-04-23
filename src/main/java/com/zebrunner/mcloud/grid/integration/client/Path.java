@@ -24,11 +24,13 @@ public enum Path {
     STF_USER_DEVICES_PATH("/api/v1/user/devices"),
     STF_USER_DEVICES_BY_ID_PATH("/api/v1/user/devices/%s"),
     STF_USER_DEVICES_REMOTE_CONNECT_PATH("/api/v1/user/devices/%s/remoteConnect"),
-    APPIUM_STATUS("/status"),
     APPIUM_START_RECORDING_SCREEN_PATH("/session/%s/appium/start_recording_screen"),
     APPIUM_STOP_RECORDING_SCREEN_PATH("/session/%s/appium/stop_recording_screen"),
     APPIUM_GET_LOG_TYPES_PATH("/session/%s/log/types"),
-    APPIUM_GET_LOGS_PATH("/session/%s/log");
+    APPIUM_GET_LOGS_PATH("/session/%s/log"),
+    APPIUM_STATUS("/status"),
+    APPIUM_STATUS_WDA("/status-wda"),
+    APPIUM_STATUS_ADB("/status-adb");
     
     private final String relativePath;
 

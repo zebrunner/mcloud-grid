@@ -27,8 +27,11 @@ import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 
+import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
+import com.zebrunner.mcloud.grid.util.HttpClient;
+import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
@@ -45,6 +48,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private final String TIMEOUT = System.getenv("STF_TIMEOUT");
 
     private static final String STF_CLIENT = "STF_CLIENT";
+    
+    private final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
@@ -81,8 +86,50 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
             
             // Check if device is busy in STF
-            if (client.isEnabled() && !client.isDeviceAvailable((String) testslot.getCapabilities().get("udid"))) {
+            String udid = (String) testslot.getCapabilities().get("udid");
+            if (client.isEnabled() && !client.isDeviceAvailable(udid)) {
                 return null;
+            }
+
+            // additional check if device is ready for session with custom Appium's status verification
+            
+            if (this.CHECK_APPIUM_STATUS) {
+                LOGGER.info("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
+                try {
+                    Platform platform = Platform.fromCapabilities(testslot.getCapabilities());
+                    Response<String> response;
+                    switch (platform) {
+                    case ANDROID:
+                        response = HttpClient.uri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get(String.class);
+                        if (response.getStatus() != 200) {
+                            LOGGER.warning(String.format(
+                                    "Device with udid %s is not ready for a session. Error status was received from Appium (/status-adb): %s", udid,
+                                    response.getObject()));
+                            return null;
+                        }
+                        LOGGER.info(String.format("Extra Appium health-check (/status-adb) successfully passed for device with udid=%s", udid));
+                        LOGGER.fine("/status-adb response content: " + response.getObject());
+                        break;
+                    case IOS:
+                        response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
+                        if (response.getStatus() != 200) {
+                            LOGGER.warning(
+                                    String.format(
+                                            "Device with udid %s is not ready for a session. Error status was received from Appium (/status-wda): %s",
+                                            udid, response.getObject()));
+                            return null;
+                        }
+                        LOGGER.info(String.format("Extra Appium health-check (/status-wda) successfully passed for device with udid=%s", udid));
+                        LOGGER.fine("/status-wda response content: " + response.getObject());
+                        break;
+                    default:
+                        LOGGER.info(String.format("Current platform %s is not supported for extra Appium health-check", platform.toString()));
+                    }
+                } catch (Exception e) {
+                    LOGGER.warning("Exception happened during extra health-check for Appium: " + e.getMessage());
+                }
+            } else {
+                LOGGER.info("CHECK_APPIUM_STATUS is not enabled!");
             }
 
             TestSession session = testslot.getNewSession(requestedCapability);

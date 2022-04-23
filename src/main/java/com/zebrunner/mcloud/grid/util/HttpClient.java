@@ -15,12 +15,16 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.util;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -171,7 +175,15 @@ public class HttpClient {
                     int status = response.getStatus();
                     rs.setStatus(status);
                     if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
-                        rs.setObject(response.getEntity(responseClass));
+                        if (responseClass.isAssignableFrom(String.class)) {
+                            String text = new BufferedReader(
+                                    new InputStreamReader(response.getEntityInputStream(), StandardCharsets.UTF_8))
+                                            .lines()
+                                            .collect(Collectors.joining("\n"));
+                            rs.setObject((R) text);
+                        } else {
+                            rs.setObject(response.getEntity(responseClass));
+                        }
                     }
                     return rs;
                 });
