@@ -15,22 +15,15 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.util;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
+import java.util.logging.Level;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.apache.commons.lang3.StringUtils;
-import org.seleniumhq.jetty9.http.HttpMethod;
 
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
@@ -39,17 +32,12 @@ import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 import com.zebrunner.mcloud.grid.integration.client.Path;
 
-import net.jodah.failsafe.Failsafe;
-import net.jodah.failsafe.RetryPolicy;
-
 public class HttpClient {
 
 	private static Logger LOGGER = Logger.getLogger(HttpClient.class.getName());
 
     private static final Integer CONNECT_TIMEOUT = 60000;
     private static final Integer READ_TIMEOUT = 60000;
-    private static final Integer RETRY_DELAY = 10000;
-    private static final Integer HTTP_CLIENT_RETRY_COUNT = Integer.parseInt(System.getenv("HTTP_CLIENT_RETRY_COUNT"));
 
     private static Client client;
 
@@ -81,43 +69,23 @@ public class HttpClient {
 
     public static class Executor {
 
-        private WebResource webResource;
+        private WebResource.Builder builder;
         private String errorMessage;
-        private String url;
-        private HttpMethod httpMethod;
-        private String mediaType;
-        private String acceptType;
-        private Map<String, String> headers = new HashMap<>();
 
         public Executor(WebResource webResource) {
-            url = webResource.getURI().toString();
-            this.webResource = webResource;
-        }
-
-        public WebResource.Builder prepareBuilder() {
-            WebResource.Builder builder = webResource.type(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON);
-            if (mediaType != null) {
-                builder.type(mediaType);
-            }
-            if (acceptType != null) {
-                builder.type(acceptType);
-            }
-            headers.keySet().stream().forEach(k -> builder.header(k, headers.get(k)));
-            return builder;
+            builder = webResource.type(MediaType.APPLICATION_JSON)
+                                 .accept(MediaType.APPLICATION_JSON);
         }
 
         public <R> Response<R> get(Class<R> responseClass) {
-            this.httpMethod = HttpMethod.GET;
             return execute(responseClass, builder -> builder.get(ClientResponse.class));
         }
 
         public <R> Response<R> post(Class<R> responseClass, Object requestEntity) {
-            this.httpMethod = HttpMethod.POST;
             return execute(responseClass, builder -> builder.post(ClientResponse.class, requestEntity));
         }
 
         public <R> Response<R> put(Class<R> responseClass, Object requestEntity) {
-            this.httpMethod = HttpMethod.PUT;
             return execute(responseClass, builder -> builder.put(ClientResponse.class, requestEntity));
         }
 
@@ -126,80 +94,52 @@ public class HttpClient {
         }
 
         public Executor type(String mediaType) {
-            this.mediaType = mediaType;
+            builder.type(mediaType);
             return this;
         }
 
-        public Executor accept(String acceptType) {
-            this.acceptType = acceptType;
+        public Executor accept(String mediaType) {
+            builder.accept(mediaType);
             return this;
         }
 
         public Executor withAuthorization(String authToken) {
-            initHeaders(authToken);
+            return withAuthorization(authToken, null);
+        }
+
+        public Executor withAuthorization(String authToken, String project) {
+            initHeaders(builder, authToken, project);
             return this;
         }
 
-        private void initHeaders(String authToken) {
+        private static void initHeaders(WebResource.Builder builder, String authToken, String project) {
             if (!StringUtils.isEmpty(authToken)) {
-                headers.put("Authorization", authToken);
+                builder.header("Authorization", authToken);
+            }
+            if (!StringUtils.isEmpty(project)) {
+                builder.header("Project", project);
             }
         }
 
-        @SuppressWarnings("unchecked")
         private <R> Response<R> execute(Class<R> responseClass, Function<WebResource.Builder, ClientResponse> methodBuilder) {
-            RetryPolicy<Object> retryPolicy = new RetryPolicy<>()
-                    .withDelay(Duration.ofMillis(RETRY_DELAY))
-                    .withMaxRetries(HTTP_CLIENT_RETRY_COUNT)
-                    .handleResultIf(result -> result != null && ((Response<R>) result).getStatus() / 100 != 2)
-                    .onRetry(e -> LOGGER.log(
-                            Level.SEVERE,
-                            String.format("HTTP call '%s' failed with status '%s'. Failure #%d. Retrying. %s", 
-                                    getEndpoint(),
-                                    ((Response<R>) e.getLastResult()) == null ? "n/a" : ((Response<R>) e.getLastResult()).getStatus(),
-                                    e.getAttemptCount(),
-                                    errorMessage != null ? errorMessage : ""),
-                            e.getLastFailure()))
-                    .onRetriesExceeded(e -> LOGGER.log(
-                            Level.SEVERE,
-                            String.format("HTTP call '%s' failed with status '%s'. Max retries exceeded. %s",
-                                    getEndpoint(),
-                                    ((Response<R>) e.getResult()) == null ? "n/a" : ((Response<R>) e.getResult()).getStatus(),
-                                    errorMessage != null ? errorMessage : ""),
-                            e.getFailure()));
-
+            Response<R> rs = new Response<>();
             try {
-                return Failsafe.with(retryPolicy).get(() -> {
-                    Response<R> rs = new Response<>();
-                    ClientResponse response = methodBuilder.apply(prepareBuilder());
-                    int status = response.getStatus();
-                    rs.setStatus(status);
-                    if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
-                        if (responseClass.isAssignableFrom(String.class)) {
-                            String text = new BufferedReader(
-                                    new InputStreamReader(response.getEntityInputStream(), StandardCharsets.UTF_8))
-                                            .lines()
-                                            .collect(Collectors.joining("\n"));
-                            rs.setObject((R) text);
-                        } else {
-                            rs.setObject(response.getEntity(responseClass));
-                        }
-                    }
-                    return rs;
-                });
+                ClientResponse response = methodBuilder.apply(builder);
+                int status = response.getStatus();
+                rs.setStatus(status);
+                if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
+                    rs.setObject(response.getEntity(responseClass));
+                }
             } catch (Exception e) {
-                // do nothing
+                String message = errorMessage == null ? e.getMessage() : e.getMessage() + ". " + errorMessage;
+                LOGGER.log(Level.SEVERE, message, e);
             }
-            return new Response<>();
+            return rs;
         }
 
         public Executor onFailure(String message) {
             this.errorMessage = message;
             return this;
-        }
-
-        private String getEndpoint() {
-            return String.format("%s %s", httpMethod.toString(), url);
         }
 
     }
