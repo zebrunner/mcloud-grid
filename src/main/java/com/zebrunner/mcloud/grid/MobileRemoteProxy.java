@@ -30,8 +30,8 @@ import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
-import com.zebrunner.mcloud.grid.util.HttpClient;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
+import com.zebrunner.mcloud.grid.util.HttpClientApache;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
@@ -94,42 +94,42 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             // additional check if device is ready for session with custom Appium's status verification
             
             if (this.CHECK_APPIUM_STATUS) {
-                LOGGER.info("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
+                LOGGER.fine("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
                 try {
                     Platform platform = Platform.fromCapabilities(testslot.getCapabilities());
                     Response<String> response;
                     switch (platform) {
                     case ANDROID:
-                        response = HttpClient.uri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get(String.class);
+                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get();
                         if (response.getStatus() != 200) {
                             LOGGER.warning(String.format(
-                                    "Device with udid %s is not ready for a session. Error status was received from Appium (/status-adb): %s", udid,
+                                    "%s is not ready for a session. /status-adb error: %s", udid,
                                     response.getObject()));
                             return null;
                         }
-                        LOGGER.info(String.format("Extra Appium health-check (/status-adb) successfully passed for device with udid=%s", udid));
+                        LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
                         LOGGER.fine("/status-adb response content: " + response.getObject());
                         break;
                     case IOS:
-                        response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
+                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get();
                         if (response.getStatus() != 200) {
                             LOGGER.warning(
                                     String.format(
-                                            "Device with udid %s is not ready for a session. Error status was received from Appium (/status-wda): %s",
+                                            "%s is not ready for a session. /status-wda error: %s",
                                             udid, response.getObject()));
                             return null;
                         }
-                        LOGGER.info(String.format("Extra Appium health-check (/status-wda) successfully passed for device with udid=%s", udid));
+                        LOGGER.fine(String.format("%s /status-wda successfully passed", udid));
                         LOGGER.fine("/status-wda response content: " + response.getObject());
                         break;
                     default:
-                        LOGGER.info(String.format("Current platform %s is not supported for extra Appium health-check", platform.toString()));
+                        LOGGER.info(String.format("Appium health-check is not supported for '%s'", platform.toString()));
                     }
                 } catch (Exception e) {
-                    LOGGER.warning("Exception happened during extra health-check for Appium: " + e.getMessage());
+                    LOGGER.warning("Appium health-check failed: " + e.getMessage());
                 }
             } else {
-                LOGGER.info("CHECK_APPIUM_STATUS is not enabled!");
+                LOGGER.fine("CHECK_APPIUM_STATUS is not enabled!");
             }
 
             TestSession session = testslot.getNewSession(requestedCapability);
