@@ -17,8 +17,8 @@ package com.zebrunner.mcloud.grid.util;
 
 import java.util.Map;
 import java.util.function.Function;
-import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -172,6 +172,12 @@ public class HttpClient {
         public void setObject(T object) {
             this.object = object;
         }
+
+        @Override
+        public String toString() {
+            return "Response [status=" + status + ", object=" + object + "]";
+        }
+
     }
 
 }

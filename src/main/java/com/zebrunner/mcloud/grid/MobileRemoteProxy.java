@@ -30,8 +30,8 @@ import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
-import com.zebrunner.mcloud.grid.util.HttpClient;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
+import com.zebrunner.mcloud.grid.util.HttpClientApache;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
@@ -100,7 +100,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     Response<String> response;
                     switch (platform) {
                     case ANDROID:
-                        response = HttpClient.uri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get(String.class);
+                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get();
                         if (response.getStatus() != 200) {
                             LOGGER.warning(String.format(
                                     "%s is not ready for a session. /status-adb error: %s", udid,
@@ -111,7 +111,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                         LOGGER.fine("/status-adb response content: " + response.getObject());
                         break;
                     case IOS:
-                        response = HttpClient.uri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get(String.class);
+                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get();
                         if (response.getStatus() != 200) {
                             LOGGER.warning(
                                     String.format(
