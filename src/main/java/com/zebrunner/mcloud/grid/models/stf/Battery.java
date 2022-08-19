@@ -16,16 +16,17 @@
 
 package com.zebrunner.mcloud.grid.models.stf;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Getter
 @Setter
@@ -38,7 +39,7 @@ public class Battery {
     private Double scale;
     private String source;
     private String status;
-    private Double temp;
+    private String temp;
     private Double voltage;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<>();
