@@ -17,6 +17,7 @@ package com.zebrunner.mcloud.grid;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.grid.internal.utils.DefaultCapabilityMatcher;
@@ -28,6 +29,8 @@ import org.openqa.grid.internal.utils.DefaultCapabilityMatcher;
  * @author Alex Khursevich (alex@qaprosoft.com)
  */
 public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
+    private static final Logger LOGGER = Logger.getLogger(MobileCapabilityMatcher.class.getName());
+    
     private static final String PLATFORM_NAME = "platformName";
     private static final String PLATFORM_VERSION = "platformVersion";
     private static final String DEVICE_NAME = "deviceName";
@@ -38,13 +41,17 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
 
     @Override
     public boolean matches(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
+        LOGGER.finest("requestedCapability: " + requestedCapability);
+        
         if (requestedCapability.containsKey(PLATFORM_NAME) || requestedCapability.containsKey(PLATFORM_VERSION)
                 || requestedCapability.containsKey(DEVICE_NAME) || requestedCapability.containsKey(APPIUM_DEVICE_NAME)
                 || requestedCapability.containsKey(UDID) || requestedCapability.containsKey(APPIUM_UDID)) {
             // Mobile-based capabilities
+            LOGGER.fine("Using extensionCapabilityCheck matcher.");
             return extensionCapabilityCheck(nodeCapability, requestedCapability);
         } else {
             // Browser-based capabilities
+            LOGGER.fine("Using default browser-based capabilities matcher.");
             return super.matches(nodeCapability, requestedCapability);
         }
     }
