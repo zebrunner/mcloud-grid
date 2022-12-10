@@ -106,6 +106,19 @@ public class MobileCapabilityMatcherTest {
         nodeCapability.put(UDID, "tt64fdfdfgdf");
         Assert.assertFalse(matcher.matches(nodeCapability, requestedCapability));
     }
+    
+    @Test
+    public void testAppiumUDID() {
+        Map<String, Object> nodeCapability = new HashMap<>();
+        nodeCapability.put(UDID, "sdf44242ggsd");
+
+        Map<String, Object> requestedCapability = new HashMap<>();
+        requestedCapability.put(UDID, "appium:sdf44242ggsd");
+
+        Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
+        nodeCapability.put(UDID, "tt64fdfdfgdf");
+        Assert.assertFalse(matcher.matches(nodeCapability, requestedCapability));
+    }
 
     @Test
     public void testUDIDs() {
@@ -114,6 +127,17 @@ public class MobileCapabilityMatcherTest {
 
         Map<String, Object> requestedCapability = new HashMap<>();
         requestedCapability.put(UDID, "sdf44242ggsd,seee4242ggsd");
+
+        Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
+    }
+    
+    @Test
+    public void testAppiumUDIDs() {
+        Map<String, Object> nodeCapability = new HashMap<>();
+        nodeCapability.put(UDID, "sdf44242ggsd");
+
+        Map<String, Object> requestedCapability = new HashMap<>();
+        requestedCapability.put(UDID, "appium:sdf44242ggsd,seee4242ggsd");
 
         Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
     }
@@ -130,6 +154,19 @@ public class MobileCapabilityMatcherTest {
         nodeCapability.put(DEVICE_NAME, "Samsung_Galaxy_S7");
         Assert.assertFalse(matcher.matches(nodeCapability, requestedCapability));
     }
+    
+    @Test
+    public void testAppiumDeviceName() {
+        Map<String, Object> nodeCapability = new HashMap<>();
+        nodeCapability.put(DEVICE_NAME, "Samsung_Galaxy_S6");
+
+        Map<String, Object> requestedCapability = new HashMap<>();
+        requestedCapability.put(DEVICE_NAME, "appium:Samsung_Galaxy_S6");
+
+        Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
+        nodeCapability.put(DEVICE_NAME, "Samsung_Galaxy_S7");
+        Assert.assertFalse(matcher.matches(nodeCapability, requestedCapability));
+    }
 
     @Test
     public void testDeviceNames() {
@@ -138,6 +175,17 @@ public class MobileCapabilityMatcherTest {
 
         Map<String, Object> requestedCapability = new HashMap<>();
         requestedCapability.put(DEVICE_NAME, "Samsung_Galaxy_S6,Samsung_Galaxy_S7");
+
+        Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
+    }
+    
+    @Test
+    public void testAppiumDeviceNames() {
+        Map<String, Object> nodeCapability = new HashMap<>();
+        nodeCapability.put(DEVICE_NAME, "Samsung_Galaxy_S6");
+
+        Map<String, Object> requestedCapability = new HashMap<>();
+        requestedCapability.put(DEVICE_NAME, "appium:Samsung_Galaxy_S6,Samsung_Galaxy_S7");
 
         Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
     }

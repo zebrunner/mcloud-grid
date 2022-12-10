@@ -31,13 +31,16 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
     private static final String PLATFORM_NAME = "platformName";
     private static final String PLATFORM_VERSION = "platformVersion";
     private static final String DEVICE_NAME = "deviceName";
+    private static final String APPIUM_DEVICE_NAME = "appium:deviceName";
     private static final String DEVICE_TYPE = "deviceType";
     private static final String UDID = "udid";
+    private static final String APPIUM_UDID = "appium:udid";
 
     @Override
     public boolean matches(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
         if (requestedCapability.containsKey(PLATFORM_NAME) || requestedCapability.containsKey(PLATFORM_VERSION)
-                || requestedCapability.containsKey(DEVICE_NAME) || requestedCapability.containsKey(UDID)) {
+                || requestedCapability.containsKey(DEVICE_NAME) || requestedCapability.containsKey(APPIUM_DEVICE_NAME)
+                || requestedCapability.containsKey(UDID) || requestedCapability.containsKey(APPIUM_UDID)) {
             // Mobile-based capabilities
             return extensionCapabilityCheck(nodeCapability, requestedCapability);
         } else {
@@ -61,6 +64,9 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
         for (String key : requestedCapability.keySet()) {
             String expectedValue = requestedCapability.get(key) != null ? requestedCapability.get(key).toString()
                     : null;
+            
+            // cut w3c "appium:" prefix if any
+            expectedValue = expectedValue.replace("appium:", "");
 
             String actualValue = (nodeCapability.containsKey(key) && nodeCapability.get(key) != null)
                     ? nodeCapability.get(key).toString()
