@@ -67,20 +67,28 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
      */
 	private boolean extensionCapabilityCheck(Map<String, Object> nodeCapability,
             Map<String, Object> requestedCapability) {
+	    final String APPIUM_PREFIX = "appium:";
 
+	    //w3c formatted caps request:
+        // 13:21:50.524 FINEST [MobileCapabilityMatcher.matches] - requestedCapability: {appium:enableVideo=true, appium:locale=US,
+        // pageLoadStrategy=eager, appium:language=en, appium:remoteAppsCacheLimit=0, appium:noSign=true, appium:automationName=UIAutomator2,
+        // appium:enableLog=true, appium:autoGrantPermissions=true, appium:deviceName=Nokia_3, platformName=android,
+        // appium:app=https://qaprosoft.s3-us-west-2.amazonaws.com/carinademoexample.apk}
         for (String key : requestedCapability.keySet()) {
             String expectedValue = requestedCapability.get(key) != null ? requestedCapability.get(key).toString()
                     : null;
             
             // cut w3c "appium:" prefix if any
-            expectedValue = expectedValue.replace("appium:", "");
+            expectedValue = expectedValue.replace(APPIUM_PREFIX, "");
 
-            String actualValue = (nodeCapability.containsKey(key) && nodeCapability.get(key) != null)
-                    ? nodeCapability.get(key).toString()
+            String nodeKey = key.replace(APPIUM_PREFIX, "");
+            String actualValue = (nodeCapability.containsKey(nodeKey) && nodeCapability.get(nodeKey) != null)
+                    ? nodeCapability.get(nodeKey).toString()
                     : null;
 
             if (!("ANY".equalsIgnoreCase(expectedValue) || "".equals(expectedValue) || "*".equals(expectedValue))) {
-                switch (key) {
+                LOGGER.finest("Analyzing nodeKey: " + nodeKey + "; expectedValue: " + expectedValue + "; actualValue" + actualValue);
+                switch (nodeKey) {
                 case PLATFORM_NAME:
                     if (actualValue != null && !StringUtils.equalsIgnoreCase(actualValue, expectedValue)) {
                         return false;
