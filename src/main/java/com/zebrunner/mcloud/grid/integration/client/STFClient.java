@@ -101,8 +101,8 @@ public class STFClient {
             if (rs.getStatus() == 200) {
                 for (STFDevice device : rs.getObject().getDevices()) {
                     if (udid.equals(device.getSerial())) {
+                        LOGGER.log(Level.FINE, "device.getModel(): " + device.getModel());
                         LOGGER.log(Level.FINE, "this.user.getUser().getName(): " + this.user.getUser().getName());
-                        
                         LOGGER.log(Level.FINE, "device.getPresent(): " + device.getPresent());
                         LOGGER.log(Level.FINE, "device.getReady(): " + device.getReady());
                         LOGGER.log(Level.FINE, "device.getOwner(): " + device.getOwner());
