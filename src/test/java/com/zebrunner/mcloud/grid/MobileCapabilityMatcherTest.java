@@ -25,9 +25,9 @@ public class MobileCapabilityMatcherTest {
     private MobileCapabilityMatcher matcher = new MobileCapabilityMatcher();
 
     private static final String PLATFORM_NAME = "platformName";
-    private static final String PLATFORM_VERSION = "platformVersion";
-    private static final String DEVICE_NAME = "deviceName";
-    private static final String UDID = "udid";
+    private static final String PLATFORM_VERSION = "appium:platformVersion";
+    private static final String DEVICE_NAME = "appium:deviceName";
+    private static final String UDID = "appium:udid";
 
     @Test
     public void testPlatformName() {
@@ -113,7 +113,7 @@ public class MobileCapabilityMatcherTest {
         nodeCapability.put(UDID, "sdf44242ggsd");
 
         Map<String, Object> requestedCapability = new HashMap<>();
-        requestedCapability.put(UDID, "appium:sdf44242ggsd");
+        requestedCapability.put(UDID, "sdf44242ggsd");
 
         Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
         nodeCapability.put(UDID, "tt64fdfdfgdf");
@@ -137,7 +137,7 @@ public class MobileCapabilityMatcherTest {
         nodeCapability.put(UDID, "sdf44242ggsd");
 
         Map<String, Object> requestedCapability = new HashMap<>();
-        requestedCapability.put(UDID, "appium:sdf44242ggsd,seee4242ggsd");
+        requestedCapability.put(UDID, "sdf44242ggsd,seee4242ggsd");
 
         Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
     }
@@ -161,7 +161,7 @@ public class MobileCapabilityMatcherTest {
         nodeCapability.put(DEVICE_NAME, "Samsung_Galaxy_S6");
 
         Map<String, Object> requestedCapability = new HashMap<>();
-        requestedCapability.put(DEVICE_NAME, "appium:Samsung_Galaxy_S6");
+        requestedCapability.put(DEVICE_NAME, "Samsung_Galaxy_S6");
 
         Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
         nodeCapability.put(DEVICE_NAME, "Samsung_Galaxy_S7");
@@ -185,7 +185,7 @@ public class MobileCapabilityMatcherTest {
         nodeCapability.put(DEVICE_NAME, "Samsung_Galaxy_S6");
 
         Map<String, Object> requestedCapability = new HashMap<>();
-        requestedCapability.put(DEVICE_NAME, "appium:Samsung_Galaxy_S6,Samsung_Galaxy_S7");
+        requestedCapability.put(DEVICE_NAME, "Samsung_Galaxy_S6,Samsung_Galaxy_S7");
 
         Assert.assertTrue(matcher.matches(nodeCapability, requestedCapability));
     }

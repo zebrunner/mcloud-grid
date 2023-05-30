@@ -32,11 +32,9 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
     private static final Logger LOGGER = Logger.getLogger(MobileCapabilityMatcher.class.getName());
     
     private static final String PLATFORM_NAME = "platformName";
-    private static final String PLATFORM_VERSION = "platformVersion";
-    private static final String DEVICE_NAME = "deviceName";
-    private static final String APPIUM_DEVICE_NAME = "appium:deviceName";
-    private static final String DEVICE_TYPE = "deviceType";
-    private static final String UDID = "udid";
+    private static final String PLATFORM_VERSION = "appium:platformVersion";
+    private static final String DEVICE_NAME = "appium:deviceName";
+    private static final String DEVICE_TYPE = "appium:deviceType";
     private static final String APPIUM_UDID = "appium:udid";
 
     @Override
@@ -44,8 +42,8 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
         LOGGER.finest("requestedCapability: " + requestedCapability);
         
         if (requestedCapability.containsKey(PLATFORM_NAME) || requestedCapability.containsKey(PLATFORM_VERSION)
-                || requestedCapability.containsKey(DEVICE_NAME) || requestedCapability.containsKey(APPIUM_DEVICE_NAME)
-                || requestedCapability.containsKey(UDID) || requestedCapability.containsKey(APPIUM_UDID)) {
+                || requestedCapability.containsKey(DEVICE_NAME)
+                || requestedCapability.containsKey(APPIUM_UDID)) {
             // Mobile-based capabilities
             LOGGER.fine("Using extensionCapabilityCheck matcher.");
             return extensionCapabilityCheck(nodeCapability, requestedCapability);
@@ -67,21 +65,11 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
      */
 	private boolean extensionCapabilityCheck(Map<String, Object> nodeCapability,
             Map<String, Object> requestedCapability) {
-	    final String APPIUM_PREFIX = "appium:";
 
-	    //w3c formatted caps request:
-        // 13:21:50.524 FINEST [MobileCapabilityMatcher.matches] - requestedCapability: {appium:enableVideo=true, appium:locale=US,
-        // pageLoadStrategy=eager, appium:language=en, appium:remoteAppsCacheLimit=0, appium:noSign=true, appium:automationName=UIAutomator2,
-        // appium:enableLog=true, appium:autoGrantPermissions=true, appium:deviceName=Nokia_3, platformName=android,
-        // appium:app=https://qaprosoft.s3-us-west-2.amazonaws.com/carinademoexample.apk}
-        for (String key : requestedCapability.keySet()) {
-            String expectedValue = requestedCapability.get(key) != null ? requestedCapability.get(key).toString()
+        for (String nodeKey : requestedCapability.keySet()) {
+            String expectedValue = requestedCapability.get(nodeKey) != null ? requestedCapability.get(nodeKey).toString()
                     : null;
             
-            // cut w3c "appium:" prefix if any
-            expectedValue = expectedValue.replace(APPIUM_PREFIX, "");
-
-            String nodeKey = key.replace(APPIUM_PREFIX, "");
             String actualValue = (nodeCapability.containsKey(nodeKey) && nodeCapability.get(nodeKey) != null)
                     ? nodeCapability.get(nodeKey).toString()
                     : null;
@@ -148,7 +136,7 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
                         return false;
                     }
                     break;
-                case UDID:
+                case APPIUM_UDID:
                     if (actualValue != null && !Arrays.asList(expectedValue.split(",")).contains(actualValue)) {
                         return false;
                     }
