@@ -32,20 +32,19 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
     private static final Logger LOGGER = Logger.getLogger(MobileCapabilityMatcher.class.getName());
     
     private static final String PLATFORM_NAME = "platformName";
-    private static final String PLATFORM_VERSION = "platformVersion";
-    private static final String DEVICE_NAME = "deviceName";
+    //TODO: remove APPIUM_ prefix as useless.
+    private static final String APPIUM_PLATFORM_VERSION = "appium:platformVersion";
     private static final String APPIUM_DEVICE_NAME = "appium:deviceName";
-    private static final String DEVICE_TYPE = "deviceType";
-    private static final String UDID = "udid";
+    private static final String APPIUM_DEVICE_TYPE = "appium:deviceType";
     private static final String APPIUM_UDID = "appium:udid";
 
     @Override
     public boolean matches(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
         LOGGER.finest("requestedCapability: " + requestedCapability);
         
-        if (requestedCapability.containsKey(PLATFORM_NAME) || requestedCapability.containsKey(PLATFORM_VERSION)
-                || requestedCapability.containsKey(DEVICE_NAME) || requestedCapability.containsKey(APPIUM_DEVICE_NAME)
-                || requestedCapability.containsKey(UDID) || requestedCapability.containsKey(APPIUM_UDID)) {
+        if (requestedCapability.containsKey(PLATFORM_NAME) || requestedCapability.containsKey(APPIUM_PLATFORM_VERSION)
+                || requestedCapability.containsKey(APPIUM_DEVICE_NAME)
+                || requestedCapability.containsKey(APPIUM_UDID)) {
             // Mobile-based capabilities
             LOGGER.fine("Using extensionCapabilityCheck matcher.");
             return extensionCapabilityCheck(nodeCapability, requestedCapability);
@@ -94,7 +93,7 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
                         return false;
                     }
                     break;
-                case PLATFORM_VERSION:
+                case APPIUM_PLATFORM_VERSION:
                     if (actualValue != null) {
                         // Limited interval: 6.1.1-7.0
                         if (expectedValue.matches("(\\d+\\.){0,}(\\d+)-(\\d+\\.){0,}(\\d+)$")) {
@@ -138,17 +137,17 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
                         }
                     }
                     break;
-                case DEVICE_NAME:
+                case APPIUM_DEVICE_NAME:
                     if (actualValue != null && !Arrays.asList(expectedValue.split(",")).contains(actualValue)) {
                         return false;
                     }
                     break;
-                case DEVICE_TYPE:
+                case APPIUM_DEVICE_TYPE:
                     if (actualValue != null && !StringUtils.equalsIgnoreCase(actualValue, expectedValue)) {
                         return false;
                     }
                     break;
-                case UDID:
+                case APPIUM_UDID:
                     if (actualValue != null && !Arrays.asList(expectedValue.split(",")).contains(actualValue)) {
                         return false;
                     }
