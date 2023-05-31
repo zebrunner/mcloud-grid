@@ -174,7 +174,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             STFClient client = (STFClient) session.get(STF_CLIENT);
             if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
                 // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
-                session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
+                session.getRequestedCapabilities().put("zebrunner:slotCapabilities", getSlotCapabilities(session, udid));
             }
         }
     }
