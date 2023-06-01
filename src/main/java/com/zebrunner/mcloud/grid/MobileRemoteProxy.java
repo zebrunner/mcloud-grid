@@ -41,6 +41,9 @@ import com.zebrunner.mcloud.grid.util.HttpClientApache;
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     
+    private static final String APPIUM_UDID = "appium:udid";
+    private static final String DEVICE_TYPE = "appium:deviceType";
+    
     private final String URL = System.getenv("STF_URL");
     private final String TOKEN = System.getenv("STF_TOKEN");
     
@@ -80,13 +83,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // any slot left for the given app ?
         for (TestSlot testslot : getTestSlots()) {
 
-            if (!testslot.getCapabilities().containsKey("udid")) {
-                // Appium node must have UDID capability to be identified in STF
+            if (!testslot.getCapabilities().containsKey(APPIUM_UDID)) {
+                // Appium node must have "appium:udid" capability to be identified in STF
                 return null;
             }
             
             // Check if device is busy in STF
-            String udid = (String) testslot.getCapabilities().get("udid");
+            String udid = (String) testslot.getCapabilities().get(APPIUM_UDID);
             if (client.isEnabled() && !client.isDeviceAvailable(udid)) {
                 return null;
             }
@@ -162,9 +165,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         String sessionId = getExternalSessionId(session);
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
-        String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
+        // udid is needed without appium prefix to reserve in STF
+        String udid = String.valueOf(session.getSlot().getCapabilities().get(APPIUM_UDID)).replace("appium:", "");
         if (!StringUtils.isEmpty(udid)) {
-            Object deviceType = session.getRequestedCapabilities().get("deviceType");
+            Object deviceType = session.getRequestedCapabilities().get(DEVICE_TYPE);
             if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
                 //override platformName for the appium capabilities into tvOS
                 LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
@@ -188,7 +192,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
 
         STFClient client = (STFClient) session.get(STF_CLIENT);
-        String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
+        // udid is needed without appium prefix to reserve in STF
+        String udid = String.valueOf(session.getSlot().getCapabilities().get(APPIUM_UDID)).replace("appium:", "");
         client.returnDevice(udid, session.getRequestedCapabilities());
         
     }
@@ -200,7 +205,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // get existing slot capabilities from session
         slotCapabilities.putAll(session.getSlot().getCapabilities());
         
-        Object deviceType = session.getSlot().getCapabilities().get("deviceType");
+        Object deviceType = session.getSlot().getCapabilities().get(DEVICE_TYPE);
         if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
             //override platformName in slot to register valid platform in reporting
             slotCapabilities.put("platformName", "tvOS");
