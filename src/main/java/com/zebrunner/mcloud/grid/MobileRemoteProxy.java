@@ -41,6 +41,9 @@ import com.zebrunner.mcloud.grid.util.HttpClientApache;
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     
+    //to operate with RequestedCapabilities where prefix is present
+    private static final String DEVICE_TYPE = "appium:deviceType";
+    
     private final String URL = System.getenv("STF_URL");
     private final String TOKEN = System.getenv("STF_TOKEN");
     
@@ -164,7 +167,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         if (!StringUtils.isEmpty(udid)) {
-            Object deviceType = session.getRequestedCapabilities().get("deviceType");
+            Object deviceType = session.getRequestedCapabilities().get(DEVICE_TYPE);
             if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
                 //override platformName for the appium capabilities into tvOS
                 LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
@@ -200,7 +203,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // get existing slot capabilities from session
         slotCapabilities.putAll(session.getSlot().getCapabilities());
         
-        Object deviceType = session.getSlot().getCapabilities().get("deviceType");
+        Object deviceType = session.getSlot().getCapabilities().get(DEVICE_TYPE);
         if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
             //override platformName in slot to register valid platform in reporting
             slotCapabilities.put("platformName", "tvOS");
