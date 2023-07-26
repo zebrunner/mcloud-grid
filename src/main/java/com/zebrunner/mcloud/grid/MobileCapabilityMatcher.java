@@ -15,35 +15,43 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid;
 
-import java.util.Arrays;
+import com.zebrunner.mcloud.grid.validator.DeviceNameValidator;
+import com.zebrunner.mcloud.grid.validator.DeviceTypeValidator;
+import com.zebrunner.mcloud.grid.validator.MobilePlatformValidator;
+import com.zebrunner.mcloud.grid.validator.PlatformVersionValidator;
+import com.zebrunner.mcloud.grid.validator.UDIDValidator;
+import com.zebrunner.mcloud.grid.validator.Validator;
+import org.openqa.grid.internal.utils.DefaultCapabilityMatcher;
+import org.openqa.selenium.remote.CapabilityType;
+
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import org.apache.commons.lang3.StringUtils;
-import org.openqa.grid.internal.utils.DefaultCapabilityMatcher;
+import static com.zebrunner.mcloud.grid.util.CapabilityUtils.getAppiumCapability;
 
 /**
  * Custom selenium capability matcher for mobile grid.
  * {@link https://nishantverma.gitbooks.io/appium-for-android/understanding_desired_capabilities.html}
- * 
+ *
  * @author Alex Khursevich (alex@qaprosoft.com)
  */
 public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
     private static final Logger LOGGER = Logger.getLogger(MobileCapabilityMatcher.class.getName());
-    
-    private static final String PLATFORM_NAME = "platformName";
-    private static final String PLATFORM_VERSION = "appium:platformVersion";
-    private static final String DEVICE_NAME = "appium:deviceName";
-    private static final String DEVICE_TYPE = "appium:deviceType";
-    private static final String APPIUM_UDID = "appium:udid";
+    private final List<Validator> validators = List.of(
+            new MobilePlatformValidator(),
+            new PlatformVersionValidator(),
+            new DeviceNameValidator(),
+            new DeviceTypeValidator(),
+            new UDIDValidator());
 
     @Override
     public boolean matches(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
-        LOGGER.finest("requestedCapability: " + requestedCapability);
-        
-        if (requestedCapability.containsKey(PLATFORM_NAME) || requestedCapability.containsKey(PLATFORM_VERSION)
-                || requestedCapability.containsKey(DEVICE_NAME)
-                || requestedCapability.containsKey(APPIUM_UDID)) {
+        LOGGER.finest("Requested capabilities: " + requestedCapability);
+        if (requestedCapability.containsKey(CapabilityType.PLATFORM_NAME) ||
+                getAppiumCapability(requestedCapability, "platformVersion").isPresent() ||
+                getAppiumCapability(requestedCapability, "deviceName").isPresent() ||
+                getAppiumCapability(requestedCapability, "udid").isPresent()) {
             // Mobile-based capabilities
             LOGGER.fine("Using extensionCapabilityCheck matcher.");
             return extensionCapabilityCheck(nodeCapability, requestedCapability);
@@ -56,142 +64,17 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
 
     /**
      * Verifies matching between requested and actual node capabilities.
-     * 
-     * @param nodeCapability
-     *            - Selenium node capabilities
-     * @param requestedCapability
-     *            - capabilities requested by Selenium client
+     *
+     * @param nodeCapabilities      - Selenium node capabilities
+     * @param requestedCapabilities - capabilities requested by Selenium client
      * @return match results
      */
-	private boolean extensionCapabilityCheck(Map<String, Object> nodeCapability,
-            Map<String, Object> requestedCapability) {
-
-        for (String nodeKey : requestedCapability.keySet()) {
-            String expectedValue = requestedCapability.get(nodeKey) != null ? requestedCapability.get(nodeKey).toString()
-                    : null;
-            
-            String actualValue = (nodeCapability.containsKey(nodeKey) && nodeCapability.get(nodeKey) != null)
-                    ? nodeCapability.get(nodeKey).toString()
-                    : null;
-
-            if (!("ANY".equalsIgnoreCase(expectedValue) || "".equals(expectedValue) || "*".equals(expectedValue))) {
-                LOGGER.finest("Analyzing nodeKey: " + nodeKey + "; expectedValue: " + expectedValue + "; actualValue" + actualValue);
-                switch (nodeKey) {
-                case PLATFORM_NAME:
-                    if (actualValue != null && !StringUtils.equalsIgnoreCase(actualValue, expectedValue)) {
-                        return false;
-                    }
-                    break;
-                case PLATFORM_VERSION:
-                    if (actualValue != null) {
-                        // Limited interval: 6.1.1-7.0
-                        if (expectedValue.matches("(\\d+\\.){0,}(\\d+)-(\\d+\\.){0,}(\\d+)$")) {
-                            PlatformVersion actPV = new PlatformVersion(actualValue);
-                            PlatformVersion minPV = new PlatformVersion(expectedValue.split("-")[0]);
-                            PlatformVersion maxPV = new PlatformVersion(expectedValue.split("-")[1]);
-
-                            if (actPV.compareTo(minPV) < 0 || actPV.compareTo(maxPV) > 0) {
-                                return false;
-                            }
-                        }
-                        // Unlimited interval: 6.0+
-                        else if (expectedValue.matches("(\\d+\\.){0,}(\\d+)\\+$")) {
-                            PlatformVersion actPV = new PlatformVersion(actualValue);
-                            PlatformVersion minPV = new PlatformVersion(expectedValue.replace("+", ""));
-
-                            if (actPV.compareTo(minPV) < 0) {
-                                return false;
-                            }
-                        }
-                        // Multiple versions: 6.1,7.0
-                        else if (expectedValue.matches("(\\d+\\.){0,}(\\d+,)+(\\d+\\.){0,}(\\d+)$")) {
-                            boolean matches = false;
-                            for (String version : expectedValue.split(",")) {
-                                if (new PlatformVersion(version).compareTo(new PlatformVersion(actualValue)) == 0) {
-                                    matches = true;
-                                    break;
-                                }
-                            }
-                            if (!matches) {
-                                return false;
-                            }
-                        }
-                        // Exact version: 7.0
-                        else if (expectedValue.matches("(\\d+\\.){0,}(\\d+)$")) {
-                            if (new PlatformVersion(expectedValue).compareTo(new PlatformVersion(actualValue)) != 0) {
-                                return false;
-                            }
-                        } else {
-                            return false;
-                        }
-                    }
-                    break;
-                case DEVICE_NAME:
-                    if (actualValue != null && !Arrays.asList(expectedValue.split(",")).contains(actualValue)) {
-                        return false;
-                    }
-                    break;
-                case DEVICE_TYPE:
-                    if (actualValue != null && !StringUtils.equalsIgnoreCase(actualValue, expectedValue)) {
-                        return false;
-                    }
-                    break;
-                case APPIUM_UDID:
-                    if (actualValue != null && !Arrays.asList(expectedValue.split(",")).contains(actualValue)) {
-                        return false;
-                    }
-                    break;
-                default:
-                    break;
-                }
-            }
-        }
-
-        return true;
+    private boolean extensionCapabilityCheck(Map<String, Object> nodeCapabilities,
+            Map<String, Object> requestedCapabilities) {
+        return nodeCapabilities != null &&
+                requestedCapabilities != null &&
+                validators.stream()
+                        .allMatch(v -> v.apply(nodeCapabilities, requestedCapabilities));
     }
 
-    public class PlatformVersion implements Comparable<PlatformVersion> {
-        private int[] version;
-
-        public PlatformVersion(String v) {
-            if (v != null && v.matches("(\\d+\\.){0,}(\\d+)$")) {
-                String[] digits = v.split("\\.");
-                this.version = new int[digits.length];
-                for (int i = 0; i < digits.length; i++) {
-                    this.version[i] = Integer.valueOf(digits[i]);
-                }
-            }
-        }
-
-        public int[] getVersion() {
-            return version;
-        }
-
-        public void setVersion(int[] version) {
-            this.version = version;
-        }
-
-        @Override
-        public int compareTo(PlatformVersion pv) {
-            int result = 0;
-            if (pv != null && pv.getVersion() != null && this.version != null) {
-                int minL = Math.min(this.version.length, pv.getVersion().length);
-                int maxL = Math.max(this.version.length, pv.getVersion().length);
-
-                for (int i = 0; i < minL; i++) {
-                    result = this.version[i] - pv.getVersion()[i];
-                    if (result != 0) {
-                        break;
-                    }
-                }
-
-                if (result == 0 && this.version.length == minL && minL != maxL) {
-                    result = -1;
-                } else if (result == 0 && this.version.length == maxL && minL != maxL) {
-                    result = 1;
-                }
-            }
-            return result;
-        }
-    }
 }
