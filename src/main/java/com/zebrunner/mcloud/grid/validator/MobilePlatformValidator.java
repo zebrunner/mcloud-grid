@@ -18,7 +18,7 @@ public class MobilePlatformValidator implements Validator {
         Object provided = nodeCapabilities.get(CapabilityType.PLATFORM_NAME);
         // we cannot safely call toString method for Platform object. ANDROID, IOS and so on do not override this method,
         // so we try to get name as is.
-        if (anything(requested instanceof Platform ? ((Platform) requested).name() : String.valueOf(requested))) {
+        if (anything(requested instanceof Platform ? ((Platform) requested).name() : (String) requested)) {
             return true;
         }
 
