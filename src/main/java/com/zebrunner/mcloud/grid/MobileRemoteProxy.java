@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.common.exception.CapabilityNotPresentOnTheGridException;
 import org.openqa.grid.internal.GridRegistry;
@@ -108,6 +110,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             LOGGER.warning(String.format(
                                     "%s is not ready for a session. /status-adb error: %s", udid,
                                     response.getObject()));
+                            HttpClientApache.create()
+                                    .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
+                                    .post(new StringEntity("{\"exitCode\": 100}", ContentType.APPLICATION_JSON));
                             return null;
                         }
                         LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
