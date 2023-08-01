@@ -112,7 +112,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                                     response.getObject()));
                             HttpClientApache.create()
                                     .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
-                                    .post(new StringEntity("{\"exitCode\": 100}", ContentType.APPLICATION_JSON));
+                                    .post(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                             return null;
                         }
                         LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
