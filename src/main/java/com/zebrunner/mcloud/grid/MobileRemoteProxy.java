@@ -105,21 +105,19 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     Response<String> response;
                     switch (platform) {
                     case ANDROID:
-                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get();
+                        response = HttpClientApache.create()
+                                .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
+                                .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                         if (response.getStatus() != 200) {
-                            LOGGER.warning(String.format(
-                                    "%s is not ready for a session. /status-adb error: %s", udid,
-                                    response.getObject()));
-                            HttpClientApache.create()
-                                    .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
-                                    .post(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
+                            LOGGER.warning(String.format("%s is not ready for a session. /status-adb error: %s", udid, response.getObject()));
                             return null;
                         }
                         LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
                         LOGGER.fine("/status-adb response content: " + response.getObject());
                         break;
                     case IOS:
-                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get();
+                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString())
+                                .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                         if (response.getStatus() != 200) {
                             LOGGER.warning(
                                     String.format(
@@ -150,7 +148,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
         return null;
     }
-    
+
     @Override
     public boolean hasCapability(Map<String, Object> requestedCapability) {
         // verify that required STF connection can be established trying to init STF client 
