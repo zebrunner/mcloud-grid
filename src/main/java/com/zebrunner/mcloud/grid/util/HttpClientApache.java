@@ -16,6 +16,7 @@
 package com.zebrunner.mcloud.grid.util;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,6 +24,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
@@ -71,6 +73,30 @@ public class HttpClientApache {
             return null;
         }
         return execute(new HttpGet(url));
+    }
+
+    public static class HttpGetWithEntity extends HttpEntityEnclosingRequestBase {
+        public static final String METHOD_NAME = "GET";
+
+        public HttpGetWithEntity(final String uri) {
+            super();
+            setURI(URI.create(uri));
+        }
+
+        @Override
+        public String getMethod() {
+            return METHOD_NAME;
+        }
+    }
+
+    public Response<String> get(HttpEntity entity) {
+        if (url == null) {
+            LOGGER.log(Level.WARNING, "url should be specified!");
+            return null;
+        }
+        HttpGetWithEntity get = new HttpGetWithEntity(url);
+        get.setEntity(entity);
+        return execute(get);
     }
 
     public Response<String> post(HttpEntity entity) {

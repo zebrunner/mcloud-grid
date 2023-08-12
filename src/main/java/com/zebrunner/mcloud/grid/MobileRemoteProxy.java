@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.common.exception.CapabilityNotPresentOnTheGridException;
 import org.openqa.grid.internal.GridRegistry;
@@ -40,6 +42,9 @@ import com.zebrunner.mcloud.grid.util.HttpClientApache;
  */
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
+    
+    //to operate with RequestedCapabilities where prefix is present
+    private static final String DEVICE_TYPE = "appium:deviceType";
     
     private final String URL = System.getenv("STF_URL");
     private final String TOKEN = System.getenv("STF_TOKEN");
@@ -100,18 +105,19 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     Response<String> response;
                     switch (platform) {
                     case ANDROID:
-                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString()).get();
+                        response = HttpClientApache.create()
+                                .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
+                                .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                         if (response.getStatus() != 200) {
-                            LOGGER.warning(String.format(
-                                    "%s is not ready for a session. /status-adb error: %s", udid,
-                                    response.getObject()));
+                            LOGGER.warning(String.format("%s is not ready for a session. /status-adb error: %s", udid, response.getObject()));
                             return null;
                         }
                         LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
                         LOGGER.fine("/status-adb response content: " + response.getObject());
                         break;
                     case IOS:
-                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString()).get();
+                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString())
+                                .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                         if (response.getStatus() != 200) {
                             LOGGER.warning(
                                     String.format(
@@ -142,7 +148,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
         return null;
     }
-    
+
     @Override
     public boolean hasCapability(Map<String, Object> requestedCapability) {
         // verify that required STF connection can be established trying to init STF client 
@@ -164,7 +170,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
         if (!StringUtils.isEmpty(udid)) {
-            Object deviceType = session.getRequestedCapabilities().get("deviceType");
+            Object deviceType = session.getRequestedCapabilities().get(DEVICE_TYPE);
             if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
                 //override platformName for the appium capabilities into tvOS
                 LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
@@ -174,7 +180,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             STFClient client = (STFClient) session.get(STF_CLIENT);
             if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
                 // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
-                session.getRequestedCapabilities().put("slotCapabilities", getSlotCapabilities(session, udid));
+                session.getRequestedCapabilities().put("zebrunner:slotCapabilities", getSlotCapabilities(session, udid));
             }
         }
     }
@@ -200,7 +206,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // get existing slot capabilities from session
         slotCapabilities.putAll(session.getSlot().getCapabilities());
         
-        Object deviceType = session.getSlot().getCapabilities().get("deviceType");
+        Object deviceType = session.getSlot().getCapabilities().get(DEVICE_TYPE);
         if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
             //override platformName in slot to register valid platform in reporting
             slotCapabilities.put("platformName", "tvOS");
