@@ -199,7 +199,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
         Object udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid").orElse(null);
-        if (StringUtils.isEmpty(String.valueOf(udid))) {
+        if (StringUtils.isEmpty((String)udid)) {
             LOGGER.warning(String.format("udid is null or empty in beforeSession. Slot capabilities: %s", session.getSlot().getCapabilities()));
             return;
         }
