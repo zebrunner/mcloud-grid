@@ -175,15 +175,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public void beforeSession(TestSession session) {
-    throw new RuntimeException("WARNING : beforeSession should NOT throw exception. If an exception is thrown, the session is considered invalid and the resources will be freed.");
-    /*
         String sessionId = getExternalSessionId(session);
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
         Object udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid").orElse(null);
         if (StringUtils.isEmpty(String.valueOf(udid))) {
             LOGGER.warning(String.format("udid is null or empty in beforeSession. Slot capabilities: %s", session.getSlot().getCapabilities()));
-           return;
+            return;
         }
 
         Object deviceType = CapabilityUtils.getZebrunnerCapability(session.getRequestedCapabilities(), DEVICE_TYPE).orElse(null);
@@ -198,8 +196,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
             session.getRequestedCapabilities().put("zebrunner:slotCapabilities", getSlotCapabilities(session, String.valueOf(udid)));
         }
-
-     */
     }
 
     @Override
@@ -221,7 +217,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         boolean isReturned = client.returnDevice(String.valueOf(udid), session.getRequestedCapabilities());
         if (!isReturned) {
-            LOGGER.warning("Device could not be returned to the STF.");
+            LOGGER.warning(String.format("Device could not be returned to the STF. Capabilities: %s", session.getSlot().getCapabilities()));
         }
     }
 
