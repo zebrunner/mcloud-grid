@@ -143,11 +143,17 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     LOGGER.fine("CHECK_APPIUM_STATUS is not enabled!");
                 }
 
-                if (!validateRemoteURL(testslot, client, udid, requestedCapability)) {
+                if(!reserveSTFDevice(client, testslot, requestedCapability)) {
                     return null;
                 }
 
-                if(!reserveSTFDevice(client, testslot, requestedCapability)) {
+                if (!validateSTFRemoteURL(testslot, client, udid, requestedCapability)) {
+                    // obligatory return device to the STF ASAP for unsuccessful session
+                    boolean isReturned = client.returnDevice(String.valueOf(udid),  requestedCapability);
+                    if (!isReturned) {
+                        LOGGER.warning(
+                                String.format("Device could not be returned to the STF. Slot capabilities: %s", testslot.getCapabilities()));
+                    }
                     return null;
                 }
 
@@ -187,7 +193,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         return super.hasCapability(requestedCapability);
     }
 
-    private boolean validateRemoteURL(TestSlot testslot, STFClient client, String udid, Map<String, Object> requestedCapabilities) {
+    private boolean validateSTFRemoteURL(TestSlot testslot, STFClient client, String udid, Map<String, Object> requestedCapabilities) {
         Object enableAdb = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "enableAdb").orElse(null);
         if (Platform.ANDROID.equals(Platform.fromCapabilities(testslot.getCapabilities())) && enableAdb != null &&
                 Boolean.parseBoolean(String.valueOf(enableAdb))) {
