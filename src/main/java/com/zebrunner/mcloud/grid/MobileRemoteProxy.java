@@ -147,7 +147,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     return null;
                 }
 
-                if (!validateRemoteURL(testslot, client, udid, requestedCapability)) {
+                if (!validateSTFRemoteURL(testslot, client, udid, requestedCapability)) {
                     // obligatory return device to the STF ASAP for unsuccessful session
                     boolean isReturned = client.returnDevice(String.valueOf(udid),  requestedCapability);
                     if (!isReturned) {
@@ -193,7 +193,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         return super.hasCapability(requestedCapability);
     }
 
-    private boolean validateRemoteURL(TestSlot testslot, STFClient client, String udid, Map<String, Object> requestedCapabilities) {
+    private boolean validateSTFRemoteURL(TestSlot testslot, STFClient client, String udid, Map<String, Object> requestedCapabilities) {
         Object enableAdb = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "enableAdb").orElse(null);
         if (Platform.ANDROID.equals(Platform.fromCapabilities(testslot.getCapabilities())) && enableAdb != null &&
                 Boolean.parseBoolean(String.valueOf(enableAdb))) {
