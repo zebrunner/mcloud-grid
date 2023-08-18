@@ -175,6 +175,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public void beforeSession(TestSession session) {
+        LOGGER.warning("ALALAL");
+        return;
+        /*
         String sessionId = getExternalSessionId(session);
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
@@ -196,6 +199,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
             session.getRequestedCapabilities().put("zebrunner:slotCapabilities", getSlotCapabilities(session, String.valueOf(udid)));
         }
+
+         */
     }
 
     @Override
