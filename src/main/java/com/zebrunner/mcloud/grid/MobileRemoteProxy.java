@@ -176,6 +176,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public void beforeSession(TestSession session) {
     throw new RuntimeException("WARNING : beforeSession should NOT throw exception. If an exception is thrown, the session is considered invalid and the resources will be freed.");
+    /*
         String sessionId = getExternalSessionId(session);
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
@@ -197,6 +198,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
             session.getRequestedCapabilities().put("zebrunner:slotCapabilities", getSlotCapabilities(session, String.valueOf(udid)));
         }
+
+     */
     }
 
     @Override
