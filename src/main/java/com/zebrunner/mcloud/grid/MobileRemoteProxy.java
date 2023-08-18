@@ -35,7 +35,6 @@ import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
-import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.remote.CapabilityType;
 
 /**
@@ -143,17 +142,24 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 } else {
                     LOGGER.fine("CHECK_APPIUM_STATUS is not enabled!");
                 }
-                if(!beforeSessionCreation(client, testslot, requestedCapability)) {
+                if(!reserveSTFDevice(client, testslot, requestedCapability)) {
                     return null;
                 }
 
                 TestSession session = testslot.getNewSession(requestedCapability);
+                // todo still TBD if session might generate exception
+                if (session == null) {
+                    // obligatory return device to the STF ASAP for unsuccessful session
+                    boolean isReturned = client.returnDevice(String.valueOf(udid), session.getRequestedCapabilities());
+                    if (!isReturned) {
+                        LOGGER.warning(
+                                String.format("Device could not be returned to the STF. Slot capabilities: %s", session.getSlot().getCapabilities()));
+                    }
+                    return null;
+                }
                 // remember current STF client in test session object
                 session.put(STF_CLIENT, client);
-
-                if (session != null) {
-                    return session;
-                }
+                return session;
             }
             return null;
         } catch (Exception e) {
@@ -176,7 +182,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         return super.hasCapability(requestedCapability);
     }
 
-    public boolean beforeSessionCreation(STFClient client, TestSlot slot, Map<String, Object>  requestedCapabilities) {
+    public boolean reserveSTFDevice(STFClient client, TestSlot slot, Map<String, Object>  requestedCapabilities) {
         Object udid = CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid").orElse(null);
         if(StringUtils.isEmpty((String)udid)) {
             LOGGER.warning(String.format("Udid is null or empty. Capabilities: %s", slot.getCapabilities()));
