@@ -43,7 +43,7 @@ public class HttpClientApache {
     private final static RequestConfig DEFAULT_REQUEST_CFG = RequestConfig.custom()
             .setConnectionRequestTimeout(1000)
             .setConnectTimeout(1000)
-            .setSocketTimeout(1000)
+            .setSocketTimeout(3000)
             .build();
 
     private RequestConfig requestConfig = DEFAULT_REQUEST_CFG;
