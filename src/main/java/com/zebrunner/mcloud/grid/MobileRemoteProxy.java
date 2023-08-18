@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
@@ -34,6 +35,8 @@ import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
+import org.openqa.selenium.Capabilities;
+import org.openqa.selenium.remote.CapabilityType;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
@@ -62,91 +65,101 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
-        LOGGER.fine("Trying to create a new session on node " + this);
+        try {
+            LOGGER.fine("Trying to create a new session on node " + this);
 
-        if (isDown()) {
-            return null;
-        }
-        
-        if (!hasCapability(requestedCapability)) {
-            LOGGER.fine("Node '" + this + "' has no matching capability!");
-            return null;
-        }
-
-        // any slot left at all?
-        if (getTotalUsed() >= config.maxSession) {
-            LOGGER.fine("Node '" + this + "' has no free slots!");
-            return null;
-        }
-
-        // init new STF client per each session request
-        STFClient client = getSTFClient(requestedCapability);
-        
-        // any slot left for the given app ?
-        for (TestSlot testslot : getTestSlots()) {
-
-            if (!testslot.getCapabilities().containsKey("udid")) {
-                // Appium node must have UDID capability to be identified in STF
-                return null;
-            }
-            
-            // Check if device is busy in STF
-            String udid = (String) testslot.getCapabilities().get("udid");
-            if (client.isEnabled() && !client.isDeviceAvailable(udid)) {
+            if (isDown()) {
                 return null;
             }
 
-            // additional check if device is ready for session with custom Appium's status verification
-            
-            if (this.CHECK_APPIUM_STATUS) {
-                LOGGER.fine("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
-                try {
-                    Platform platform = Platform.fromCapabilities(testslot.getCapabilities());
-                    Response<String> response;
-                    switch (platform) {
-                    case ANDROID:
-                        response = HttpClientApache.create()
-                                .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
-                                .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
-                        if (response.getStatus() != 200) {
-                            LOGGER.warning(String.format("%s is not ready for a session. /status-adb error: %s", udid, response.getObject()));
-                            return null;
-                        }
-                        LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
-                        LOGGER.fine("/status-adb response content: " + response.getObject());
-                        break;
-                    case IOS:
-                        response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString())
-                                .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
-                        if (response.getStatus() != 200) {
-                            LOGGER.warning(
-                                    String.format(
-                                            "%s is not ready for a session. /status-wda error: %s",
-                                            udid, response.getObject()));
-                            return null;
-                        }
-                        LOGGER.fine(String.format("%s /status-wda successfully passed", udid));
-                        LOGGER.fine("/status-wda response content: " + response.getObject());
-                        break;
-                    default:
-                        LOGGER.info(String.format("Appium health-check is not supported for '%s'", platform.toString()));
-                    }
-                } catch (Exception e) {
-                    LOGGER.warning("Appium health-check failed: " + e.getMessage());
+            if (!hasCapability(requestedCapability)) {
+                LOGGER.fine("Node '" + this + "' has no matching capability!");
+                return null;
+            }
+
+            // any slot left at all?
+            if (getTotalUsed() >= config.maxSession) {
+                LOGGER.fine("Node '" + this + "' has no free slots!");
+                return null;
+            }
+
+            // init new STF client per each session request
+            STFClient client = getSTFClient(requestedCapability);
+
+            // any slot left for the given app ?
+            for (TestSlot testslot : getTestSlots()) {
+
+                if (CapabilityUtils.getAppiumCapability(testslot.getCapabilities(),"udid").isEmpty()) {
+                    LOGGER.warning(String.format("Appium node must have UDID capability to be identified in STF. Capabilities: %s", testslot.getCapabilities()));
+                    // Appium node must have UDID capability to be identified in STF
+                    return null;
                 }
-            } else {
-                LOGGER.fine("CHECK_APPIUM_STATUS is not enabled!");
-            }
 
-            TestSession session = testslot.getNewSession(requestedCapability);
-            // remember current STF client in test session object
-            session.put(STF_CLIENT, client);
+                // Check if device is busy in STF
+                String udid = String.valueOf(CapabilityUtils.getAppiumCapability(testslot.getCapabilities(),"udid").get());
+                if (client.isEnabled() && !client.isDeviceAvailable(udid)) {
+                    return null;
+                }
 
-            if (session != null) {
-                return session;
+                // additional check if device is ready for session with custom Appium's status verification
+
+                if (this.CHECK_APPIUM_STATUS) {
+                    LOGGER.fine("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
+                    try {
+                        Platform platform = Platform.fromCapabilities(testslot.getCapabilities());
+                        Response<String> response;
+                        switch (platform) {
+                        case ANDROID:
+                            response = HttpClientApache.create()
+                                    .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
+                                    .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
+                            if (response.getStatus() != 200) {
+                                LOGGER.warning(String.format("%s is not ready for a session. /status-adb error: %s", udid, response.getObject()));
+                                return null;
+                            }
+                            LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
+                            LOGGER.fine("/status-adb response content: " + response.getObject());
+                            break;
+                        case IOS:
+                            response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString())
+                                    .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
+                            if (response.getStatus() != 200) {
+                                LOGGER.warning(
+                                        String.format(
+                                                "%s is not ready for a session. /status-wda error: %s",
+                                                udid, response.getObject()));
+                                return null;
+                            }
+                            LOGGER.fine(String.format("%s /status-wda successfully passed", udid));
+                            LOGGER.fine("/status-wda response content: " + response.getObject());
+                            break;
+                        default:
+                            LOGGER.info(String.format("Appium health-check is not supported for '%s'", platform.toString()));
+                        }
+                    } catch (Exception e) {
+                        LOGGER.warning("Appium health-check failed: " + e.getMessage());
+                        return null;
+                    }
+                } else {
+                    LOGGER.fine("CHECK_APPIUM_STATUS is not enabled!");
+                }
+                if(!beforeSessionCreation(client, testslot, requestedCapability)) {
+                    return null;
+                }
+
+                TestSession session = testslot.getNewSession(requestedCapability);
+                // remember current STF client in test session object
+                session.put(STF_CLIENT, client);
+
+                if (session != null) {
+                    return session;
+                }
             }
+            return null;
+        } catch (Exception e) {
+            LOGGER.warning(String.format("Got error in MobileRemoteProxy.getNewSession: %s", e.getMessage()));
+            return null;
         }
-        return null;
     }
 
     @Override
@@ -162,26 +175,40 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         
         return super.hasCapability(requestedCapability);
     }
-    
+
+    public boolean beforeSessionCreation(STFClient client, TestSlot slot, Map<String, Object>  requestedCapabilities) {
+        Object udid = CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid").orElse(null);
+        if(StringUtils.isEmpty((String)udid)) {
+            LOGGER.warning(String.format("Udid is null or empty. Capabilities: %s", slot.getCapabilities()));
+            return false;
+        }
+
+        if (client.reserveDevice(String.valueOf(udid), requestedCapabilities)) {
+            // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
+            requestedCapabilities.put("zebrunner:slotCapabilities", getSlotCapabilities(slot, String.valueOf(udid), client));
+        } else {
+            LOGGER.warning(String.format("Cannot reserve device. Slot capabilities: %s", slot.getCapabilities()));
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public void beforeSession(TestSession session) {
         String sessionId = getExternalSessionId(session);
         LOGGER.finest("beforeSession sessionId: " + sessionId);
 
-        String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        if (!StringUtils.isEmpty(udid)) {
-            Object deviceType = session.getRequestedCapabilities().get(DEVICE_TYPE);
-            if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
-                //override platformName for the appium capabilities into tvOS
-                LOGGER.finest("beforeSession overriding: '" + session.get("platformName") + "' by 'tvOS' for " + sessionId);
-                session.getRequestedCapabilities().put("platformName", "tvOS");
-            }
-            
-            STFClient client = (STFClient) session.get(STF_CLIENT);
-            if (client.reserveDevice(udid, session.getRequestedCapabilities())) {
-                // this is our slot object for Zebrunner Mobile Farm (Android or iOS)
-                session.getRequestedCapabilities().put("zebrunner:slotCapabilities", getSlotCapabilities(session, udid));
-            }
+        Object udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid").orElse(null);
+        if (StringUtils.isEmpty(String.valueOf(udid))) {
+            LOGGER.warning(String.format("udid is null or empty in beforeSession. Slot capabilities: %s", session.getSlot().getCapabilities()));
+            return;
+        }
+
+        Object deviceType = CapabilityUtils.getZebrunnerCapability(session.getRequestedCapabilities(), DEVICE_TYPE).orElse(null);
+        if (deviceType != null && "tvos".equalsIgnoreCase(deviceType.toString())) {
+            //override platformName for the appium capabilities into tvOS
+            LOGGER.finest("beforeSession overriding: '" + session.get(CapabilityType.PLATFORM_NAME) + "' by 'tvOS' for " + sessionId);
+            session.getRequestedCapabilities().put(CapabilityType.PLATFORM_NAME, "tvOS");
         }
     }
 
@@ -194,19 +221,28 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
 
         STFClient client = (STFClient) session.get(STF_CLIENT);
-        String udid = String.valueOf(session.getSlot().getCapabilities().get("udid"));
-        client.returnDevice(udid, session.getRequestedCapabilities());
-        
+        Object udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid").orElse(null);
+
+        if (udid == null) {
+            LOGGER.warning(String.format("There are no udid in slot capabilities. Device could not be returned to the STF. Capabilities: %s",
+                    session.getSlot().getCapabilities()));
+            return;
+        }
+
+        boolean isReturned = client.returnDevice(String.valueOf(udid), session.getRequestedCapabilities());
+        if (!isReturned) {
+            LOGGER.warning(String.format("Device could not be returned to the STF. Capabilities: %s", session.getSlot().getCapabilities()));
+        }
     }
 
-    private Map<String, Object> getSlotCapabilities(TestSession session, String udid) {
+    private Map<String, Object> getSlotCapabilities(TestSlot slot, String udid, STFClient client) {
         // obligatory create new map as original object is UnmodifiableMap
         Map<String, Object> slotCapabilities = new HashMap<String, Object>();
 
         // get existing slot capabilities from session
-        slotCapabilities.putAll(session.getSlot().getCapabilities());
+        slotCapabilities.putAll(slot.getCapabilities());
         
-        Object deviceType = session.getSlot().getCapabilities().get(DEVICE_TYPE);
+        Object deviceType = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), DEVICE_TYPE).orElse(null);
         if (deviceType != null  && "tvos".equalsIgnoreCase(deviceType.toString())) {
             //override platformName in slot to register valid platform in reporting
             slotCapabilities.put("platformName", "tvOS");
@@ -214,8 +250,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         // get remoteURL from STF device and put into custom slotCapabilities map
         String remoteURL = null;
-        STFClient client = (STFClient) session.get(STF_CLIENT);
         STFDevice stfDevice = client.getDevice(udid);
+        //todo add verification of capabilities.enableAdb
         if (stfDevice != null) {
             LOGGER.info("Identified '" + stfDevice.getModel() + "' device by udid: " + udid);
             remoteURL = (String) stfDevice.getRemoteConnectUrl();
