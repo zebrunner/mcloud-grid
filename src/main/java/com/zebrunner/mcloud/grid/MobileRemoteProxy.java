@@ -17,8 +17,10 @@ package com.zebrunner.mcloud.grid;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Logger;
 
+import com.zebrunner.mcloud.grid.servlets.ProxyServlet;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.ContentType;
@@ -168,6 +170,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     }
                     return null;
                 }
+
+                Optional<String> pacConfiguration = CapabilityUtils.getZebrunnerCapability(requestedCapability, "pac")
+                        .map(String::valueOf);
+                if (pacConfiguration.isPresent()) {
+                    LOGGER.info(String.format("Detected PAC configuration for device '%s': %n%s", udid, pacConfiguration.get()));
+                    ProxyServlet.updatePacConfiguration(udid, pacConfiguration.get());
+                }
+
                 // remember current STF client in test session object
                 session.put(STF_CLIENT, client);
                 return session;
@@ -243,7 +253,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public void afterSession(TestSession session) {
-        LOGGER.info("QQQQ sessionId = " +  getExternalSessionId(session));
         String sessionId = getExternalSessionId(session);
         LOGGER.info("afterSession sessionId: " + sessionId);
 
@@ -251,7 +260,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
 
         STFClient client = (STFClient) session.get(STF_CLIENT);
-        Object udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid").orElse(null);
+        String udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid")
+                .map(String::valueOf)
+                .orElse(null);
 
         if (udid == null) {
             LOGGER.warning(String.format("There are no udid in slot capabilities. Device could not be returned to the STF. Capabilities: %s",
@@ -259,10 +270,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return;
         }
 
-        boolean isReturned = client.returnDevice(String.valueOf(udid), session.getRequestedCapabilities());
+        boolean isReturned = client.returnDevice(udid, session.getRequestedCapabilities());
         if (!isReturned) {
             LOGGER.warning(String.format("Device could not be returned to the STF. Capabilities: %s", session.getSlot().getCapabilities()));
         }
+
+        ProxyServlet.cleanPacConfiguration(udid);
     }
 
     private Map<String, Object> getSlotCapabilities(TestSlot slot, String udid, STFClient client) {
