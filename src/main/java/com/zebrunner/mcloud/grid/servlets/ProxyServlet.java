@@ -12,7 +12,6 @@ import java.util.regex.Pattern;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.NoBodyResponse;
 
 import org.apache.http.HttpStatus;
 import org.apache.http.client.utils.DateUtils;
