@@ -2,16 +2,20 @@ package com.zebrunner.mcloud.grid.servlets;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.NoBodyResponse;
 
 import org.apache.http.HttpStatus;
+import org.apache.http.client.utils.DateUtils;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.web.servlet.RegistryBasedServlet;
 
@@ -48,6 +52,10 @@ public class ProxyServlet extends RegistryBasedServlet {
         process(req, resp);
     }
 
+    protected void doHead(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        process(req, resp);
+    }
+
     protected void process(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Matcher matcher = PAC_PATTERN.matcher(request.getRequestURI());
         if (matcher.find()) {
@@ -60,6 +68,7 @@ public class ProxyServlet extends RegistryBasedServlet {
             response.setContentType("application/x-ns-proxy-autoconfig");
             response.setHeader("Pragma", "no-cache");
             response.setHeader("Cache-Control", "no-cache");
+            response.setHeader("Last-Modified", String.valueOf(ZonedDateTime.now().toInstant().toEpochMilli()));
             response.setCharacterEncoding("UTF-8");
             response.getWriter()
                     .write(new String(pacConfiguration.getBytes(StandardCharsets.UTF_8)));
