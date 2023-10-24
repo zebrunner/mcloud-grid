@@ -171,6 +171,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     return null;
                 }
 
+                ProxyServlet.cleanPacConfiguration(udid);
                 Optional<String> pacConfiguration = CapabilityUtils.getZebrunnerCapability(requestedCapability, "pac")
                         .map(String::valueOf);
                 if (pacConfiguration.isPresent()) {
