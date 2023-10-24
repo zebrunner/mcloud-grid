@@ -51,10 +51,6 @@ public class ProxyServlet extends RegistryBasedServlet {
         process(req, resp);
     }
 
-    protected void doHead(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        process(req, resp);
-    }
-
     protected void process(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Matcher matcher = PAC_PATTERN.matcher(request.getRequestURI());
         if (matcher.find()) {
@@ -67,6 +63,7 @@ public class ProxyServlet extends RegistryBasedServlet {
             response.setContentType("application/x-ns-proxy-autoconfig");
             response.setHeader("Pragma", "no-cache");
             response.setHeader("Cache-Control", "no-cache");
+            response.setHeader("Date",  String.valueOf(ZonedDateTime.now().toInstant().toEpochMilli()));
             response.setHeader("Last-Modified", String.valueOf(ZonedDateTime.now().toInstant().toEpochMilli()));
             response.setCharacterEncoding("UTF-8");
             response.getWriter()
