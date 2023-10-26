@@ -63,8 +63,8 @@ public class ProxyServlet extends RegistryBasedServlet {
             response.setContentType("application/x-ns-proxy-autoconfig");
             response.setHeader("Pragma", "no-cache");
             response.setHeader("Cache-Control", "no-cache");
-            response.setHeader("Date",  String.valueOf(ZonedDateTime.now().toInstant().toEpochMilli()));
-            response.setHeader("Last-Modified", String.valueOf(ZonedDateTime.now().toInstant().toEpochMilli()));
+//            response.setHeader("Date",  String.valueOf(ZonedDateTime.now().toInstant().toEpochMilli()));
+//            response.setHeader("Last-Modified", String.valueOf(ZonedDateTime.now().toInstant().toEpochMilli()));
             response.setCharacterEncoding("UTF-8");
             response.getWriter()
                     .write(new String(pacConfiguration.getBytes(StandardCharsets.UTF_8)));
