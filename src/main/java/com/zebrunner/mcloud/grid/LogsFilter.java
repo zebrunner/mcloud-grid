@@ -9,6 +9,6 @@ public class LogsFilter implements Filter {
 
     public boolean isLoggable(LogRecord record) {
         // do not log this exception
-        return !StringUtils.equalsIgnoreCase(record.getMessage(), "timed out waiting for a node to become available");
+        return !StringUtils.containsIgnoreCase(record.getMessage(), "timed out waiting for a node to become available");
     }
 }
