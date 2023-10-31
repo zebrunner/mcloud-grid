@@ -39,7 +39,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public class ProxyInfo extends RegistryBasedServlet {
 	private static final long serialVersionUID = 1224921425278259572L;
-	
+
 	private static final ObjectMapper mapper = new ObjectMapper();
 
 	public ProxyInfo() {

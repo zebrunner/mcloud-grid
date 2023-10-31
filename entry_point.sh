@@ -34,10 +34,10 @@ function shutdown {
     echo "shutdown complete"
 }
 
-java ${JAVA_OPTS} -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
+java ${JAVA_OPTS} -Djava.util.logging.config.file=/opt/selenium/logger.properties -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
   org.openqa.grid.selenium.GridLauncherV3 \
   -role hub \
-  -servlets com.zebrunner.mcloud.grid.servlets.ProxyInfo \
+  -servlets com.zebrunner.mcloud.grid.servlets.ProxyInfo,com.zebrunner.mcloud.grid.servlets.ProxyServlet \
   -hubConfig $CONF \
   ${SE_OPTS} &
 NODE_PID=$!
