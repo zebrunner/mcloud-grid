@@ -235,9 +235,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public void beforeSession(TestSession session) {
-        String sessionId = getExternalSessionId(session);
-        LOGGER.info("beforeSession sessionId: " + sessionId);
-
         Object udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid").orElse(null);
         if (StringUtils.isEmpty((String)udid)) {
             LOGGER.warning(String.format("udid is null or empty in beforeSession. Slot capabilities: %s", session.getSlot().getCapabilities()));
@@ -247,7 +244,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         Object deviceType = CapabilityUtils.getZebrunnerCapability(session.getRequestedCapabilities(), DEVICE_TYPE).orElse(null);
         if (deviceType != null && "tvos".equalsIgnoreCase(deviceType.toString())) {
             //override platformName for the appium capabilities into tvOS
-            LOGGER.info("beforeSession overriding: '" + session.get(CapabilityType.PLATFORM_NAME) + "' by 'tvOS' for " + sessionId);
+            LOGGER.info("beforeSession overriding: '" + session.get(CapabilityType.PLATFORM_NAME) + "' by 'tvOS'");
             session.getRequestedCapabilities().put(CapabilityType.PLATFORM_NAME, "tvOS");
         }
     }
@@ -255,7 +252,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public void afterSession(TestSession session) {
         String sessionId = getExternalSessionId(session);
-        LOGGER.info("afterSession sessionId: " + sessionId);
+        LOGGER.info(String.format("Session [%s] will be closed.", sessionId));
 
         // unable to start recording after Session due to the:
         // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
