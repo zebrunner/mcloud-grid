@@ -18,6 +18,7 @@ package com.zebrunner.mcloud.grid;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import com.zebrunner.mcloud.grid.servlets.ProxyServlet;
@@ -36,6 +37,7 @@ import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
+import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.remote.CapabilityType;
 
 /**
@@ -46,8 +48,9 @@ import org.openqa.selenium.remote.CapabilityType;
 public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final Logger LOGGER = Logger.getLogger(MobileRemoteProxy.class.getName());
     //to operate with RequestedCapabilities where prefix is present
-    private static final String DEVICE_TYPE = "deviceType";
+    private static final String DEVICE_TYPE_CAPABILITY = "deviceType";
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
+    private static final String SESSION_UUID_PARAMETER = "SESSION_UUID_PARAMETER";
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
@@ -55,39 +58,36 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
+        String sessionUUID = UUID.randomUUID().toString();
+        LOGGER.info(() -> String.format("[NODE-%s] Request new session. Capabilities: %s.", sessionUUID, requestedCapability));
+
         String udid = null;
         try {
-            LOGGER.fine("Trying to create a new session on node " + this);
             if (isDown()) {
+                LOGGER.fine(() -> String.format("[NODE-%s] Node is down.", sessionUUID));
                 return null;
             }
             if (!hasCapability(requestedCapability)) {
-                LOGGER.fine("Node '" + this + "' has no matching capability!");
+                LOGGER.warning(() -> String.format("[NODE-%s] Node does not match requested capabilities.", sessionUUID));
                 return null;
             }
-            // any slot left at all?
             if (getTotalUsed() >= config.maxSession) {
-                LOGGER.fine("Node '" + this + "' has no free slots!");
+                LOGGER.warning(() -> String.format("[NODE-%s] Node has no free slots.", sessionUUID));
                 return null;
             }
-            // any slot left for the given app ?
             for (TestSlot testslot : getTestSlots()) {
-                // Check if device is busy in STF
+                LOGGER.info(() -> String.format("[NODE-%s] Start of the logic that trying to get TestSlot. TestSlot capabilities: %s.", sessionUUID,
+                        testslot.getCapabilities()));
                 udid = String.valueOf(CapabilityUtils.getAppiumCapability(testslot.getCapabilities(), "udid").orElse(""));
                 if (StringUtils.isBlank(udid)) {
-                    LOGGER.warning(String.format("Appium node must have UDID capability to be identified in STF. Capabilities: %s",
-                            testslot.getCapabilities()));
+                    LOGGER.warning(() -> String.format("[NODE-%s] Appium node must have 'UDID' capability to be identified in STF.", sessionUUID));
                     return null;
                 }
-
-                if (!STFClient.reserveSTFDevice(udid, requestedCapability)) {
-                    return null;
-                }
-                requestedCapability.put("zebrunner:slotCapabilities", getSlotCapabilities(testslot, udid, STFClient.getSTFDevice(udid)));
 
                 // additional check if device is ready for session with custom Appium's status verification
                 if (CHECK_APPIUM_STATUS) {
-                    LOGGER.fine("CHECK_APPIUM_STATUS is enabled so additional Appium health-check will be verified");
+                    LOGGER.info(() -> String.format("[NODE-%s] 'CHECK_APPIUM_STATUS' is enabled so additional Appium health-check will be verified.",
+                            sessionUUID));
                     try {
                         Platform platform = Platform.fromCapabilities(testslot.getCapabilities());
                         Response<String> response;
@@ -97,38 +97,50 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                                     .withUri(Path.APPIUM_STATUS_ADB, testslot.getRemoteURL().toString())
                                     .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                             if (response.getStatus() != 200) {
-                                LOGGER.warning(String.format("%s is not ready for a session. /status-adb error: %s", udid, response.getObject()));
+                                String finalUdid = udid;
+                                LOGGER.warning(() ->
+                                        String.format("[NODE-%s]  %s is not ready for a session. /status-adb error: %s.",
+                                                sessionUUID, finalUdid, response.getObject()));
                                 return null;
                             }
-                            LOGGER.fine(String.format("%s /status-adb successfully passed", udid));
-                            LOGGER.fine("/status-adb response content: " + response.getObject());
+                            String finalUdid1 = udid;
+                            LOGGER.info(() -> String.format("[NODE-%s]  %s /status-adb successfully passed.", sessionUUID, finalUdid1));
                             break;
                         case IOS:
                             response = HttpClientApache.create().withUri(Path.APPIUM_STATUS_WDA, testslot.getRemoteURL().toString())
                                     .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                             if (response.getStatus() != 200) {
-                                LOGGER.warning(
-                                        String.format(
-                                                "%s is not ready for a session. /status-wda error: %s",
-                                                udid, response.getObject()));
+                                String finalUdid2 = udid;
+                                LOGGER.warning(() ->
+                                        String.format("[NODE-%s]  %s is not ready for a session. /status-wda error: %s.",
+                                                sessionUUID, finalUdid2, response.getObject()));
                                 return null;
                             }
-                            LOGGER.fine(String.format("%s /status-wda successfully passed", udid));
-                            LOGGER.fine("/status-wda response content: " + response.getObject());
+                            String finalUdid3 = udid;
+                            LOGGER.info(() -> String.format("[NODE-%s]  %s /status-wda successfully passed.", sessionUUID, finalUdid3));
                             break;
                         default:
-                            LOGGER.info(String.format("Appium health-check is not supported for '%s'", platform.toString()));
+                            LOGGER.info(() -> String.format("[NODE-%s] Appium health-check is not supported for '%s'.", sessionUUID,
+                                    platform.toString()));
                         }
                     } catch (Exception e) {
-                        LOGGER.warning("Appium health-check failed: " + e.getMessage());
+                        LOGGER.warning(() -> String.format("[NODE-%s] Appium health-check failed: %s.", sessionUUID, e));
                         return null;
                     }
                 } else {
-                    LOGGER.fine("CHECK_APPIUM_STATUS is not enabled!");
+                    LOGGER.info(() -> String.format("[NODE-%s] 'CHECK_APPIUM_STATUS' is not enabled.", sessionUUID));
                 }
 
+                if (!STFClient.reserveSTFDevice(udid, requestedCapability, sessionUUID)) {
+                    return null;
+                }
+
+                Map<String, Object> slotCapabilities = getSlotCapabilities(testslot, udid, STFClient.getSTFDevice(udid));
+                LOGGER.info(() ->
+                        String.format("[NODE-%s] slotCapabilities will be added to the session capabilities: %s.", sessionUUID, slotCapabilities));
+                requestedCapability.put("zebrunner:slotCapabilities", slotCapabilities);
+
                 TestSession session = testslot.getNewSession(requestedCapability);
-                // todo still TBD if session might generate exception
                 if (session == null) {
                     STFClient.disconnectSTFDevice(udid);
                     return null;
@@ -138,80 +150,88 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 Optional<String> pacConfiguration = CapabilityUtils.getZebrunnerCapability(requestedCapability, "pac")
                         .map(String::valueOf);
                 if (pacConfiguration.isPresent()) {
-                    LOGGER.info(String.format("Detected PAC configuration for device '%s': %n%s", udid, pacConfiguration.get()));
+                    LOGGER.info(() -> String.format("[NODE-%s] Detected PAC configuration: %n%s.", sessionUUID, pacConfiguration.get()));
                     ProxyServlet.updatePacConfiguration(udid, pacConfiguration.get());
                 }
+                session.put(SESSION_UUID_PARAMETER, sessionUUID);
                 return session;
             }
             return null;
         } catch (Exception e) {
-            LOGGER.warning(String.format("Got error in MobileRemoteProxy.getNewSession: %s", e));
+            LOGGER.warning(() -> String.format("[NODE-%s] Exception in MobileRemoteProxy.getNewSession: %s.", sessionUUID, e));
             if (udid != null) {
                 STFClient.disconnectSTFDevice(udid);
             }
+            ProxyServlet.cleanPacConfiguration(udid);
             return null;
         }
     }
 
     @Override
     public void beforeSession(TestSession session) {
+        String sessionUUID = (String) session.get(SESSION_UUID_PARAMETER);
+        LOGGER.info(() -> String.format("[NODE-%s] Called 'beforeSession' method.", sessionUUID));
         try {
-            Object deviceType = CapabilityUtils.getZebrunnerCapability(session.getRequestedCapabilities(), DEVICE_TYPE).orElse(null);
-            if (deviceType != null && "tvos".equalsIgnoreCase(deviceType.toString())) {
+            String deviceType = CapabilityUtils.getZebrunnerCapability(session.getRequestedCapabilities(), DEVICE_TYPE_CAPABILITY)
+                    .map(String::valueOf)
+                    .orElse("");
+
+            if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
                 //override platformName for the appium capabilities into tvOS
-                LOGGER.info("beforeSession overriding: '" + session.get(CapabilityType.PLATFORM_NAME) + "' by 'tvOS'");
-                session.getRequestedCapabilities().put(CapabilityType.PLATFORM_NAME, "tvOS");
+                LOGGER.info(() -> String.format("[NODE-%s] Detected 'tvOS' 'deviceType' capability, so 'platformName' will be overrided by 'tvOS'.",
+                        sessionUUID));
+                session.getRequestedCapabilities()
+                        .put(CapabilityType.PLATFORM_NAME, "tvOS");
             }
         } catch (Exception e) {
-            LOGGER.warning("Error in the beforeSession: " + e.getMessage());
+            LOGGER.warning(() -> String.format("[NODE-%s] Exception in 'beforeSession' method: %s.", sessionUUID, e));
         }
     }
 
     @Override
     public void afterSession(TestSession session) {
+        String sessionUUID = (String) session.get(SESSION_UUID_PARAMETER);
         try {
             String sessionId = getExternalSessionId(session);
-            LOGGER.info(String.format("Session [%s] will be closed.", sessionId));
-
-            // unable to start recording after Session due to the:
-            // Error running afterSession for ext. key 5e6960c5-b82b-4e68-a24d-508c3d98dc53, the test slot is now dead: null
+            LOGGER.info(() -> String.format("[NODE-%s] Session [%s] will be closed.", sessionUUID, sessionId));
 
             Optional<String> udid = CapabilityUtils.getAppiumCapability(session.getSlot().getCapabilities(), "udid")
-                    .map(String::valueOf)
-                    .filter(StringUtils::isNotBlank);
+                    .map(String::valueOf);
 
             if (udid.isEmpty()) {
-                LOGGER.warning(String.format("There are no udid in slot capabilities. Device could not be returned to the STF. Capabilities: %s",
-                        session.getSlot().getCapabilities()));
+                LOGGER.warning(() ->
+                        String.format("[NODE-%s] There are no udid in slot capabilities. Device could not be returned to the STF. Capabilities: %s.",
+                                sessionUUID, session.getSlot().getCapabilities()));
                 return;
             }
 
             ProxyServlet.cleanPacConfiguration(udid.get());
             STFClient.disconnectSTFDevice(udid.get());
         } catch (Exception e) {
-            LOGGER.warning("Exception in afterSession: " + e.getMessage());
+            LOGGER.warning(String.format("[NODE-%s] Exception in afterSession: %s.", sessionUUID, e));
         }
     }
 
     private static Map<String, Object> getSlotCapabilities(TestSlot slot, String udid, STFDevice stfDevice) {
         Map<String, Object> slotCapabilities = new HashMap<>(slot.getCapabilities());
-        Object deviceType = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), DEVICE_TYPE).orElse(null);
-        if (deviceType != null && "tvos".equalsIgnoreCase(deviceType.toString())) {
-            slotCapabilities.put("platformName", "tvOS");
+        String deviceType = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), DEVICE_TYPE_CAPABILITY)
+                .map(String::valueOf)
+                .orElse("");
+        if (StringUtils.equalsIgnoreCase("tvos", deviceType)) {
+            slotCapabilities.put(CapabilityType.PLATFORM_NAME, "tvOS");
         }
-        String remoteURL;
+
         if (stfDevice != null) {
-            LOGGER.info(String.format("Identified '%s' device by udid: %s", stfDevice.getModel(), udid));
-            remoteURL = (String) stfDevice.getRemoteConnectUrl();
-            LOGGER.info(String.format("Identified remoteURL '%s' by udid: %s", remoteURL, udid));
+            LOGGER.info(() -> String.format("Identified '%s' device by udid: %s", stfDevice.getModel(), udid));
+            String remoteURL = (String) stfDevice.getRemoteConnectUrl();
+            LOGGER.info(() -> String.format("Identified remoteURL '%s' by udid: %s", remoteURL, udid));
             slotCapabilities.put("remoteURL", remoteURL);
         }
         return slotCapabilities;
     }
 
-    private String getExternalSessionId(TestSession session) {
+    private static String getExternalSessionId(TestSession session) {
         // external key if exists correlates with valid appium sessionId. Internal key is unique uuid value inside hub
         return session.getExternalKey() != null ? session.getExternalKey().getKey() : "";
     }
-
 }

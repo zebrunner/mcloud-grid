@@ -18,7 +18,6 @@ package com.zebrunner.mcloud.grid.integration.client;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -68,16 +67,16 @@ public final class STFClient {
     /**
      * Reserve STF device
      */
-    public static boolean reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities) {
+    public static boolean reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
+        LOGGER.info(() -> String.format("[STF-%s] Start of the logic that reserve STF Device", sessionUUID));
         if (!isSTFEnabled()) {
             return true;
         }
         if (STF_CLIENTS.get(deviceUDID) != null) {
-            LOGGER.warning(String.format("Device '%s' already busy (in the local pool). Info: %s", deviceUDID, STF_CLIENTS.get(deviceUDID)));
+            LOGGER.warning(() -> String.format("Device '%s' already busy (in the local pool). Info: %s", deviceUDID, STF_CLIENTS.get(deviceUDID)));
         }
 
         STFClient stfClient = new STFClient();
-        String stfSessionUUID = UUID.randomUUID().toString();
         String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TOKEN")
                 .map(String::valueOf)
                 .orElse(DEFAULT_STF_TOKEN);
@@ -93,8 +92,8 @@ public final class STFClient {
                 .get(User.class);
 
         if (user.getStatus() != 200) {
-            LOGGER.warning(
-                    String.format("[STF-%s] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", stfSessionUUID, STF_URL, stfToken));
+            LOGGER.warning(() ->
+                    String.format("[STF-%s] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", sessionUUID, STF_URL, stfToken));
             return false;
         }
 
@@ -103,7 +102,7 @@ public final class STFClient {
                 .get(Devices.class);
 
         if (devices.getStatus() != 200) {
-            LOGGER.warning(String.format("[STF-%s] Unable to get devices status. HTTP status: %s", stfSessionUUID, devices.getStatus()));
+            LOGGER.warning(() -> String.format("[STF-%s] Unable to get devices status. HTTP status: %s", sessionUUID, devices.getStatus()));
             return false;
         }
 
@@ -112,11 +111,12 @@ public final class STFClient {
                 .findFirst();
 
         if (optionalSTFDevice.isEmpty()) {
-            LOGGER.warning(String.format("[STF-%s] Could not find STF device with udid: %s", stfSessionUUID, deviceUDID));
+            LOGGER.warning(() -> String.format("[STF-%s] Could not find STF device with udid: %s", sessionUUID, deviceUDID));
             return false;
         }
 
         STFDevice stfDevice = optionalSTFDevice.get();
+        LOGGER.info(() -> String.format("[STF-%s] Got STF Device info: %s", sessionUUID, stfDevice));
 
         stfClient.setDevice(stfDevice);
 
@@ -126,17 +126,20 @@ public final class STFClient {
                         .map(Boolean::parseBoolean)
                         .orElse(false)) {
             if (StringUtils.isBlank((String) stfDevice.getRemoteConnectUrl())) {
-                LOGGER.warning(String.format("[STF-%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", stfSessionUUID));
+                LOGGER.warning(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", sessionUUID));
                 return false;
+            } else {
+                LOGGER.info(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, and remoteURL is present.", sessionUUID));
             }
         }
 
         if (stfDevice.getOwner() != null && StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName()) &&
                 stfDevice.getPresent() &&
                 stfDevice.getReady()) {
-            LOGGER.fine(String.format("[STF-%s] Device [%s] already reserved manually by the same user.", stfSessionUUID, deviceUDID));
+            LOGGER.fine(() -> String.format("[STF-%s] Device [%s] already reserved manually by the same user.", sessionUUID, deviceUDID));
             stfClient.reservedManually(true);
         } else if (stfDevice.getOwner() == null && stfDevice.getPresent() && stfDevice.getReady()) {
+            LOGGER.fine(() -> String.format("[STF-%s] Device was not reserved manually, so we will try to reserve it.", sessionUUID));
 
             Map<String, Object> entity = new HashMap<>();
             entity.put("serial", deviceUDID);
@@ -145,27 +148,28 @@ public final class STFClient {
                     .withAuthorization(buildAuthToken(stfToken))
                     .post(Void.class, entity);
             if (response.getStatus() != 200) {
-                LOGGER.warning(String.format("[STF-%s] Could not reserve STF device with udid: %s", stfSessionUUID, deviceUDID));
+                LOGGER.warning(() -> String.format("[STF-%s] Could not reserve STF device with udid: %s", sessionUUID, deviceUDID));
                 return false;
             }
 
             if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities))) {
+                LOGGER.fine(
+                        () -> String.format("[STF-%s] Detected 'Android' platform, so we will try additionally call 'remoteConnect'.", sessionUUID));
+
                 HttpClient.Response<RemoteConnectUserDevice> remoteConnectUserDevice = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
                                 STF_URL, deviceUDID)
                         .withAuthorization(buildAuthToken(stfToken))
                         .post(RemoteConnectUserDevice.class, null);
 
                 if (remoteConnectUserDevice.getStatus() != 200) {
-                    if (HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, deviceUDID)
-                            .withAuthorization(buildAuthToken(stfToken))
-                            .delete(Void.class).getStatus() != 200) {
-                        LOGGER.warning(String.format("[STF-%s] Could not disconnect android remote connect.", stfSessionUUID));
-                    }
+                    LOGGER.warning(
+                            () -> String.format("[STF-%s] Unsuccessful remoteConnect. Status: %s", sessionUUID, remoteConnectUserDevice.getStatus()));
 
                     if (HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, deviceUDID)
                             .withAuthorization(buildAuthToken(stfToken))
                             .delete(Void.class).getStatus() != 200) {
-                        LOGGER.warning(String.format("[STF-%s] Could not return device to the STF.", stfSessionUUID));
+                        LOGGER.warning(() -> String.format("[STF-%s] Could not return device to the STF after unsuccessful Android remoteConnect.",
+                                sessionUUID));
                     }
                     return false;
                 }
@@ -175,30 +179,39 @@ public final class STFClient {
         }
 
         stfClient.setPlatform(Platform.fromCapabilities(requestedCapabilities));
-        stfClient.setSTFSessionUUID(stfSessionUUID);
+        stfClient.setSTFSessionUUID(sessionUUID);
+        LOGGER.fine(
+                () -> String.format("[STF-%s] Device '%s' successfully reserved.", sessionUUID, stfDevice.getSerial()));
         STF_CLIENTS.put(deviceUDID, stfClient);
         return true;
     }
 
     public static void disconnectSTFDevice(String udid) {
+
+        STFClient client = STF_CLIENTS.get(udid);
+        if (client == null) {
+            return;
+        }
+        String sessionUUID = client.getSTFSessionUUID();
         try {
-            STFClient client = STF_CLIENTS.get(udid);
-            if (client == null) {
-                return;
-            }
-            String stfSessionUUID = client.getSTFSessionUUID();
+            LOGGER.fine(
+                    () -> String.format("[STF-%s] Start logic that disconnect STF Device.", sessionUUID));
             if (client.reservedManually()) {
-                LOGGER.info(String.format("[STF-%s] no need to return device as it was reserved manually. ", stfSessionUUID));
+                LOGGER.info(() -> String.format("[STF-%s] No need to return '%s' device as it was reserved manually. ",
+                        sessionUUID, client.getDevice().getSerial()));
                 return;
             }
 
             // it seems like return and remote disconnect guarantee that device becomes free asap
             if (Platform.ANDROID.equals(client.getPlatform())) {
+                LOGGER.fine(
+                        () -> String.format("[STF-%s] Detected 'Android' platform, so we will try additionally disconnect 'remoteConnect'.",
+                                sessionUUID));
                 HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
                         .withAuthorization(buildAuthToken(client.getToken()))
                         .delete(Void.class);
                 if (response.getStatus() != 200) {
-                    LOGGER.warning(String.format("[STF-%s] Could not disconnect android remote connect.", stfSessionUUID));
+                    LOGGER.warning(() -> String.format("[STF-%s] Could not disconnect android remote connect.", sessionUUID));
                 }
             }
 
@@ -206,10 +219,12 @@ public final class STFClient {
                     .withAuthorization(buildAuthToken(client.getToken()))
                     .delete(Void.class);
             if (response.getStatus() != 200) {
-                LOGGER.warning(String.format("[STF-%s] Could not return device to the STF.", stfSessionUUID));
+                LOGGER.warning(() -> String.format("[STF-%s] Could not return device to the STF.", sessionUUID));
             }
+            LOGGER.warning(() -> String.format("[STF-%s] Device '%s' successfully returned to the STF.",
+                    sessionUUID, client.getDevice().getSerial()));
         } catch (Exception e) {
-            LOGGER.warning("Error when disconnect device: " + e);
+            LOGGER.warning(() -> String.format("[STF-%s] Error when disconnect device: %s", sessionUUID, e));
         } finally {
             STF_CLIENTS.remove(udid);
         }
