@@ -59,7 +59,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
         String sessionUUID = UUID.randomUUID().toString();
-        LOGGER.info(() -> String.format("[NODE-%s] Request new session. Capabilities: %s.", sessionUUID, requestedCapability));
 
         String udid = null;
         try {
@@ -68,14 +67,18 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 return null;
             }
             if (!hasCapability(requestedCapability)) {
-                LOGGER.warning(() -> String.format("[NODE-%s] Node does not match requested capabilities.", sessionUUID));
+                //LOGGER.warning(() -> String.format("[NODE-%s] Node does not match requested capabilities.", sessionUUID));
                 return null;
             }
             if (getTotalUsed() >= config.maxSession) {
-                LOGGER.warning(() -> String.format("[NODE-%s] Node has no free slots.", sessionUUID));
+                //LOGGER.warning(() -> String.format("[NODE-%s] Node has no free slots.", sessionUUID));
                 return null;
             }
+
             for (TestSlot testslot : getTestSlots()) {
+                LOGGER.info(() -> String.format(
+                        "[NODE-%s] Request new session on the node that has free slots and matches capabilities. Requested capabilities: %n%s. %nSlotCapabilities: %n%s",
+                        sessionUUID, requestedCapability, testslot.getCapabilities()));
                 LOGGER.info(() -> String.format("[NODE-%s] Start of the logic that trying to get TestSlot. TestSlot capabilities: %s.", sessionUUID,
                         testslot.getCapabilities()));
                 udid = String.valueOf(CapabilityUtils.getAppiumCapability(testslot.getCapabilities(), "udid").orElse(""));
