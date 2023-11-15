@@ -136,10 +136,10 @@ public final class STFClient {
         if (stfDevice.getOwner() != null && StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName()) &&
                 stfDevice.getPresent() &&
                 stfDevice.getReady()) {
-            LOGGER.fine(() -> String.format("[STF-%s] Device [%s] already reserved manually by the same user.", sessionUUID, deviceUDID));
+            LOGGER.info(() -> String.format("[STF-%s] Device [%s] already reserved manually by the same user.", sessionUUID, deviceUDID));
             stfClient.reservedManually(true);
         } else if (stfDevice.getOwner() == null && stfDevice.getPresent() && stfDevice.getReady()) {
-            LOGGER.fine(() -> String.format("[STF-%s] Device was not reserved manually, so we will try to reserve it.", sessionUUID));
+            LOGGER.info(() -> String.format("[STF-%s] Device was not reserved manually, so we will try to reserve it.", sessionUUID));
 
             Map<String, Object> entity = new HashMap<>();
             entity.put("serial", deviceUDID);
@@ -153,7 +153,7 @@ public final class STFClient {
             }
 
             if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities))) {
-                LOGGER.fine(
+                LOGGER.info(
                         () -> String.format("[STF-%s] Detected 'Android' platform, so we will try additionally call 'remoteConnect'.", sessionUUID));
 
                 HttpClient.Response<RemoteConnectUserDevice> remoteConnectUserDevice = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
@@ -180,7 +180,7 @@ public final class STFClient {
 
         stfClient.setPlatform(Platform.fromCapabilities(requestedCapabilities));
         stfClient.setSTFSessionUUID(sessionUUID);
-        LOGGER.fine(
+        LOGGER.info(
                 () -> String.format("[STF-%s] Device '%s' successfully reserved.", sessionUUID, stfDevice.getSerial()));
         STF_CLIENTS.put(deviceUDID, stfClient);
         return true;
@@ -194,7 +194,7 @@ public final class STFClient {
         }
         String sessionUUID = client.getSTFSessionUUID();
         try {
-            LOGGER.fine(
+            LOGGER.info(
                     () -> String.format("[STF-%s] Start logic that disconnect STF Device.", sessionUUID));
             if (client.reservedManually()) {
                 LOGGER.info(() -> String.format("[STF-%s] No need to return '%s' device as it was reserved manually. ",
@@ -204,7 +204,7 @@ public final class STFClient {
 
             // it seems like return and remote disconnect guarantee that device becomes free asap
             if (Platform.ANDROID.equals(client.getPlatform())) {
-                LOGGER.fine(
+                LOGGER.info(
                         () -> String.format("[STF-%s] Detected 'Android' platform, so we will try additionally disconnect 'remoteConnect'.",
                                 sessionUUID));
                 HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)

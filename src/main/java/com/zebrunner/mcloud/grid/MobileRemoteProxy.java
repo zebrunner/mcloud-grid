@@ -63,7 +63,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         String udid = null;
         try {
             if (isDown()) {
-                LOGGER.fine(() -> String.format("[NODE-%s] Node is down.", sessionUUID));
+                LOGGER.info(() -> String.format("[NODE-%s] Node is down.", sessionUUID));
                 return null;
             }
             if (!hasCapability(requestedCapability)) {
