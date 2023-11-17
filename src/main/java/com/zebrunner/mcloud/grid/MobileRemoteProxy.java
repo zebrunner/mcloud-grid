@@ -56,7 +56,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     @Override
-    public TestSession getNewSession(Map<String, Object> requestedCapability) {
+    public synchronized TestSession getNewSession(Map<String, Object> requestedCapability) {
         String sessionUUID = UUID.randomUUID().toString();
 
         String udid = null;
