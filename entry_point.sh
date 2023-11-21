@@ -39,6 +39,7 @@ java ${JAVA_OPTS} -Djava.util.logging.config.file=/opt/selenium/logger.propertie
   -role hub \
   -servlets com.zebrunner.mcloud.grid.servlets.ProxyInfo,com.zebrunner.mcloud.grid.servlets.ProxyServlet \
   -hubConfig $CONF \
+  -jettyThreads 1024 \
   ${SE_OPTS} &
 NODE_PID=$!
 

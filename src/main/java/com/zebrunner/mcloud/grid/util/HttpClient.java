@@ -31,21 +31,22 @@ import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.core.util.MultivaluedMapImpl;
 import com.zebrunner.mcloud.grid.integration.client.Path;
+import org.apache.commons.lang3.concurrent.ConcurrentException;
+import org.apache.commons.lang3.concurrent.LazyInitializer;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 
 public class HttpClient {
+    private static final Logger LOGGER = Logger.getLogger(HttpClient.class.getName());
 
-	private static Logger LOGGER = Logger.getLogger(HttpClient.class.getName());
-
-    private static final Integer CONNECT_TIMEOUT = 60000;
-    private static final Integer READ_TIMEOUT = 60000;
-
-    private static Client client;
-
-    static {
-        client = Client.create(new DefaultClientConfig(GensonProvider.class));
-        client.setConnectTimeout(CONNECT_TIMEOUT);
-        client.setReadTimeout(READ_TIMEOUT);
-    }
+    private static final LazyInitializer<Client> CLIENT = new LazyInitializer<>() {
+        @Override
+        protected Client initialize() throws ConcurrentException {
+            Client client = Client.create(new DefaultClientConfig(GensonProvider.class));
+            client.setConnectTimeout(3000);
+            client.setReadTimeout(3000);
+            return client;
+        }
+    };
 
     public static Executor uri(Path path, String serviceUrl, Object... parameters) {
         String url = path.build(serviceUrl, parameters);
@@ -58,23 +59,28 @@ public class HttpClient {
     }
 
     private static Executor uri(String url, Map<String, String> queryParameters) {
-        WebResource webResource = client.resource(url);
-        if (queryParameters != null) {
-            MultivaluedMap<String, String> requestParameters = new MultivaluedMapImpl();
-            queryParameters.forEach(requestParameters::add);
-            webResource = webResource.queryParams(requestParameters);
+        try {
+            WebResource webResource = CLIENT.get()
+                    .resource(url);
+            if (queryParameters != null) {
+                MultivaluedMap<String, String> requestParameters = new MultivaluedMapImpl();
+                queryParameters.forEach(requestParameters::add);
+                webResource = webResource.queryParams(requestParameters);
+            }
+            return new Executor(webResource);
+        } catch (ConcurrentException e) {
+            return ExceptionUtils.rethrow(e);
         }
-        return new Executor(webResource);
     }
 
     public static class Executor {
 
-        private WebResource.Builder builder;
+        private final WebResource.Builder builder;
         private String errorMessage;
 
         public Executor(WebResource webResource) {
             builder = webResource.type(MediaType.APPLICATION_JSON)
-                                 .accept(MediaType.APPLICATION_JSON);
+                    .accept(MediaType.APPLICATION_JSON);
         }
 
         public <R> Response<R> get(Class<R> responseClass) {

@@ -47,7 +47,7 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
 
     @Override
     public boolean matches(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
-        LOGGER.finest("Requested capabilities: " + requestedCapability);
+        LOGGER.finest(() -> "Requested capabilities: " + requestedCapability);
         if (requestedCapability.containsKey(CapabilityType.PLATFORM_NAME) ||
                 getAppiumCapability(requestedCapability, "platformVersion").isPresent() ||
                 getAppiumCapability(requestedCapability, "deviceName").isPresent() ||
