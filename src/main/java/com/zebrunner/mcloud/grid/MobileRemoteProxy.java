@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 import com.zebrunner.mcloud.grid.servlets.ProxyServlet;
@@ -50,17 +51,22 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final String DEVICE_TYPE_CAPABILITY = "deviceType";
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String SESSION_UUID_PARAMETER = "SESSION_UUID_PARAMETER";
+    private final AtomicBoolean lock = new AtomicBoolean(false);
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
     }
 
     @Override
-    public synchronized TestSession getNewSession(Map<String, Object> requestedCapability) {
+    public TestSession getNewSession(Map<String, Object> requestedCapability) {
         String sessionUUID = UUID.randomUUID().toString();
-
         String udid = null;
+        TestSession testSession = null;
+
         try {
+            if (!lock.compareAndSet(false, true)) {
+                return null;
+            }
             if (isDown()) {
                 LOGGER.info(() -> "Node is down.");
                 return null;
@@ -136,9 +142,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
                 TestSession session = testslot.getNewSession(requestedCapability);
                 if (session == null) {
+                    LOGGER.warning(() ->
+                            String.format(
+                                    "[NODE-%s] Somehow we got null when we try to call getNewSession from free slot. Device will be disconnected.",
+                                    sessionUUID));
                     STFClient.disconnectSTFDevice(udid);
                     return null;
                 }
+                testSession = session;
 
                 ProxyServlet.cleanPacConfiguration(udid);
                 Optional<String> pacConfiguration = CapabilityUtils.getZebrunnerCapability(requestedCapability, "pac")
@@ -159,6 +170,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
             ProxyServlet.cleanPacConfiguration(udid);
             return null;
+        } finally {
+            if (testSession == null) {
+                lock.set(false);
+            }
         }
     }
 
@@ -204,6 +219,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             STFClient.disconnectSTFDevice(udid.get());
         } catch (Exception e) {
             LOGGER.warning(String.format("[NODE-%s] Exception in afterSession: %s.", sessionUUID, e));
+        } finally {
+            LOGGER.warning(() -> String.format("[NODE-%s] Lock removed.", sessionUUID));
+            lock.set(false);
         }
     }
 
