@@ -148,7 +148,8 @@ public final class STFClient {
                     .withAuthorization(buildAuthToken(stfToken))
                     .post(Void.class, entity);
             if (response.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s] Could not reserve STF device with udid: %s", sessionUUID, deviceUDID));
+                LOGGER.warning(() -> String.format("[STF-%s] Could not reserve STF device with udid: %s. Status: %s. Response: %s",
+                        sessionUUID, deviceUDID, response.getStatus(), response.getObject()));
                 return false;
             }
 
@@ -163,7 +164,8 @@ public final class STFClient {
 
                 if (remoteConnectUserDevice.getStatus() != 200) {
                     LOGGER.warning(
-                            () -> String.format("[STF-%s] Unsuccessful remoteConnect. Status: %s", sessionUUID, remoteConnectUserDevice.getStatus()));
+                            () -> String.format("[STF-%s] Unsuccessful remoteConnect. Status: %s. Response: %s",
+                                    sessionUUID, remoteConnectUserDevice.getStatus(), remoteConnectUserDevice.getObject()));
 
                     if (HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, deviceUDID)
                             .withAuthorization(buildAuthToken(stfToken))
