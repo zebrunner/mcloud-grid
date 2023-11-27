@@ -16,7 +16,7 @@
 #*******************************************************************************
 
 ROOT=/opt/selenium
-CONF=$ROOT/config.json
+CONF=$ROOT/config.toml
 
 /opt/bin/generate_config >$CONF
 
@@ -34,12 +34,8 @@ function shutdown {
     echo "shutdown complete"
 }
 
-java ${JAVA_OPTS} -Dwebdriver.http.factory=apache -Djava.util.logging.config.file=/opt/selenium/logger.properties -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
-  org.openqa.grid.selenium.GridLauncherV3 \
-  -role hub \
-  -servlets com.zebrunner.mcloud.grid.servlets.ProxyInfo,com.zebrunner.mcloud.grid.servlets.ProxyServlet \
-  -hubConfig $CONF \
-  -jettyThreads 1024 \
+java ${JAVA_OPTS} -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid.jar org.openqa.selenium.grid.Bootstrap hub \
+  --config $CONF \
   ${SE_OPTS} &
 NODE_PID=$!
 

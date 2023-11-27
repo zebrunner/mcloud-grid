@@ -1,19 +1,28 @@
 #!/bin/bash
 
 cat <<_EOF
-{
-  "host": null,
-  "port": 4444,
-  "role": "hub",
-  "maxSession": $GRID_MAX_SESSION,
-  "newSessionWaitTimeout": $GRID_NEW_SESSION_WAIT_TIMEOUT,
-  "capabilityMatcher": "$GRID_CAPABILITY_MATCHER",
-  "throwOnCapabilityNotPresent": $GRID_THROW_ON_CAPABILITY_NOT_PRESENT,
-  "jettyMaxThreads": $GRID_JETTY_MAX_THREADS,
-  "cleanUpCycle": $GRID_CLEAN_UP_CYCLE,
-  "browserTimeout": $GRID_BROWSER_TIMEOUT,
-  "timeout": $GRID_TIMEOUT,
-  "debug": $GRID_DEBUG,
-  "proxy": "$GRID_PROXY"
-}
+#Documentation:
+# https://www.selenium.dev/documentation/grid/configuration/cli_options/#matching-node-a
+[server]
+port = 4444
+# Maximum number of listener threads. Default value is: (available processors) * 3.
+#max-threads = $GRID_JETTY_MAX_THREADS
+
+[sessionqueue]
+# Timeout in seconds. A new incoming session request is added to the queue.
+# Requests sitting in the queue for longer than the configured time will timeout.
+session-request-timeout = $GRID_NEW_SESSION_WAIT_TIMEOUT
+
+[distributor]
+# Full class name of non-default slot matcher to use.
+# This is used to determine whether a Node can support a particular session.
+slot-matcher = com.zebrunner.mcloud.grid.MobileCapabilityMatcher
+
+# TODO"throwOnCapabilityNotPresent": $GRID_THROW_ON_CAPABILITY_NOT_PRESENT,
+# TODO "cleanUpCycle": $GRID_CLEAN_UP_CYCLE,
+# TODO "browserTimeout": $GRID_BROWSER_TIMEOUT,
+# TODO "timeout": $GRID_TIMEOUT,
+# TODO "debug": $GRID_DEBUG,
+# TODO "proxy": "$GRID_PROXY"
+
 _EOF
