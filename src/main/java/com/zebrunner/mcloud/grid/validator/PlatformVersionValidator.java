@@ -1,33 +1,25 @@
 package com.zebrunner.mcloud.grid.validator;
 
-import com.zebrunner.mcloud.grid.util.CapabilityUtils;
+import com.zebrunner.mcloud.grid.utils.CapabilityUtils;
+import org.openqa.selenium.Capabilities;
 
 import javax.annotation.Nonnull;
 import java.lang.invoke.MethodHandles;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class PlatformVersionValidator implements Validator {
     private static final Logger LOGGER = Logger.getLogger(MethodHandles.lookup().lookupClass().getName());
-    //todo reuse MobileCapabilityType interface
     private static final String PLATFORM_VERSION_CAPABILITY = "platformVersion";
 
     @Override
-    public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
-        String expectedValue = CapabilityUtils.getAppiumCapability(requestedCapabilities, PLATFORM_VERSION_CAPABILITY)
-                .map(String::valueOf)
-                .orElse(null);
-
-        String actualValue = CapabilityUtils.getAppiumCapability(nodeCapabilities, PLATFORM_VERSION_CAPABILITY)
-                .map(String::valueOf)
-                .orElse(null);
-
+    public Boolean apply(Capabilities nodeCapabilities, Capabilities requestedCapabilities) {
+        String expectedValue = CapabilityUtils.getAppiumCapability(requestedCapabilities, PLATFORM_VERSION_CAPABILITY, String.class);
         if (anything(expectedValue)) {
             return true;
         }
 
+        String actualValue = CapabilityUtils.getAppiumCapability(nodeCapabilities, PLATFORM_VERSION_CAPABILITY, String.class);
         if (actualValue == null) {
-            LOGGER.warning("No 'platformVersion' capability specified for node.");
             return false;
         }
 

@@ -1,39 +1,46 @@
 package com.zebrunner.mcloud.grid.validator;
 
+import com.zebrunner.mcloud.grid.utils.CapabilityUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.Platform;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.remote.CapabilityType;
 
 import java.lang.invoke.MethodHandles;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class MobilePlatformValidator implements Validator {
     private static final Logger LOGGER = Logger.getLogger(MethodHandles.lookup().lookupClass().getName());
 
     @Override
-    public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
-        Object requested = requestedCapabilities.get(CapabilityType.PLATFORM_NAME);
-        Object provided = nodeCapabilities.get(CapabilityType.PLATFORM_NAME);
-        // we cannot safely call toString method for Platform object. ANDROID, IOS and so on do not override this method,
-        // so we try to get name as is.
-        if (anything(requested instanceof Platform ? ((Platform) requested).name() : (String) requested)) {
+    public Boolean apply(Capabilities stereotype, Capabilities capabilities) {
+        Object requested = capabilities.getCapability(CapabilityType.PLATFORM_NAME);
+        if (anything(requested instanceof Platform ? ((Platform) requested).name() : String.valueOf(requested))) {
             return true;
         }
-
-        Platform requestedPlatform = extractPlatform(requested);
-        if (requestedPlatform != null) {
-            Platform providedPlatform = extractPlatform(provided);
-            return providedPlatform != null && providedPlatform.is(requestedPlatform);
-        }
-
+        Object provided = stereotype.getCapability(CapabilityType.PLATFORM_NAME);
         if (provided == null) {
             LOGGER.warning("No 'platformName' capability specified for node.");
             return false;
         }
 
-        return StringUtils.equalsIgnoreCase(requested.toString(), provided.toString());
+        if (Platform.IOS.is(extractPlatform(provided)) &&
+                StringUtils.equalsIgnoreCase(CapabilityUtils.getZebrunnerCapability(capabilities, "deviceType", String.class), "tvos") &&
+                Platform.IOS.is(extractPlatform(stereotype))
+        ) {
+            return true;
+        }
+
+        boolean matches = extractPlatform(provided).is(extractPlatform(requested));
+        if (matches) {
+            LOGGER.info(
+                    () -> String.format("[CAPABILITY-VALIDATOR] Platform matches: %s - %s", extractPlatform(requested), extractPlatform(provided)));
+        } else {
+            LOGGER.info(() -> String.format("[CAPABILITY-VALIDATOR] Platform does not matches: %s - %s", extractPlatform(requested),
+                    extractPlatform(provided)));
+        }
+        return matches;
     }
 
     private Platform extractPlatform(Object o) {

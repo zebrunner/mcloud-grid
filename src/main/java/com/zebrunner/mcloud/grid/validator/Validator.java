@@ -1,11 +1,13 @@
 package com.zebrunner.mcloud.grid.validator;
 
-import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.openqa.selenium.Capabilities;
+
 import java.util.function.BiFunction;
 
-public interface Validator extends BiFunction<Map<String, Object>, Map<String, Object>, Boolean> {
+public interface Validator extends BiFunction<Capabilities, Capabilities, Boolean> {
 
     default boolean anything(String requested) {
-        return requested == null || "ANY".equalsIgnoreCase(requested) || "".equals(requested) || "*".equals(requested);
+        return StringUtils.equalsAnyIgnoreCase(requested, "ANY", "", "*", null);
     }
 }

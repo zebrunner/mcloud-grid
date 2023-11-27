@@ -21,8 +21,7 @@ docker build . -t zebrunner/mcloud-grid:latest
 
 ### Run MCloud Grid
 ```
-docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
-		-e GRID_TIMEOUT=60000 -e GRID_BROWSER_TIMEOUT=60000 \
+docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240 \
 		--name mcloud-grid zebrunner/mcloud-grid:latest
 ```
 
