@@ -16,7 +16,7 @@ session-request-timeout = $GRID_NEW_SESSION_WAIT_TIMEOUT
 [distributor]
 # Full class name of non-default slot matcher to use.
 # This is used to determine whether a Node can support a particular session.
-slot-matcher = com.zebrunner.mcloud.grid.MobileCapabilityMatcher
+slot-matcher = "com.zebrunner.mcloud.grid.MobileCapabilityMatcher"
 
 # TODO"throwOnCapabilityNotPresent": $GRID_THROW_ON_CAPABILITY_NOT_PRESENT,
 # TODO "cleanUpCycle": $GRID_CLEAN_UP_CYCLE,
