@@ -1,10 +1,10 @@
 package com.zebrunner.mcloud.grid.validator;
 
-import com.zebrunner.mcloud.grid.util.CapabilityUtils;
+import com.zebrunner.mcloud.grid.utils.CapabilityUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.openqa.selenium.Capabilities;
 
 import java.lang.invoke.MethodHandles;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class DeviceTypeValidator implements Validator {
@@ -12,7 +12,7 @@ public class DeviceTypeValidator implements Validator {
     private static final String ZEBRUNNER_DEVICE_TYPE_CAPABILITY = "deviceType";
 
     @Override
-    public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
+    public Boolean apply(Capabilities nodeCapabilities, Capabilities requestedCapabilities) {
         String expectedValue = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, ZEBRUNNER_DEVICE_TYPE_CAPABILITY)
                 .map(String::valueOf)
                 .orElse(null);

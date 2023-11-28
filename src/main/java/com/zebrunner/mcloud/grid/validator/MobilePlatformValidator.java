@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.validator;
 
 import org.apache.commons.lang3.StringUtils;
+import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.Platform;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.remote.CapabilityType;
@@ -13,9 +14,9 @@ public class MobilePlatformValidator implements Validator {
     private static final Logger LOGGER = Logger.getLogger(MethodHandles.lookup().lookupClass().getName());
 
     @Override
-    public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
-        Object requested = requestedCapabilities.get(CapabilityType.PLATFORM_NAME);
-        Object provided = nodeCapabilities.get(CapabilityType.PLATFORM_NAME);
+    public Boolean apply(Capabilities nodeCapabilities, Capabilities requestedCapabilities) {
+        Object requested = requestedCapabilities.getCapability(CapabilityType.PLATFORM_NAME);
+        Object provided = nodeCapabilities.getCapability(CapabilityType.PLATFORM_NAME);
         // we cannot safely call toString method for Platform object. ANDROID, IOS and so on do not override this method,
         // so we try to get name as is.
         if (anything(requested instanceof Platform ? ((Platform) requested).name() : (String) requested)) {

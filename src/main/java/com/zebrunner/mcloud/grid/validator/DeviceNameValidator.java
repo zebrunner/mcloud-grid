@@ -1,19 +1,18 @@
 package com.zebrunner.mcloud.grid.validator;
 
-import com.zebrunner.mcloud.grid.util.CapabilityUtils;
+import com.zebrunner.mcloud.grid.utils.CapabilityUtils;
+import org.openqa.selenium.Capabilities;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class DeviceNameValidator implements Validator {
     private static final Logger LOGGER = Logger.getLogger(MethodHandles.lookup().lookupClass().getName());
-    //todo reuse MobileCapabilityType interface
     private static final String DEVICE_NAME_CAPABILITY = "deviceName";
 
     @Override
-    public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
+    public Boolean apply(Capabilities nodeCapabilities, Capabilities requestedCapabilities) {
         String expectedValue = CapabilityUtils.getAppiumCapability(requestedCapabilities, DEVICE_NAME_CAPABILITY)
                 .map(String::valueOf)
                 .orElse(null);

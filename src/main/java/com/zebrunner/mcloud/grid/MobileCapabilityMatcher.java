@@ -21,22 +21,16 @@ import com.zebrunner.mcloud.grid.validator.MobilePlatformValidator;
 import com.zebrunner.mcloud.grid.validator.PlatformVersionValidator;
 import com.zebrunner.mcloud.grid.validator.UDIDValidator;
 import com.zebrunner.mcloud.grid.validator.Validator;
-import org.openqa.grid.internal.utils.DefaultCapabilityMatcher;
+import org.openqa.selenium.Capabilities;
+import org.openqa.selenium.grid.data.DefaultSlotMatcher;
 import org.openqa.selenium.remote.CapabilityType;
 
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 
-import static com.zebrunner.mcloud.grid.util.CapabilityUtils.getAppiumCapability;
+import static com.zebrunner.mcloud.grid.utils.CapabilityUtils.getAppiumCapability;
 
-/**
- * Custom selenium capability matcher for mobile grid.
- * {@link https://nishantverma.gitbooks.io/appium-for-android/understanding_desired_capabilities.html}
- *
- * @author Alex Khursevich (alex@qaprosoft.com)
- */
-public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
+public final class MobileCapabilityMatcher extends DefaultSlotMatcher {
     private static final Logger LOGGER = Logger.getLogger(MobileCapabilityMatcher.class.getName());
     private final List<Validator> validators = List.of(
             new MobilePlatformValidator(),
@@ -46,19 +40,19 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
             new UDIDValidator());
 
     @Override
-    public boolean matches(Map<String, Object> nodeCapability, Map<String, Object> requestedCapability) {
-        LOGGER.finest(() -> "Requested capabilities: " + requestedCapability);
-        if (requestedCapability.containsKey(CapabilityType.PLATFORM_NAME) ||
-                getAppiumCapability(requestedCapability, "platformVersion").isPresent() ||
-                getAppiumCapability(requestedCapability, "deviceName").isPresent() ||
-                getAppiumCapability(requestedCapability, "udid").isPresent()) {
+    public boolean matches(Capabilities stereotype, Capabilities capabilities) {
+        LOGGER.finest(() -> "Requested capabilities: " + capabilities);
+        if (capabilities.getCapability(CapabilityType.PLATFORM_NAME) != null ||
+                getAppiumCapability(capabilities, "platformVersion").isPresent() ||
+                getAppiumCapability(capabilities, "deviceName").isPresent() ||
+                getAppiumCapability(capabilities, "udid").isPresent()) {
             // Mobile-based capabilities
             LOGGER.fine("Using extensionCapabilityCheck matcher.");
-            return extensionCapabilityCheck(nodeCapability, requestedCapability);
+            return extensionCapabilityCheck(stereotype, capabilities);
         } else {
             // Browser-based capabilities
             LOGGER.fine("Using default browser-based capabilities matcher.");
-            return super.matches(nodeCapability, requestedCapability);
+            return super.matches(stereotype, capabilities);
         }
     }
 
@@ -69,8 +63,8 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
      * @param requestedCapabilities - capabilities requested by Selenium client
      * @return match results
      */
-    private boolean extensionCapabilityCheck(Map<String, Object> nodeCapabilities,
-            Map<String, Object> requestedCapabilities) {
+    private boolean extensionCapabilityCheck(Capabilities nodeCapabilities,
+            Capabilities requestedCapabilities) {
         return nodeCapabilities != null &&
                 requestedCapabilities != null &&
                 validators.stream()
