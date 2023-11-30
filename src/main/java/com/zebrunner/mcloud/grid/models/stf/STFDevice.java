@@ -77,4 +77,38 @@ public class STFDevice {
         this.additionalProperties.put(name, value);
     }
 
+    @Override public String toString() {
+        return "STFDevice{" +
+                "abi='" + abi + '\'' +
+                ", airplaneMode=" + airplaneMode +
+                ", battery=" + battery +
+                ", browser=" + browser +
+                ", channel='" + channel + '\'' +
+                ", createdAt='" + createdAt + '\'' +
+                ", display=" + display +
+                ", manufacturer='" + manufacturer + '\'' +
+                ", model='" + model + '\'' +
+                ", network=" + network +
+                ", operator=" + operator +
+                ", owner=" + owner +
+                ", phone=" + phone +
+                ", platform='" + platform + '\'' +
+                ", presenceChangedAt='" + presenceChangedAt + '\'' +
+                ", present=" + present +
+                ", product='" + product + '\'' +
+                ", provider=" + provider +
+                ", ready=" + ready +
+                ", remoteConnectUrl=" + remoteConnectUrl +
+                ", remoteConnect=" + remoteConnect +
+                ", reverseForwards=" + reverseForwards +
+                ", sdk='" + sdk + '\'' +
+                ", serial='" + serial + '\'' +
+                ", statusChangedAt='" + statusChangedAt + '\'' +
+                ", status=" + status +
+                ", using=" + using +
+                ", version='" + version + '\'' +
+                ", deviceType='" + deviceType + '\'' +
+                ", additionalProperties=" + additionalProperties +
+                '}';
+    }
 }
