@@ -15,6 +15,7 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.integration.client;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -36,10 +37,14 @@ import com.zebrunner.mcloud.grid.util.HttpClient;
 public final class STFClient {
     private static final Logger LOGGER = Logger.getLogger(STFClient.class.getName());
     private static final Map<String, STFClient> STF_CLIENTS = new ConcurrentHashMap<>();
+    private static final Map<String, Duration> STF_DEVICE_IGNORE_AUTOMATION_TIMERS = new ConcurrentHashMap<>();
     private static final String STF_URL = System.getenv("STF_URL");
     private static final String DEFAULT_STF_TOKEN = System.getenv("STF_TOKEN");
     // Max time is seconds for reserving devices in STF
     private static final String DEFAULT_STF_TIMEOUT = System.getenv("STF_TIMEOUT");
+
+    private static final Duration UNAUTHORIZED_TIMEOUT = Duration.ofMinutes(10);
+    private static final Duration UNHEALTHY_TIMEOUT = Duration.ofMinutes(5);
 
     private Platform platform;
     private String token;
@@ -72,6 +77,17 @@ public final class STFClient {
         if (!isSTFEnabled()) {
             return true;
         }
+
+        if (STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID) != null) {
+            Duration timeout = STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID);
+            if (Duration.ofMillis(System.currentTimeMillis()).compareTo(timeout) < 0) {
+                return false;
+            } else {
+                STF_DEVICE_IGNORE_AUTOMATION_TIMERS.remove(deviceUDID);
+            }
+        }
+
+
         if (STF_CLIENTS.get(deviceUDID) != null) {
             LOGGER.warning(() -> String.format("Device '%s' already busy (in the local pool). Info: %s", deviceUDID, STF_CLIENTS.get(deviceUDID)));
         }
@@ -116,9 +132,27 @@ public final class STFClient {
         }
 
         STFDevice stfDevice = optionalSTFDevice.get();
-        LOGGER.info(() -> String.format("[STF-%s] STF Device info: %s", sessionUUID, stfDevice));
+        LOGGER.info(() -> String.format("[STF-%s] STF device info: %s", sessionUUID, stfDevice));
 
         stfClient.setDevice(stfDevice);
+
+        if(stfDevice.getStatus() == null) {
+            LOGGER.warning(() -> String.format("[STF-%s] STF device status is null. It will be ignored.", sessionUUID));
+            return false;
+        }
+
+        if(stfDevice.getStatus().intValue() == 2) {
+            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s.", sessionUUID,
+                    UNAUTHORIZED_TIMEOUT));
+           STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
+           return false;
+        }
+
+        if(stfDevice.getStatus() == 7) {
+            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNHEALTHY'. It will be ignored: %s.", sessionUUID, UNHEALTHY_TIMEOUT));
+            STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
+            return false;
+        }
 
         if (stfDevice.getOwner() != null && StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName()) &&
                 stfDevice.getPresent() &&
