@@ -171,6 +171,16 @@ public final class STFClient {
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[STF-%s] Could not reserve STF device with udid: %s. Status: %s. Response: %s",
                         sessionUUID, deviceUDID, response.getStatus(), response.getObject()));
+                if(response.getStatus() == 0) {
+                    LOGGER.warning(() -> String.format("[STF-%s] Device will be marked as unhealthy due to response status '0'.",  sessionUUID));
+                    entity.put("body", Map.of("status", "Unhealthy"));
+                    HttpClient.Response r =  HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, deviceUDID)
+                            .withAuthorization(buildAuthToken(stfToken))
+                            .put(Void.class, entity);
+                    if(r.getStatus() != 200) {
+                        LOGGER.warning(() -> String.format("[STF-%s] Could not mark device as unhealthy. Status: %s. Response: %s",  sessionUUID, r.getStatus(), r.getObject()));
+                    }
+                }
                 return false;
             }
         } else {
