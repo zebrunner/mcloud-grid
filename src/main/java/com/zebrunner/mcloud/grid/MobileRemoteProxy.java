@@ -15,6 +15,7 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid;
 
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -29,6 +30,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.internal.GridRegistry;
+import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
@@ -68,7 +70,26 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 return null;
             }
             if (isDown()) {
-                LOGGER.info(() -> "Node is down.");
+                TestSlot slot = getTestSlots().get(0);
+                if (slot != null) {
+                    LOGGER.info(() -> String.format("Node is down: '%s:%s' - '%s (%s)'",
+                            Optional.of(slot)
+                                    .map(TestSlot::getProxy)
+                                    .map(RemoteProxy::getRemoteHost)
+                                    .map(URL::getHost)
+                                    .orElse(StringUtils.EMPTY),
+                            Optional.of(slot)
+                                    .map(TestSlot::getProxy)
+                                    .map(RemoteProxy::getRemoteHost)
+                                    .map(URL::getPort)
+                                    .map(String::valueOf)
+                                    .orElse(StringUtils.EMPTY),
+                            CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid"),
+                            CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName"))
+                    );
+                } else {
+                    LOGGER.info(() -> "Node is down.");
+                }
                 return null;
             }
             if (!hasCapability(requestedCapability)) {
