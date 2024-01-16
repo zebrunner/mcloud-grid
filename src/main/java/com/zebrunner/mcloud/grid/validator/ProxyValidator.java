@@ -1,12 +1,15 @@
 package com.zebrunner.mcloud.grid.validator;
 
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 
 import java.util.Map;
 
 public class ProxyValidator implements Validator {
-    private static final String MITM_CAPABILITY = "Mitm";
+    public static final String MITM_CAPABILITY = "Mitm";
+    public static final String MITM_ARGS_CAPABILITY = "MitmArgs";
+    public static final String MITM_TYPE_CAPABILITY = "MitmType";
     private static final String PROXY_PORT_CAPABILITY = "proxy_port";
     private static final String SERVER_PROXY_PORT_CAPABILITY = "server_proxy_port";
 
@@ -16,23 +19,25 @@ public class ProxyValidator implements Validator {
                 .map(String::valueOf)
                 .map(Boolean::parseBoolean)
                 .orElse(false);
-
-        Integer serverProxyPortNode = CapabilityUtils.getZebrunnerCapability(nodeCapabilities, SERVER_PROXY_PORT_CAPABILITY)
-                .map(String::valueOf)
-                .filter(NumberUtils::isParsable)
-                .map(Integer::parseInt)
-                .orElse(null);
-
-        Integer proxyPortNode = CapabilityUtils.getZebrunnerCapability(nodeCapabilities, PROXY_PORT_CAPABILITY)
-                .map(String::valueOf)
-                .filter(NumberUtils::isParsable)
-                .map(Integer::parseInt)
-                .orElse(null);
-
         if (!expectedValue) {
             return true;
         }
 
-        return serverProxyPortNode != null && serverProxyPortNode > 0 && proxyPortNode != null && proxyPortNode > 0;
+        Integer serverProxyPort = CapabilityUtils.getZebrunnerCapability(nodeCapabilities, SERVER_PROXY_PORT_CAPABILITY)
+                .map(String::valueOf)
+                .filter(NumberUtils::isParsable)
+                .map(Integer::parseInt)
+                .orElse(null);
+        Integer proxyPort = CapabilityUtils.getZebrunnerCapability(nodeCapabilities, PROXY_PORT_CAPABILITY)
+                .map(String::valueOf)
+                .filter(NumberUtils::isParsable)
+                .map(Integer::parseInt)
+                .orElse(null);
+        String mitmType = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, MITM_TYPE_CAPABILITY)
+                .map(String::valueOf)
+                .orElse("simple");
+
+        return (serverProxyPort != null && serverProxyPort > 0 && proxyPort != null && proxyPort > 0) &&
+                StringUtils.equalsAny(mitmType, "full", "simple");
     }
 }
