@@ -55,13 +55,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
-        TestSlot slot = getTestSlots().get(0);
-        MitmProxyClient.initProxy(slot);
-        if (MitmProxyClient.isProxyAvailable(slot)) {
-            if (!MitmProxyClient.restartProxy(getTestSlots().get(0), StringUtils.EMPTY)) {
-                LOGGER.info(() -> String.format("Could not start mitmproxy. Capabilities: %s", slot.getCapabilities()));
-            }
-        }
+        MitmProxyClient.initProxy(getTestSlots().get(0));
     }
 
     @Override

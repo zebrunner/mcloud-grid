@@ -57,7 +57,7 @@ public final class MitmProxyClient {
             return false;
         }
 
-        Map<String, String> proxy = Map.of("proxyType", "simple", "proxyArgs", String.format(" --set block_global=false %s ", args));
+        Map<String, String> proxy = Map.of("proxyType", "simple", "proxyArgs", String.format(" %s ", args));
 
         try {
             HttpClient.Response<String> mitmResponse = HttpClientApache.create()
@@ -116,18 +116,9 @@ public final class MitmProxyClient {
         client.serverProxyPort = serverProxyPort;
 
         try {
-            URL proxyURL = new URL(remoteURL.getProtocol(), remoteURL.getHost(), serverProxyPort, "");
-            HttpClient.Response<String> mitmResponse = HttpClientApache.create()
-                    .withUri(Path.MITM_RESTART, proxyURL.toString())
-                    .post(new StringEntity("{\"proxyType\": \"simple\", \"proxyArgs\":\" --set block_global=false\"}", ContentType.APPLICATION_JSON));
-            if (mitmResponse.getStatus() != 200) {
-                LOGGER.warning(
-                        () -> String.format(" Could not start proxy. Response code: %s, %s", mitmResponse.getStatus(), mitmResponse.getObject()));
-            }
-            client.proxyURL = proxyURL;
+            client.proxyURL = new URL(remoteURL.getProtocol(), remoteURL.getHost(), serverProxyPort, "");
         } catch (Exception e) {
-            LOGGER.warning(
-                    () -> String.format("Could not start proxy. Exception: %s -  %s", e.getClass(), e.getMessage()));
+            LOGGER.warning(() -> String.format("Could not create proxy client. Exception: %s -  %s", e.getClass(), e.getMessage()));
             return;
         }
         ProxyServlet.updatePacConfiguration(udid, pac);
