@@ -120,19 +120,6 @@ public final class STFClient {
 
         stfClient.setDevice(stfDevice);
 
-        if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities)) &&
-                CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "enableAdb")
-                        .map(String::valueOf)
-                        .map(Boolean::parseBoolean)
-                        .orElse(false)) {
-            if (StringUtils.isBlank((String) stfDevice.getRemoteConnectUrl())) {
-                LOGGER.warning(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", sessionUUID));
-                return false;
-            } else {
-                LOGGER.info(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, and remoteURL is present.", sessionUUID));
-            }
-        }
-
         if (stfDevice.getOwner() != null && StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName()) &&
                 stfDevice.getPresent() &&
                 stfDevice.getReady()) {
@@ -152,38 +139,83 @@ public final class STFClient {
                         sessionUUID, deviceUDID, response.getStatus(), response.getObject()));
                 return false;
             }
+        } else {
+            return false;
+        }
 
-            if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities))) {
-                LOGGER.info(
-                        () -> String.format("[STF-%s] Additionally call 'remoteConnect'.", sessionUUID));
+        if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities))) {
+            LOGGER.info(() -> String.format("[STF-%s] Additionally call 'remoteConnect'.", sessionUUID));
 
-                HttpClient.Response<RemoteConnectUserDevice> remoteConnectUserDevice = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
-                                STF_URL, deviceUDID)
-                        .withAuthorization(buildAuthToken(stfToken))
-                        .post(RemoteConnectUserDevice.class, null);
+            HttpClient.Response<RemoteConnectUserDevice> remoteConnectUserDevice = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
+                            STF_URL, deviceUDID)
+                    .withAuthorization(buildAuthToken(stfToken))
+                    .post(RemoteConnectUserDevice.class, null);
 
-                if (remoteConnectUserDevice.getStatus() != 200) {
-                    LOGGER.warning(
-                            () -> String.format("[STF-%s] Unsuccessful remoteConnect. Status: %s. Response: %s",
-                                    sessionUUID, remoteConnectUserDevice.getStatus(), remoteConnectUserDevice.getObject()));
+            if (remoteConnectUserDevice.getStatus() != 200) {
+                LOGGER.warning(
+                        () -> String.format("[STF-%s] Unsuccessful remoteConnect. Status: %s. Response: %s",
+                                sessionUUID, remoteConnectUserDevice.getStatus(), remoteConnectUserDevice.getObject()));
 
+                if (!stfClient.reservedManually()) {
                     if (HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, deviceUDID)
                             .withAuthorization(buildAuthToken(stfToken))
                             .delete(Void.class).getStatus() != 200) {
                         LOGGER.warning(() -> String.format("[STF-%s] Could not return device to the STF after unsuccessful Android remoteConnect.",
                                 sessionUUID));
                     }
-                    return false;
                 }
+                return false;
             }
-        } else {
-            return false;
+        }
+
+        //RemoteURL appears only after reservation
+        if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities)) &&
+                CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "enableAdb")
+                        .map(String::valueOf)
+                        .map(Boolean::parseBoolean)
+                        .orElse(false)) {
+            // get again device info
+            HttpClient.Response<Devices> _devices = HttpClient.uri(Path.STF_DEVICES_PATH, STF_URL)
+                    .withAuthorization(buildAuthToken(stfToken))
+                    .get(Devices.class);
+
+            if (_devices.getStatus() != 200) {
+                LOGGER.warning(() -> String.format("[STF-%s] Unable to get devices status. HTTP status: %s", sessionUUID, _devices.getStatus()));
+                return false;
+            }
+
+            Optional<STFDevice> _optionalSTFDevice = _devices.getObject().getDevices()
+                    .stream()
+                    .filter(device -> StringUtils.equals(device.getSerial(), deviceUDID))
+                    .findFirst();
+
+            if (_optionalSTFDevice.isEmpty()) {
+                LOGGER.warning(() -> String.format("[STF-%s] Could not find STF device with udid: %s", sessionUUID, deviceUDID));
+                return false;
+            }
+            STFDevice _stfDevice = _optionalSTFDevice.get();
+            stfClient.setDevice(_stfDevice);
+
+            if (StringUtils.isBlank((String) _stfDevice.getRemoteConnectUrl())) {
+                LOGGER.warning(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", sessionUUID));
+                if (!stfClient.reservedManually()) {
+                    if (HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, deviceUDID)
+                            .withAuthorization(buildAuthToken(stfToken))
+                            .delete(Void.class).getStatus() != 200) {
+                        LOGGER.warning(() -> String.format("[STF-%s] Could not return device to the STF after unsuccessful remoteURL check.",
+                                sessionUUID));
+                    }
+                }
+                return false;
+            } else {
+                LOGGER.info(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, and remoteURL is present.", sessionUUID));
+            }
         }
 
         stfClient.setPlatform(Platform.fromCapabilities(requestedCapabilities));
         stfClient.setSTFSessionUUID(sessionUUID);
         LOGGER.info(
-                () -> String.format("[STF-%s] Device '%s' successfully reserved.", sessionUUID, stfDevice.getSerial()));
+                () -> String.format("[STF-%s] Device '%s' successfully reserved.", sessionUUID, stfClient.getDevice().getSerial()));
         STF_CLIENTS.put(deviceUDID, stfClient);
         return true;
     }
@@ -196,13 +228,6 @@ public final class STFClient {
         }
         String sessionUUID = client.getSTFSessionUUID();
         try {
-            if (client.reservedManually()) {
-                LOGGER.info(() -> String.format("[STF-%s] Device '%s' will not be returned as it was reserved manually.",
-                        sessionUUID, client.getDevice().getSerial()));
-                return;
-            }
-            LOGGER.info(() -> String.format("[STF-%s] Return STF Device.", sessionUUID));
-
             // it seems like return and remote disconnect guarantee that device becomes free asap
             if (Platform.ANDROID.equals(client.getPlatform())) {
                 LOGGER.info(() -> String.format("[STF-%s] Additionally disconnect 'remoteConnect'.", sessionUUID));
@@ -214,14 +239,22 @@ public final class STFClient {
                 }
             }
 
+            if (client.reservedManually()) {
+                LOGGER.info(() -> String.format("[STF-%s] Device '%s' will not be returned as it was reserved manually.",
+                        sessionUUID, client.getDevice().getSerial()));
+                return;
+            }
+            LOGGER.info(() -> String.format("[STF-%s] Return STF Device.", sessionUUID));
+
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                     .withAuthorization(buildAuthToken(client.getToken()))
                     .delete(Void.class);
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[STF-%s] Could not return device to the STF. Status: %s", sessionUUID, response.getStatus()));
+            } else {
+                LOGGER.warning(() -> String.format("[STF-%s] Device '%s' successfully returned to the STF.",
+                        sessionUUID, client.getDevice().getSerial()));
             }
-            LOGGER.warning(() -> String.format("[STF-%s] Device '%s' successfully returned to the STF.",
-                    sessionUUID, client.getDevice().getSerial()));
         } catch (Exception e) {
             LOGGER.warning(() -> String.format("[STF-%s] Error when return device to the STF: %s", sessionUUID, e));
         } finally {
