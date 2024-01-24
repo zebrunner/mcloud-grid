@@ -43,6 +43,7 @@ public final class STFClient {
     // Max time is seconds for reserving devices in STF
     private static final String DEFAULT_STF_TIMEOUT = System.getenv("STF_TIMEOUT");
 
+    private static final Duration  INVALID_STF_RESPONSE_TIMEOUT = Duration.ofMinutes(10);
     private static final Duration UNAUTHORIZED_TIMEOUT = Duration.ofMinutes(10);
     private static final Duration UNHEALTHY_TIMEOUT = Duration.ofMinutes(5);
 
@@ -81,6 +82,10 @@ public final class STFClient {
         if (STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID) != null) {
             Duration timeout = STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID);
             if (Duration.ofMillis(System.currentTimeMillis()).compareTo(timeout) < 0) {
+                LOGGER.warning(() -> String.format("[STF-%s] The next attempt to reserve '%s' STF device will be given only after '%s' minutes.",
+                        sessionUUID,
+                        deviceUDID,
+                        timeout.minus(Duration.ofMillis(System.currentTimeMillis())).toMinutes()));
                 return false;
             } else {
                 STF_DEVICE_IGNORE_AUTOMATION_TIMERS.remove(deviceUDID);
@@ -137,19 +142,22 @@ public final class STFClient {
         stfClient.setDevice(stfDevice);
 
         if(stfDevice.getStatus() == null) {
-            LOGGER.warning(() -> String.format("[STF-%s] STF device status is null. It will be ignored.", sessionUUID));
+            LOGGER.warning(() -> String.format("[STF-%s] STF device status is null. It will be ignored: %s minutes.", sessionUUID,
+                    INVALID_STF_RESPONSE_TIMEOUT.toMinutes()));
+            STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
             return false;
         }
 
         if(stfDevice.getStatus().intValue() == 2) {
-            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s.", sessionUUID,
-                    UNAUTHORIZED_TIMEOUT));
+            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s minutes.", sessionUUID,
+                    UNAUTHORIZED_TIMEOUT.toMinutes()));
            STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
            return false;
         }
 
         if(stfDevice.getStatus() == 7) {
-            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNHEALTHY'. It will be ignored: %s.", sessionUUID, UNHEALTHY_TIMEOUT));
+            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNHEALTHY'. It will be ignored: %s minutes.", sessionUUID,
+                    UNHEALTHY_TIMEOUT.toMinutes()));
             STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
             return false;
         }
