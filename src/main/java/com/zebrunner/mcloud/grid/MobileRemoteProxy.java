@@ -70,26 +70,25 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 return null;
             }
             if (isDown()) {
-                TestSlot slot = getTestSlots().get(0);
-                if (slot != null) {
-                    LOGGER.info(() -> String.format("Node is down: '%s:%s' - '%s (%s)'",
-                            Optional.of(slot)
-                                    .map(TestSlot::getProxy)
-                                    .map(RemoteProxy::getRemoteHost)
-                                    .map(URL::getHost)
-                                    .orElse(StringUtils.EMPTY),
-                            Optional.of(slot)
-                                    .map(TestSlot::getProxy)
-                                    .map(RemoteProxy::getRemoteHost)
-                                    .map(URL::getPort)
-                                    .map(String::valueOf)
-                                    .orElse(StringUtils.EMPTY),
-                            CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid"),
-                            CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName"))
-                    );
-                } else {
-                    LOGGER.info(() -> "Node is down.");
-                }
+                getTestSlots().stream()
+                        .findAny()
+                        .ifPresent((slot -> {
+                            LOGGER.info(() -> String.format("Node is down: '%s:%s' - '%s (%s)'",
+                                    Optional.of(slot)
+                                            .map(TestSlot::getProxy)
+                                            .map(RemoteProxy::getRemoteHost)
+                                            .map(URL::getHost)
+                                            .orElse(StringUtils.EMPTY),
+                                    Optional.of(slot)
+                                            .map(TestSlot::getProxy)
+                                            .map(RemoteProxy::getRemoteHost)
+                                            .map(URL::getPort)
+                                            .map(String::valueOf)
+                                            .orElse(StringUtils.EMPTY),
+                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid"),
+                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName"))
+                            );
+                        }));
                 return null;
             }
             if (!hasCapability(requestedCapability)) {
