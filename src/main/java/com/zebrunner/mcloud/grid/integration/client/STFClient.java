@@ -87,10 +87,10 @@ public final class STFClient {
      * Reserve STF device
      */
     public static boolean reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
-        LOGGER.info(() -> String.format("[STF-%s] Reserve STF Device.", sessionUUID));
         if (!isSTFEnabled()) {
             return true;
         }
+        LOGGER.info(() -> String.format("[STF-%s] Reserve STF Device.", sessionUUID));
 
         if (STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID) != null) {
             Duration timeout = STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID);
@@ -374,6 +374,23 @@ public final class STFClient {
 
     private static boolean isSTFEnabled() {
         return (!StringUtils.isEmpty(STF_URL) && !StringUtils.isEmpty(DEFAULT_STF_TOKEN));
+    }
+
+    public static boolean isDevicePresentInSTF(String udid) {
+        if (!isSTFEnabled()) {
+            return true;
+        }
+        HttpClient.Response<Devices> devices = HttpClient.uri(Path.STF_DEVICES_PATH, STF_URL)
+                .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                .get(Devices.class);
+        if (devices.getStatus() != 200) {
+            LOGGER.warning(() -> String.format("[NODE REGISTRATION] Unable to get devices status. HTTP status: %s", devices.getStatus()));
+            return false;
+        }
+        return devices.getObject()
+                .getDevices()
+                .stream()
+                .anyMatch(device -> StringUtils.equals(device.getSerial(), udid));
     }
 
     @Override public String toString() {

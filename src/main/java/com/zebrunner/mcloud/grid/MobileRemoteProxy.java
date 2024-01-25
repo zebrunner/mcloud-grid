@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
+import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSession;
@@ -57,6 +58,20 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
+        getTestSlots().stream()
+                .findAny()
+                .ifPresent(slot -> {
+                    String udid = String.valueOf(CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid")
+                            .orElse(""));
+                    if (StringUtils.isBlank(udid)) {
+                        throw new GridException(String.format("Appium node must have 'UDID' capability. Slot capabilities: %s",
+                                slot.getCapabilities()));
+                    }
+                    if (!STFClient.isDevicePresentInSTF(udid)) {
+                        throw new GridException(String.format("Could not find device with udid '%s' in STF. Slot capabilities: %s",
+                                udid, slot.getCapabilities()));
+                    }
+                });
     }
 
     @Override
