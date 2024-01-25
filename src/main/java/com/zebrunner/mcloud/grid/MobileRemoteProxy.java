@@ -73,7 +73,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 getTestSlots().stream()
                         .findAny()
                         .ifPresent((slot -> {
-                            LOGGER.info(() -> String.format("Node is down: '%s:%s' - '%s (%s)'",
+                            LOGGER.info(() -> String.format("Node is down: '[%s]-'%s:%s' (%s)'",
+                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName")
+                                            .orElse(StringUtils.EMPTY),
                                     Optional.of(slot)
                                             .map(TestSlot::getProxy)
                                             .map(RemoteProxy::getRemoteHost)
@@ -85,8 +87,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                                             .map(URL::getPort)
                                             .map(String::valueOf)
                                             .orElse(StringUtils.EMPTY),
-                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid"),
-                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName"))
+                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid")
+                                            .orElse(StringUtils.EMPTY)
+                                    )
                             );
                         }));
                 return null;
