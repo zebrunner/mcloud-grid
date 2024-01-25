@@ -43,9 +43,22 @@ public final class STFClient {
     // Max time is seconds for reserving devices in STF
     private static final String DEFAULT_STF_TIMEOUT = System.getenv("STF_TIMEOUT");
 
-    private static final Duration  INVALID_STF_RESPONSE_TIMEOUT = Duration.ofMinutes(10);
-    private static final Duration UNAUTHORIZED_TIMEOUT = Duration.ofMinutes(10);
-    private static final Duration UNHEALTHY_TIMEOUT = Duration.ofMinutes(5);
+    private static final Duration INVALID_STF_RESPONSE_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_INVALID_RESPONSE_IGNORE_TIMEOUT"))
+            .filter(StringUtils::isNotBlank)
+            .map(Integer::parseInt)
+            .map(Duration::ofSeconds)
+            .orElse(Duration.ofMinutes(10));
+    private static final Duration UNAUTHORIZED_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_UNAUTHORIZED_IGNORE_TIMEOUT"))
+            .filter(StringUtils::isNotBlank)
+            .map(Integer::parseInt)
+            .map(Duration::ofSeconds)
+            .orElse(Duration.ofMinutes(10));
+
+    private static final Duration UNHEALTHY_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_UNHEALTHY_IGNORE_TIMEOUT"))
+            .filter(StringUtils::isNotBlank)
+            .map(Integer::parseInt)
+            .map(Duration::ofSeconds)
+            .orElse(Duration.ofMinutes(5));
 
     private Platform platform;
     private String token;
@@ -91,7 +104,6 @@ public final class STFClient {
                 STF_DEVICE_IGNORE_AUTOMATION_TIMERS.remove(deviceUDID);
             }
         }
-
 
         if (STF_CLIENTS.get(deviceUDID) != null) {
             LOGGER.warning(() -> String.format("Device '%s' already busy (in the local pool). Info: %s", deviceUDID, STF_CLIENTS.get(deviceUDID)));
@@ -141,21 +153,21 @@ public final class STFClient {
 
         stfClient.setDevice(stfDevice);
 
-        if(stfDevice.getStatus() == null) {
+        if (stfDevice.getStatus() == null) {
             LOGGER.warning(() -> String.format("[STF-%s] STF device status is null. It will be ignored: %s minutes.", sessionUUID,
                     INVALID_STF_RESPONSE_TIMEOUT.toMinutes()));
             STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
             return false;
         }
 
-        if(stfDevice.getStatus().intValue() == 2) {
+        if (stfDevice.getStatus().intValue() == 2) {
             LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s minutes.", sessionUUID,
                     UNAUTHORIZED_TIMEOUT.toMinutes()));
-           STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
-           return false;
+            STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
+            return false;
         }
 
-        if(stfDevice.getStatus() == 7) {
+        if (stfDevice.getStatus() == 7) {
             LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNHEALTHY'. It will be ignored: %s minutes.", sessionUUID,
                     UNHEALTHY_TIMEOUT.toMinutes()));
             STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
@@ -179,14 +191,15 @@ public final class STFClient {
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[STF-%s] Could not reserve STF device with udid: %s. Status: %s. Response: %s",
                         sessionUUID, deviceUDID, response.getStatus(), response.getObject()));
-                if(response.getStatus() == 0) {
-                    LOGGER.warning(() -> String.format("[STF-%s] Device will be marked as unhealthy due to response status '0'.",  sessionUUID));
+                if (response.getStatus() == 0) {
+                    LOGGER.warning(() -> String.format("[STF-%s] Device will be marked as unhealthy due to response status '0'.", sessionUUID));
                     entity.put("body", Map.of("status", "Unhealthy"));
-                    HttpClient.Response r =  HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, deviceUDID)
+                    HttpClient.Response r = HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, deviceUDID)
                             .withAuthorization(buildAuthToken(stfToken))
                             .put(Void.class, entity);
-                    if(r.getStatus() != 200) {
-                        LOGGER.warning(() -> String.format("[STF-%s] Could not mark device as unhealthy. Status: %s. Response: %s",  sessionUUID, r.getStatus(), r.getObject()));
+                    if (r.getStatus() != 200) {
+                        LOGGER.warning(() -> String.format("[STF-%s] Could not mark device as unhealthy. Status: %s. Response: %s", sessionUUID,
+                                r.getStatus(), r.getObject()));
                     }
                 }
                 return false;
