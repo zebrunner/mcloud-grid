@@ -31,7 +31,7 @@ public enum Path {
     APPIUM_STATUS("/status"),
     APPIUM_STATUS_WDA("/status-wda"),
     APPIUM_STATUS_ADB("/status-adb"),
-    PROXY_RESTART("/restart");
+    PROXY_RESTART("/mitm-restart");
     
     private final String relativePath;
 
