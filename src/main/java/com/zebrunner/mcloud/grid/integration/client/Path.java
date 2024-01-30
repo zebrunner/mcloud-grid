@@ -30,7 +30,8 @@ public enum Path {
     APPIUM_GET_LOGS_PATH("/session/%s/log"),
     APPIUM_STATUS("/status"),
     APPIUM_STATUS_WDA("/status-wda"),
-    APPIUM_STATUS_ADB("/status-adb");
+    APPIUM_STATUS_ADB("/status-adb"),
+    PROXY_RESTART("/mitm-restart");
     
     private final String relativePath;
 

@@ -71,8 +71,4 @@ public class ProxyServlet extends RegistryBasedServlet {
     public static void updatePacConfiguration(String udid, String pac) {
         CUSTOM_DEVICE_PAC_PROXY_CONFIGURATION.put(udid, pac);
     }
-
-    public static void cleanPacConfiguration(String udid) {
-        CUSTOM_DEVICE_PAC_PROXY_CONFIGURATION.remove(udid);
-    }
 }
