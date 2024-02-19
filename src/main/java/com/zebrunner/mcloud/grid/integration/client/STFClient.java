@@ -359,6 +359,7 @@ public final class STFClient {
         devices.getObject()
                 .getDevices()
                 .stream()
+                .filter(d -> d.getOwner() != null)
                 .filter(d -> StringUtils.equals(d.getOwner().getName(), user.getObject().getUser().getName()))
                 .map(STFDevice::getSerial)
                 .filter(StringUtils::isNotBlank)

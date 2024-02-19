@@ -59,11 +59,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String SESSION_UUID_PARAMETER = "SESSION_UUID_PARAMETER";
     private final AtomicBoolean lock = new AtomicBoolean(false);
-    private static final LazyInitializer<Void> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
+    private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
         @Override
-        protected Void initialize() throws ConcurrentException {
+        protected Object initialize() throws ConcurrentException {
             STFClient.disconnectAllDevices();
-            return null;
+            return  true;
         }
     };
 
