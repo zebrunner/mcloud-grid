@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -286,7 +287,9 @@ public final class STFClient {
     }
 
     public static void disconnectSTFDevice(String udid) {
-
+        if (!isSTFEnabled()) {
+            return;
+        }
         STFClient client = STF_CLIENTS.get(udid);
         if (client == null) {
             return;
@@ -326,6 +329,47 @@ public final class STFClient {
             STF_CLIENTS.remove(udid);
         }
 
+    }
+
+    public static void disconnectAllDevices() {
+        if (!STFClient.isSTFEnabled()) {
+            return;
+        }
+        LOGGER.info("[STF] All devices previously reserved for automation will be disconnected in STF.");
+        HttpClient.Response<User> user = HttpClient.uri(Path.STF_USER_PATH, STF_URL)
+                .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                .get(User.class);
+
+        if (user.getStatus() != 200) {
+            LOGGER.warning(() ->
+                    String.format("[STF] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", STF_URL, DEFAULT_STF_TOKEN));
+            return;
+        }
+
+        HttpClient.Response<Devices> devices = HttpClient.uri(Path.STF_DEVICES_PATH, STF_URL)
+                .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                .get(Devices.class);
+
+        if (devices.getStatus() != 200) {
+            LOGGER.warning(() -> String.format("[STF] Unable to get devices status. HTTP status: %s", devices.getStatus()));
+            return;
+        }
+
+        devices.getObject()
+                .getDevices()
+                .stream()
+                .filter(d -> StringUtils.equals(d.getOwner().getName(), user.getObject().getUser().getName()))
+                .map(STFDevice::getSerial).collect(Collectors.toList())
+                .forEach(udid -> {
+                    HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
+                            .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                            .delete(Void.class);
+                    if (response.getStatus() != 200) {
+                        LOGGER.warning(() -> String.format("[STF] Could not return device to the STF. Status: %s", response.getStatus()));
+                    } else {
+                        LOGGER.warning(() -> String.format("[STF] Device '%s' successfully returned to the STF.", udid));
+                    }
+                });
     }
 
     private static String buildAuthToken(String authToken) {
@@ -372,7 +416,7 @@ public final class STFClient {
         isReservedManually = owned;
     }
 
-    private static boolean isSTFEnabled() {
+    public static boolean isSTFEnabled() {
         return (!StringUtils.isEmpty(STF_URL) && !StringUtils.isEmpty(DEFAULT_STF_TOKEN));
     }
 

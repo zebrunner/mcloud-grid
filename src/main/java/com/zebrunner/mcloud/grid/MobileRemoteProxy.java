@@ -27,6 +27,9 @@ import com.zebrunner.mcloud.grid.integration.client.MitmProxyClient;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.validator.ProxyValidator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.concurrent.ConcurrentException;
+import org.apache.commons.lang3.concurrent.LazyInitializer;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
@@ -56,9 +59,21 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String SESSION_UUID_PARAMETER = "SESSION_UUID_PARAMETER";
     private final AtomicBoolean lock = new AtomicBoolean(false);
+    private static final LazyInitializer<Void> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
+        @Override
+        protected Void initialize() throws ConcurrentException {
+            STFClient.disconnectAllDevices();
+            return null;
+        }
+    };
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
+        try {
+            DISCONNECT_ALL_DEVICES.get();
+        } catch (ConcurrentException e) {
+            ExceptionUtils.rethrow(e);
+        }
         getTestSlots().stream()
                 .findAny()
                 .ifPresent(slot -> {
