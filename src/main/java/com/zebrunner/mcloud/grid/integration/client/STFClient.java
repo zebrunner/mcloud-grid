@@ -18,6 +18,7 @@ package com.zebrunner.mcloud.grid.integration.client;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -359,7 +360,9 @@ public final class STFClient {
                 .getDevices()
                 .stream()
                 .filter(d -> StringUtils.equals(d.getOwner().getName(), user.getObject().getUser().getName()))
-                .map(STFDevice::getSerial).collect(Collectors.toList())
+                .map(STFDevice::getSerial)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList())
                 .forEach(udid -> {
                     HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                             .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))

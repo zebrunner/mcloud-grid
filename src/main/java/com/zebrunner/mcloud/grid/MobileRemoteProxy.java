@@ -71,8 +71,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         super(request, registry);
         try {
             DISCONNECT_ALL_DEVICES.get();
-        } catch (ConcurrentException e) {
-            ExceptionUtils.rethrow(e);
+        } catch (Exception e) {
+            LOGGER.warning(() -> String.format("Could not disconnect STF devices. Error message: %s", e.getMessage()));
         }
         getTestSlots().stream()
                 .findAny()
