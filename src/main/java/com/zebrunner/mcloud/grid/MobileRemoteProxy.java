@@ -27,6 +27,9 @@ import com.zebrunner.mcloud.grid.integration.client.MitmProxyClient;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.validator.ProxyValidator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.concurrent.ConcurrentException;
+import org.apache.commons.lang3.concurrent.LazyInitializer;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
@@ -56,9 +59,21 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String SESSION_UUID_PARAMETER = "SESSION_UUID_PARAMETER";
     private final AtomicBoolean lock = new AtomicBoolean(false);
+    private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
+        @Override
+        protected Object initialize() throws ConcurrentException {
+            STFClient.disconnectAllDevices();
+            return  true;
+        }
+    };
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
+        try {
+            DISCONNECT_ALL_DEVICES.get();
+        } catch (Exception e) {
+            LOGGER.warning(() -> String.format("Could not disconnect STF devices. Error message: %s", e.getMessage()));
+        }
         getTestSlots().stream()
                 .findAny()
                 .ifPresent(slot -> {
@@ -78,6 +93,39 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
+        if (!hasCapability(requestedCapability)) {
+            return null;
+        }
+        if (isDown()) {
+            getTestSlots().stream()
+                    .findAny()
+                    .ifPresent((slot -> {
+                        LOGGER.info(() -> String.format("Node is down: '[%s]-'%s:%s' (%s)'",
+                                        CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName")
+                                                .orElse(StringUtils.EMPTY),
+                                        Optional.of(slot)
+                                                .map(TestSlot::getProxy)
+                                                .map(RemoteProxy::getRemoteHost)
+                                                .map(URL::getHost)
+                                                .orElse(StringUtils.EMPTY),
+                                        Optional.of(slot)
+                                                .map(TestSlot::getProxy)
+                                                .map(RemoteProxy::getRemoteHost)
+                                                .map(URL::getPort)
+                                                .map(String::valueOf)
+                                                .orElse(StringUtils.EMPTY),
+                                        CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid")
+                                                .orElse(StringUtils.EMPTY)
+                                )
+                        );
+                    }));
+            return null;
+        }
+
+        if (getTotalUsed() >= config.maxSession) {
+            return null;
+        }
+
         String sessionUUID = UUID.randomUUID().toString();
         String udid = null;
         TestSession testSession = null;
@@ -87,39 +135,43 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             if (!lock.compareAndSet(false, true)) {
                 return null;
             }
-            if (isDown()) {
+
+            if (getTotalUsed() >= config.maxSession) {
+                return null;
+            }
+
+            if (!isAlive()) {
                 getTestSlots().stream()
                         .findAny()
                         .ifPresent((slot -> {
-                            LOGGER.info(() -> String.format("Node is down: '[%s]-'%s:%s' (%s)'",
-                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName")
-                                            .orElse(StringUtils.EMPTY),
-                                    Optional.of(slot)
-                                            .map(TestSlot::getProxy)
-                                            .map(RemoteProxy::getRemoteHost)
-                                            .map(URL::getHost)
-                                            .orElse(StringUtils.EMPTY),
-                                    Optional.of(slot)
-                                            .map(TestSlot::getProxy)
-                                            .map(RemoteProxy::getRemoteHost)
-                                            .map(URL::getPort)
-                                            .map(String::valueOf)
-                                            .orElse(StringUtils.EMPTY),
-                                    CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid")
-                                            .orElse(StringUtils.EMPTY)
+                            LOGGER.info(() -> String.format("Node is not alive: '[%s]-'%s:%s' (%s)'",
+                                            CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName")
+                                                    .orElse(StringUtils.EMPTY),
+                                            Optional.of(slot)
+                                                    .map(TestSlot::getProxy)
+                                                    .map(RemoteProxy::getRemoteHost)
+                                                    .map(URL::getHost)
+                                                    .orElse(StringUtils.EMPTY),
+                                            Optional.of(slot)
+                                                    .map(TestSlot::getProxy)
+                                                    .map(RemoteProxy::getRemoteHost)
+                                                    .map(URL::getPort)
+                                                    .map(String::valueOf)
+                                                    .orElse(StringUtils.EMPTY),
+                                            CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "udid")
+                                                    .orElse(StringUtils.EMPTY)
                                     )
                             );
                         }));
                 return null;
             }
-            if (!hasCapability(requestedCapability)) {
-                return null;
-            }
-            if (getTotalUsed() >= config.maxSession) {
-                return null;
-            }
 
             for (TestSlot testslot : getTestSlots()) {
+                if (testslot.getSession() != null) {
+                    LOGGER.info(() -> String.format("[NODE-%s] Skip node - slot is busy. Requested capabilities: %n%s. %nSlotCapabilities: %n%s",
+                            sessionUUID, requestedCapability, testslot.getCapabilities()));
+                    return null;
+                }
                 LOGGER.info(() -> String.format("[NODE-%s] Occupy the slot. Requested capabilities: %n%s. %nSlotCapabilities: %n%s",
                         sessionUUID, requestedCapability, testslot.getCapabilities()));
                 udid = String.valueOf(CapabilityUtils.getAppiumCapability(testslot.getCapabilities(), "udid").orElse(""));
@@ -223,17 +275,21 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             LOGGER.warning(() -> String.format("[NODE-%s] Exception in MobileRemoteProxy.getNewSession: %s.", sessionUUID, e));
             return null;
         } finally {
-            if (testSession == null) {
-                if (udid != null) {
-                    STFClient.disconnectSTFDevice(udid);
-                    if (isMitmStarted) {
-                        if (!MitmProxyClient.start(udid, "simple", null, sessionUUID)) {
-                            LOGGER.info(() -> String.format("[NODE-%s] Could not reset proxy.", sessionUUID));
+            try {
+                if (testSession == null) {
+                    if (udid != null) {
+                        STFClient.disconnectSTFDevice(udid);
+                        if (isMitmStarted) {
+                            if (!MitmProxyClient.start(udid, "simple", null, sessionUUID)) {
+                                LOGGER.info(() -> String.format("[NODE-%s] Could not reset proxy.", sessionUUID));
+                            }
                         }
                     }
                 }
-                lock.set(false);
+            } catch (Exception e) {
+                LOGGER.warning(() -> String.format("[NODE-%s] Exception in finally block: %s.", sessionUUID, e.getMessage()));
             }
+            lock.set(false);
         }
     }
 
@@ -283,9 +339,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
         } catch (Exception e) {
             LOGGER.warning(String.format("[NODE-%s] Exception in afterSession: %s.", sessionUUID, e));
-        } finally {
-            LOGGER.warning(() -> String.format("[NODE-%s] Lock removed.", sessionUUID));
-            lock.set(false);
         }
     }
 
