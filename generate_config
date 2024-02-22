@@ -5,7 +5,7 @@ cat <<_EOF
   "host": null,
   "port": 4444,
   "role": "hub",
-  "maxSession": $GRID_MAX_SESSION,
+  "maxSession": 1,
   "newSessionWaitTimeout": $GRID_NEW_SESSION_WAIT_TIMEOUT,
   "capabilityMatcher": "$GRID_CAPABILITY_MATCHER",
   "throwOnCapabilityNotPresent": $GRID_THROW_ON_CAPABILITY_NOT_PRESENT,

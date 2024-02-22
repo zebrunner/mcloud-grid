@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 
 public class DeviceTypeValidator implements Validator {
     private static final Logger LOGGER = Logger.getLogger(MethodHandles.lookup().lookupClass().getName());
-    private static final String ZEBRUNNER_DEVICE_TYPE_CAPABILITY = "deviceType";
+    public static final String ZEBRUNNER_DEVICE_TYPE_CAPABILITY = "deviceType";
 
     @Override
     public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {

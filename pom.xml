@@ -22,14 +22,14 @@
 		<httpclient.version>4.5.13</httpclient.version>
 		<genson.version>0.99</genson.version>
 		<jersey-bundle.version>1.19.4</jersey-bundle.version>
-		<lombok.version>1.18.10</lombok.version>
+		<lombok.version>1.18.30</lombok.version>
 		<testng.version>7.4.0</testng.version>
 	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-server</artifactId>
-			<version>3.14.0</version>
+			<version>3.141.59</version>
 		</dependency>
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
