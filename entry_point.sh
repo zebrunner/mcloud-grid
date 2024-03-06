@@ -34,7 +34,7 @@ function shutdown {
     echo "shutdown complete"
 }
 
-java ${JAVA_OPTS} -Djava.security.egd=file:/dev/./urandom -XX:InitialRAMPercentage=50.0 -XX:+UseG1GC -XX:InitialHeapSize=1g -XX:MaxHeapSize=4g -XX:MaxGCPauseMillis=500 -XX:+DisableExplicitGC -XX:+UseStringDeduplication -XX:+ParallelRefProcEnabled -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid.jar org.openqa.selenium.grid.Bootstrap hub \
+java ${JAVA_OPTS} -Djava.security.egd=file:/dev/./urandom -XX:+UseG1GC -XX:InitialHeapSize=1g -XX:MaxHeapSize=4g -XX:MaxGCPauseMillis=500 -XX:+DisableExplicitGC -XX:+UseStringDeduplication -XX:+ParallelRefProcEnabled -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid.jar org.openqa.selenium.grid.Bootstrap hub \
   --config $CONF \
   ${SE_OPTS} &
 NODE_PID=$!
