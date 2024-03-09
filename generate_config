@@ -8,7 +8,7 @@ port = 4444
 # Whether the server should bind to the host address/name, or only use it to" report its reachable url.
 # Helpful in complex network topologies where the server cannot report itself with the current IP/hostname
 # but rather an external IP or hostname (e.g. inside a Docker container)
-bind-host = true
+#bind-host = true
 
 # Maximum number of listener threads. Default value is: (available processors) * 3.
 # max-threads = 24
