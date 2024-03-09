@@ -10,6 +10,8 @@ port = 4444
 # but rather an external IP or hostname (e.g. inside a Docker container)
 bind-host = true
 
+allow-cors = true
+
 # Maximum number of listener threads. Default value is: (available processors) * 3.
 # max-threads = 24
 
