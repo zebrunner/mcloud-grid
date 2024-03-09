@@ -36,7 +36,7 @@ reject-unsupported-caps = $GRID_THROW_ON_CAPABILITY_NOT_PRESENT
 
 [logging]
 # Log level. Default logging level is INFO. Log levels are described here https://docs.oracle.com/javase/7/docs/api/java/util/logging/Level.html
-log-level = "INFO"
+log-level = "FINEST"
 
 [network]
 # Relax checks on origin header and content type of incoming requests, in contravention of strict W3C spec compliance.
