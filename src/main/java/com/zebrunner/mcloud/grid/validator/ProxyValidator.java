@@ -10,8 +10,8 @@ public class ProxyValidator implements Validator {
     public static final String MITM_CAPABILITY = "Mitm";
     public static final String MITM_ARGS_CAPABILITY = "MitmArgs";
     public static final String MITM_TYPE_CAPABILITY = "MitmType";
-    private static final String PROXY_PORT_CAPABILITY = "proxy_port";
-    private static final String SERVER_PROXY_PORT_CAPABILITY = "server_proxy_port";
+    public static final String PROXY_PORT_CAPABILITY = "proxy_port";
+    public static final String SERVER_PROXY_PORT_CAPABILITY = "server_proxy_port";
 
     @Override
     public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {

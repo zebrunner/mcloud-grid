@@ -19,7 +19,7 @@ import java.util.Map;
 
 /**
  * Platforms available in Selenium Grid.
- * 
+ *
  * @author Alex Khursevich (alex@qaprosoft.com)
  */
 public enum Platform {
@@ -33,20 +33,15 @@ public enum Platform {
 
     /**
      * Retrieves platform type from capabilities.
-     * 
+     *
      * @param cap - desired capabilities
      * @return platform
      */
     public static Platform fromCapabilities(Map<String, Object> cap) {
         Platform platform = Platform.ANY;
-
-        if (cap != null && cap.containsKey("platform") && cap.get("platform") != null) {
-            platform = Platform.valueOf(cap.get("platform").toString().toUpperCase());
-        }
         if (cap != null && cap.containsKey("platformName") && cap.get("platformName") != null) {
             platform = Platform.valueOf(cap.get("platformName").toString().toUpperCase());
         }
-
         return platform;
     }
 }
