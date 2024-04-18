@@ -26,7 +26,6 @@ import com.zebrunner.mcloud.grid.validator.ProxyValidator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
@@ -64,6 +63,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         @Override
         protected Object initialize() throws ConcurrentException {
             STFClient.disconnectAllDevices();
+            MitmProxyClient.clearConfiguration();
             return true;
         }
     };
@@ -85,6 +85,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private final Platform platform;
     private final boolean isMitmSupported;
     private final BiFunction<URL, String, Boolean> appiumCheck;
+
+    public String getUdid() {
+        return udid;
+    }
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
@@ -154,12 +158,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         Integer serverProxyPort = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), SERVER_PROXY_PORT_CAPABILITY)
                 .map(String::valueOf)
-                .filter(NumberUtils::isParsable)
                 .map(Integer::parseInt)
                 .orElse(null);
         Integer proxyPort = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), PROXY_PORT_CAPABILITY)
                 .map(String::valueOf)
-                .filter(NumberUtils::isParsable)
                 .map(Integer::parseInt)
                 .orElse(null);
         isMitmSupported = (serverProxyPort != null && serverProxyPort > 0 && proxyPort != null && proxyPort > 0);
@@ -171,7 +173,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
         }
         if (isMitmSupported) {
-            MitmProxyClient.initProxy(getTestSlots());
+            MitmProxyClient.initConfiguration(slot, udid, proxyPort, serverProxyPort);
+            //init proxy to ignore all requests
+            if (!MitmProxyClient.start(udid, "simple", "--ignore-hosts ':'", "INIT")) {
+                LOGGER.warning(() -> "Could not restart proxy due initialization.");
+            }
+        } else {
+            MitmProxyClient.clearConfiguration(udid);
         }
     }
 
@@ -203,33 +211,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 return null;
             }
 
-            if (isMitmSupported) {
-                // trigger proxy restart with specific capabilities
-                // capabilities already validated in ProxyValidator
-                Boolean isMitmEnable = CapabilityUtils.getZebrunnerCapability(requestedCapability, ProxyValidator.MITM_CAPABILITY)
-                        .map(String::valueOf)
-                        .map(Boolean::valueOf)
-                        .orElse(false);
-                if (isMitmEnable) {
-                    if (!MitmProxyClient.isProxyInitialized(udid)) {
-                        testslot.doFinishRelease();
-                        LOGGER.warning(() -> String.format("[NODE-%s] Proxy enabled for session, but is not initialized.", sessionUUID));
-                        return null;
-                    }
-                    String mitmArgs = CapabilityUtils.getZebrunnerCapability(requestedCapability, ProxyValidator.MITM_ARGS_CAPABILITY)
-                            .map(String::valueOf)
-                            .orElse(null);
-                    String mitmType = CapabilityUtils.getZebrunnerCapability(requestedCapability, MITM_TYPE_CAPABILITY)
-                            .map(String::valueOf)
-                            .orElse("simple");
-
-                    if (!MitmProxyClient.start(udid, mitmType, mitmArgs, sessionUUID)) {
-                        testslot.doFinishRelease();
-                        LOGGER.warning(() -> String.format("[NODE-%s] Could not start proxy with args: %s.", sessionUUID, mitmArgs));
-                        return null;
-                    }
-                }
-            }
             if (STFClient.isSTFEnabled()) {
                 STFDevice device = STFClient.reserveSTFDevice(udid, requestedCapability, sessionUUID);
                 if (device == null) {
@@ -249,6 +230,32 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 requestedCapability.put("zebrunner:slotCapabilities", slotCapabilities);
                 session.put(SESSION_UUID_PARAMETER, sessionUUID);
             }
+
+            if (isMitmSupported) {
+                // trigger proxy restart with specific capabilities
+                // capabilities already validated in ProxyValidator
+                boolean isMitmEnable = CapabilityUtils.getZebrunnerCapability(requestedCapability, ProxyValidator.MITM_CAPABILITY)
+                        .map(String::valueOf)
+                        .map(Boolean::valueOf)
+                        .orElse(false);
+                if (isMitmEnable) {
+                    String mitmArgs = CapabilityUtils.getZebrunnerCapability(requestedCapability, ProxyValidator.MITM_ARGS_CAPABILITY)
+                            .map(String::valueOf)
+                            .orElse(null);
+                    String mitmType = CapabilityUtils.getZebrunnerCapability(requestedCapability, MITM_TYPE_CAPABILITY)
+                            .map(String::valueOf)
+                            .orElse("simple");
+                    if (!MitmProxyClient.start(udid, mitmType, mitmArgs, sessionUUID)) {
+                        if (STFClient.isSTFEnabled()) {
+                            STFClient.disconnectSTFDevice(udid, platform, false, sessionUUID);
+                        }
+                        testslot.doFinishRelease();
+                        LOGGER.warning(() -> String.format("[NODE-%s] Could not start proxy with args: %s.", sessionUUID, mitmArgs));
+                        return null;
+                    }
+                }
+            }
+
             LOGGER.warning(() -> String.format("[NODE-%s] Session on [%s] will be started.", sessionUUID, deviceName));
             return session;
         }
@@ -276,10 +283,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), sessionUUID);
         }
         if (isMitmSupported) {
-            if (MitmProxyClient.isProxyInitialized(udid)) {
-                if (!MitmProxyClient.start(udid, "simple", null, sessionUUID)) {
-                    LOGGER.info(() -> String.format("[NODE-%s] Could not reset proxy.", sessionUUID));
-                }
+            //init proxy to ignore all requests
+            if (!MitmProxyClient.start(udid, "simple", "--ignore-hosts ':'", sessionUUID)) {
+                LOGGER.info(() -> String.format("[NODE-%s] Could not reset proxy.", sessionUUID));
             }
         }
     }

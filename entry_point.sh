@@ -37,6 +37,7 @@ function shutdown {
 java ${JAVA_OPTS} -Xms1G -Xmx4G -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv6Stack=false -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.util.logging.config.file=/opt/selenium/logger.properties -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
   org.openqa.grid.selenium.GridLauncherV3 \
   -role hub \
+  -registry com.zebrunner.mcloud.grid.MobileGridRegistry \
   -hubConfig $CONF \
 #  -jettyThreads 1000 \
   ${SE_OPTS} &
