@@ -120,7 +120,8 @@ public final class STFClient {
         }
 
         STFDevice stfDevice = optionalSTFDevice.get();
-        LOGGER.info(() -> String.format("[STF-%s] STF device info: %s", sessionUUID, stfDevice));
+        STFDevice finalStfDevice2 = stfDevice;
+        LOGGER.info(() -> String.format("[STF-%s] STF device info: %s", sessionUUID, finalStfDevice2));
 
         if (stfDevice.getStatus() == null) {
             LOGGER.warning(() -> String.format("[STF-%s] STF device status is null. It will be ignored: %s seconds.", sessionUUID,
@@ -146,8 +147,9 @@ public final class STFClient {
         if (stfDevice.getOwner() != null && StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName()) &&
                 stfDevice.getPresent() &&
                 stfDevice.getReady()) {
+            STFDevice finalStfDevice1 = stfDevice;
             LOGGER.warning(() -> String.format("[STF-%s] Device [%s] already reserved manually by the same user: %s.",
-                    sessionUUID, deviceUDID, stfDevice.getOwner().getName()));
+                    sessionUUID, deviceUDID, finalStfDevice1.getOwner().getName()));
         } else if (stfDevice.getOwner() == null && stfDevice.getPresent() && stfDevice.getReady()) {
 
             Map<String, Object> entity = new HashMap<>();
@@ -219,7 +221,7 @@ public final class STFClient {
                 return null;
             }
             STFDevice _stfDevice = _optionalSTFDevice.get();
-
+            stfDevice = _stfDevice;
             if (StringUtils.isBlank((String) _stfDevice.getRemoteConnectUrl())) {
                 LOGGER.warning(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", sessionUUID));
                 return null;
@@ -227,8 +229,9 @@ public final class STFClient {
                 LOGGER.info(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, and remoteURL is present.", sessionUUID));
             }
         }
+        STFDevice finalStfDevice = stfDevice;
         LOGGER.info(
-                () -> String.format("[STF-%s] Device '%s' successfully reserved.", sessionUUID, stfDevice.getSerial()));
+                () -> String.format("[STF-%s] Device '%s' successfully reserved.", sessionUUID, finalStfDevice.getSerial()));
         return stfDevice;
     }
 
