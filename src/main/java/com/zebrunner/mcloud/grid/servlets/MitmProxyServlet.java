@@ -85,7 +85,7 @@ public class MitmProxyServlet extends RegistryBasedServlet {
             } catch (IOException e) {
                 throw e;
             } catch (Throwable e) {
-                LOGGER.warning(() -> String.format("[CRITICAL] [PAC] cannot send for for '%s' request: %s", request.getRequestURI(), e.getMessage()));
+                LOGGER.warning(() -> String.format("[CRITICAL] [PAC] cannot send for '%s' request: %s", request.getRequestURI(), e.getMessage()));
             }
             return;
         }
@@ -103,14 +103,14 @@ public class MitmProxyServlet extends RegistryBasedServlet {
             String sessionId = sessionIdMatcher.group(SESSION_ID_GROUP);
             TestSession session = getRegistry().getExistingSession(new ExternalSessionKey(sessionId));
             if (session == null) {
-                response.sendError(404);
+                response.sendError(500);
                 return;
             }
 
             String udid = ((MobileRemoteProxy) session.getSlot().getProxy()).getUdid();
             MitmProxyClient client = MitmProxyClient.getProxyClient(udid);
             if (client == null) {
-                response.sendError(404);
+                response.sendError(500);
                 return;
             }
 
@@ -155,8 +155,7 @@ public class MitmProxyServlet extends RegistryBasedServlet {
             throw e;
         } catch (Throwable e) {
             LOGGER.warning(() -> String.format("[CRITICAL] [PROXY] %s:  %s", e.getClass().getSimpleName(), e.getMessage()));
-            response.sendError(500,
-                    String.format("%s: %s", e.getClass().getSimpleName(), e.getMessage()));
+            response.sendError(500);
         }
     }
 }
