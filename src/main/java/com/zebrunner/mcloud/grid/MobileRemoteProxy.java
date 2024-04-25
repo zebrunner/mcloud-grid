@@ -26,6 +26,7 @@ import com.zebrunner.mcloud.grid.validator.ProxyValidator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
@@ -158,10 +159,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         Integer serverProxyPort = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), SERVER_PROXY_PORT_CAPABILITY)
                 .map(String::valueOf)
+                .filter(NumberUtils::isParsable)
                 .map(Integer::parseInt)
                 .orElse(null);
         Integer proxyPort = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), PROXY_PORT_CAPABILITY)
                 .map(String::valueOf)
+                .filter(NumberUtils::isParsable)
                 .map(Integer::parseInt)
                 .orElse(null);
         isMitmSupported = (serverProxyPort != null && serverProxyPort > 0 && proxyPort != null && proxyPort > 0);
