@@ -84,7 +84,7 @@ public final class MitmProxyClient {
         client.remoteHost = slot.getProxy()
                 .getRemoteHost()
                 .getHost();
-        PROXY_CLIENTS.putIfAbsent(udid, client);
+        PROXY_CLIENTS.put(udid, client);
     }
 
     public static @Nullable MitmProxyClient getProxyClient(String udid) {
