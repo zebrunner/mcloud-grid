@@ -31,8 +31,11 @@ public enum Path {
     APPIUM_STATUS("/status"),
     APPIUM_STATUS_WDA("/status-wda"),
     APPIUM_STATUS_ADB("/status-adb"),
-    PROXY_RESTART("/mitm-restart");
-    
+    PROXY_RESTART("/mitm-restart"),
+    PROXY_DOWNLOAD_HAR("/download/har/%s"),
+    PROXY_DOWNLOAD_DUMP("/download/dump/%s"),
+    PROXY_CLEAR_FLOWS("/clear-flows");
+
     private final String relativePath;
 
     Path(String relativePath) {
@@ -46,5 +49,5 @@ public enum Path {
     public String build(String serviceUrl, Object... parameters) {
         return serviceUrl + String.format(relativePath, parameters);
     }
-    
+
 }

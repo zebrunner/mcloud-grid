@@ -15,7 +15,7 @@ public class ProxyValidator implements Validator {
 
     @Override
     public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
-        Boolean expectedValue = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, MITM_CAPABILITY)
+        boolean expectedValue = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, MITM_CAPABILITY)
                 .map(String::valueOf)
                 .map(Boolean::parseBoolean)
                 .orElse(false);
@@ -38,6 +38,6 @@ public class ProxyValidator implements Validator {
                 .orElse("simple");
 
         return (serverProxyPort != null && serverProxyPort > 0 && proxyPort != null && proxyPort > 0) &&
-                StringUtils.equalsAny(mitmType, "full", "simple");
+                StringUtils.equalsAny(mitmType, "full", "simple",  null);
     }
 }
