@@ -9,6 +9,9 @@
 	<packaging>jar</packaging>
 	<name>Zebrunner Device Farm (Selenium Grid)</name>
 	<properties>
+		<java.version>11</java.version>
+		<maven.compiler.source>${java.version}</maven.compiler.source>
+		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
 		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
