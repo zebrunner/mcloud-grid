@@ -33,10 +33,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import static com.zebrunner.mcloud.grid.MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS;
+
 @SuppressWarnings("rawtypes")
 public final class STFClient {
     private static final Logger LOGGER = Logger.getLogger(STFClient.class.getName());
-    private static final Map<String, Duration> STF_DEVICE_IGNORE_AUTOMATION_TIMERS = new ConcurrentHashMap<>();
     private static final String STF_URL = System.getenv("STF_URL");
     public static final String DEFAULT_STF_TOKEN = System.getenv("STF_TOKEN");
     // Max time is seconds for reserving devices in STF
@@ -58,7 +59,13 @@ public final class STFClient {
             .filter(StringUtils::isNotBlank)
             .map(Integer::parseInt)
             .map(Duration::ofSeconds)
-            .orElse(Duration.ofMinutes(5));
+            .orElse(Duration.ofMinutes(1));
+
+    private static final Duration STF_DEVICE_MANUALLY_RESERVED_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_MANUALLY_RESERVED_TIMEOUT"))
+            .filter(StringUtils::isNotBlank)
+            .map(Integer::parseInt)
+            .map(Duration::ofSeconds)
+            .orElse(Duration.ofMinutes(3));
 
     private STFClient() {
         //do nothing
@@ -67,21 +74,8 @@ public final class STFClient {
     /**
      * Reserve STF device
      */
-    public static STFDevice reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
+    public static synchronized STFDevice reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
         LOGGER.info(() -> String.format("[STF-%s] Reserve STF Device.", sessionUUID));
-
-        if (STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID) != null) {
-            Duration timeout = STF_DEVICE_IGNORE_AUTOMATION_TIMERS.get(deviceUDID);
-            if (Duration.ofMillis(System.currentTimeMillis()).compareTo(timeout) < 0) {
-                LOGGER.warning(() -> String.format("[STF-%s] The next attempt to reserve '%s' STF device will be given only after '%s' seconds.",
-                        sessionUUID,
-                        deviceUDID,
-                        timeout.minus(Duration.ofMillis(System.currentTimeMillis())).toSeconds()));
-                return null;
-            } else {
-                STF_DEVICE_IGNORE_AUTOMATION_TIMERS.remove(deviceUDID);
-            }
-        }
 
         String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TOKEN")
                 .map(String::valueOf)
@@ -124,23 +118,23 @@ public final class STFClient {
         LOGGER.info(() -> String.format("[STF-%s] STF device info: %s", sessionUUID, finalStfDevice2));
 
         if (stfDevice.getStatus() == null) {
+            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
             LOGGER.warning(() -> String.format("[STF-%s] STF device status is null. It will be ignored: %s seconds.", sessionUUID,
                     INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
-            STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
             return null;
         }
 
         if (stfDevice.getStatus().intValue() == 2) {
+            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
             LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s seconds.", sessionUUID,
                     UNAUTHORIZED_TIMEOUT.toSeconds()));
-            STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
             return null;
         }
 
         if (stfDevice.getStatus() == 7) {
+            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
             LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNHEALTHY'. It will be ignored: %s seconds.", sessionUUID,
                     UNHEALTHY_TIMEOUT.toSeconds()));
-            STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
             return null;
         }
 
@@ -151,7 +145,6 @@ public final class STFClient {
             LOGGER.warning(() -> String.format("[STF-%s] Device [%s] already reserved manually by the same user: %s.",
                     sessionUUID, deviceUDID, finalStfDevice1.getOwner().getName()));
         } else if (stfDevice.getOwner() == null && stfDevice.getPresent() && stfDevice.getReady()) {
-
             Map<String, Object> entity = new HashMap<>();
             entity.put("serial", deviceUDID);
             entity.put("timeout", TimeUnit.SECONDS.toMillis(stfTimeout));
@@ -161,8 +154,10 @@ public final class STFClient {
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[STF-%s] Could not reserve STF device with udid: %s. Status: %s. Response: %s",
                         sessionUUID, deviceUDID, response.getStatus(), response.getObject()));
+                LOGGER.warning(() -> String.format("[STF-%s] Device [%s] will be ignored %s seconds.",
+                        sessionUUID, deviceUDID, INVALID_STF_RESPONSE_TIMEOUT));
+                DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
                 if (response.getStatus() == 0) {
-                    STF_DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(Duration.ofMinutes(30)));
                     LOGGER.warning(() -> String.format("[STF-%s] Device will be marked as unhealthy due to response status '0'.", sessionUUID));
                     entity.put("body", Map.of("status", "Unhealthy"));
                     HttpClient.Response r = HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, deviceUDID)
@@ -175,7 +170,16 @@ public final class STFClient {
                 }
                 return null;
             }
+        } else if (stfDevice.getOwner() != null && !StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName())){
+            STFDevice finalStfDevice1 = stfDevice;
+            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(STF_DEVICE_MANUALLY_RESERVED_TIMEOUT));
+            LOGGER.warning(() -> String.format("[STF-%s] Device [%s] reserved manually by user: %s. Will be ignored %s seconds.",
+                    sessionUUID, deviceUDID, finalStfDevice1.getOwner().getName(), STF_DEVICE_MANUALLY_RESERVED_TIMEOUT.toSeconds()));
+            return null;
         } else {
+            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
+            LOGGER.warning(() -> String.format("[STF-%s] Device [%s] is not ready. Will be ignored %s seconds.",
+                    sessionUUID, deviceUDID, UNHEALTHY_TIMEOUT.toSeconds()));
             return null;
         }
 
@@ -235,7 +239,7 @@ public final class STFClient {
         return stfDevice;
     }
 
-    public static void disconnectSTFDevice(String udid, Platform platform, boolean isReservedManually, String sessionUUID) {
+    public static synchronized void disconnectSTFDevice(String udid, Platform platform, boolean isReservedManually, String sessionUUID) {
         // it seems like return and remote disconnect guarantee that device becomes free asap
         if (Platform.ANDROID.equals(platform)) {
             LOGGER.info(() -> String.format("[STF-%s] Additionally disconnect 'remoteConnect'.", sessionUUID));
