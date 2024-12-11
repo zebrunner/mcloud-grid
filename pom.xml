@@ -27,7 +27,6 @@
 		<jersey-bundle.version>1.19.4</jersey-bundle.version>
 		<lombok.version>1.18.30</lombok.version>
 		<testng.version>7.4.0</testng.version>
-		<property name="image.directory">${org.openqa.grid.images}</property>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -97,12 +96,6 @@
 
 	</dependencies>
 	<build>
-		<resources>
-			<resource>
-				<directory>src/main/resources</directory>
-				<filtering>true</filtering>
-			</resource>
-		</resources>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -119,6 +112,9 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
+					<archiverConfig>
+						<duplicateBehavior>add</duplicateBehavior>
+					</archiverConfig>
 					<finalName>mcloud-grid</finalName>
 				</configuration>
 			</plugin>
@@ -140,23 +136,8 @@
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<version>${maven-javadoc-plugin.version}</version>
 			</plugin>
-			<plugin>
-				<artifactId>maven-resources-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>default-resources</id>
-						<phase>process-resources</phase>
-						<goals>
-							<goal>resources</goal>
-						</goals>
-						<configuration>
-							<filters>
-								<filter>src/main/resources/filters/filter.properties</filter>
-							</filters>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+
+
 		</plugins>
 	</build>
 </project>
