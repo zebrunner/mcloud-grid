@@ -35,6 +35,7 @@ import org.openqa.grid.internal.DefaultGridRegistry;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
+import org.openqa.grid.internal.utils.HtmlRenderer;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import org.openqa.selenium.remote.CapabilityType;
 
@@ -72,6 +73,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return true;
         }
     };
+    private final HtmlRenderer htmlRenderer;
     private static final LazyInitializer<Boolean> INITIAL_GRID_CONFIGURATION_LOGS = new LazyInitializer<Boolean>() {
         @Override
         protected Boolean initialize() throws ConcurrentException {
@@ -192,6 +194,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         if (isMitmSupported) {
             MitmProxyClient.initProxy(getTestSlots());
         }
+
+        htmlRenderer = new ProxyHtmlRenderer(this, udid);
+    }
+
+    @Override
+    public HtmlRenderer getHtmlRender() {
+        return htmlRenderer;
     }
 
     public void beforeCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
