@@ -27,6 +27,7 @@
 		<jersey-bundle.version>1.19.4</jersey-bundle.version>
 		<lombok.version>1.18.30</lombok.version>
 		<testng.version>7.4.0</testng.version>
+		<property name="image.directory">${org.openqa.grid.images}</property>
 	</properties>
 	<dependencies>
 		<dependency>
