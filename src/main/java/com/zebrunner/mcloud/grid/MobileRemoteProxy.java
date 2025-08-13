@@ -15,14 +15,12 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid;
 
-import com.zebrunner.mcloud.grid.integration.client.MitmProxyClient;
 import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
-import com.zebrunner.mcloud.grid.validator.ProxyValidator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
@@ -31,7 +29,6 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.common.exception.GridException;
-import org.openqa.grid.internal.DefaultGridRegistry;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
@@ -45,15 +42,11 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.logging.Logger;
 
 import static com.zebrunner.mcloud.grid.validator.DeviceTypeValidator.ZEBRUNNER_DEVICE_TYPE_CAPABILITY;
-import static com.zebrunner.mcloud.grid.validator.ProxyValidator.MITM_TYPE_CAPABILITY;
-import static com.zebrunner.mcloud.grid.validator.ProxyValidator.PROXY_PORT_CAPABILITY;
-import static com.zebrunner.mcloud.grid.validator.ProxyValidator.SERVER_PROXY_PORT_CAPABILITY;
 
 /**
  * Mobile proxy that connects/disconnects STF devices.
@@ -102,7 +95,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private final String deviceName;
     private final String deviceType;
     private final Platform platform;
-    private final boolean isMitmSupported;
     private final BiFunction<URL, String, Boolean> appiumCheck;
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
@@ -171,26 +163,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             appiumCheck = (remoteURL, sessionUUID) -> true;
         }
 
-        Integer serverProxyPort = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), SERVER_PROXY_PORT_CAPABILITY)
-                .map(String::valueOf)
-                .filter(NumberUtils::isParsable)
-                .map(Integer::parseInt)
-                .orElse(null);
-        Integer proxyPort = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), PROXY_PORT_CAPABILITY)
-                .map(String::valueOf)
-                .filter(NumberUtils::isParsable)
-                .map(Integer::parseInt)
-                .orElse(null);
-        isMitmSupported = (serverProxyPort != null && serverProxyPort > 0 && proxyPort != null && proxyPort > 0);
-
         if (STFClient.isSTFEnabled()) {
             if (!STFClient.isDevicePresentInSTF(udid)) {
                 throw new GridException(String.format("Could not find device with udid '%s' in STF. Slot capabilities: %s",
                         udid, slot.getCapabilities()));
             }
-        }
-        if (isMitmSupported) {
-            MitmProxyClient.initProxy(getTestSlots());
         }
     }
 
@@ -246,33 +223,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 return null;
             }
 
-            if (isMitmSupported) {
-                // trigger proxy restart with specific capabilities
-                // capabilities already validated in ProxyValidator
-                Boolean isMitmEnable = CapabilityUtils.getZebrunnerCapability(requestedCapability, ProxyValidator.MITM_CAPABILITY)
-                        .map(String::valueOf)
-                        .map(Boolean::valueOf)
-                        .orElse(false);
-                if (isMitmEnable) {
-                    if (!MitmProxyClient.isProxyInitialized(udid)) {
-                        testslot.doFinishRelease();
-                        LOGGER.warning(() -> String.format("[NODE-%s] Proxy enabled for session, but is not initialized.", udid));
-                        return null;
-                    }
-                    String mitmArgs = CapabilityUtils.getZebrunnerCapability(requestedCapability, ProxyValidator.MITM_ARGS_CAPABILITY)
-                            .map(String::valueOf)
-                            .orElse(null);
-                    String mitmType = CapabilityUtils.getZebrunnerCapability(requestedCapability, MITM_TYPE_CAPABILITY)
-                            .map(String::valueOf)
-                            .orElse("simple");
-
-                    if (!MitmProxyClient.start(udid, mitmType, mitmArgs, udid)) {
-                        testslot.doFinishRelease();
-                        LOGGER.warning(() -> String.format("[NODE-%s] Could not start proxy with args: %s.", udid, mitmArgs));
-                        return null;
-                    }
-                }
-            }
             if (STFClient.isSTFEnabled()) {
                 STFDevice device = STFClient.reserveSTFDevice(udid, requestedCapability, udid);
                 if (device == null) {
@@ -316,13 +266,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.warning(() -> String.format("[%s] Session on [%s]  will be closed. Ext.id: [%s]", udid, deviceName, sessionId));
         if (STFClient.isSTFEnabled()) {
             STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), udid);
-        }
-        if (isMitmSupported) {
-            if (MitmProxyClient.isProxyInitialized(udid)) {
-                if (!MitmProxyClient.start(udid, "simple", null, udid)) {
-                    LOGGER.info(() -> String.format("[%s] Could not reset proxy.", udid));
-                }
-            }
         }
     }
 

@@ -19,7 +19,6 @@ import com.zebrunner.mcloud.grid.validator.DeviceNameValidator;
 import com.zebrunner.mcloud.grid.validator.DeviceTypeValidator;
 import com.zebrunner.mcloud.grid.validator.MobilePlatformValidator;
 import com.zebrunner.mcloud.grid.validator.PlatformVersionValidator;
-import com.zebrunner.mcloud.grid.validator.ProxyValidator;
 import com.zebrunner.mcloud.grid.validator.UDIDValidator;
 import com.zebrunner.mcloud.grid.validator.Validator;
 import org.openqa.grid.internal.utils.DefaultCapabilityMatcher;
@@ -38,8 +37,7 @@ public class MobileCapabilityMatcher extends DefaultCapabilityMatcher {
             new DeviceNameValidator(),
             new DeviceTypeValidator(),
             new PlatformVersionValidator(),
-            new UDIDValidator(),
-            new ProxyValidator());
+            new UDIDValidator());
 
     @Override
     public boolean matches(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
