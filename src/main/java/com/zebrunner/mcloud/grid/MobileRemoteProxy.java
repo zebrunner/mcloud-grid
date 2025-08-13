@@ -24,7 +24,6 @@ import com.zebrunner.mcloud.grid.util.HttpClientApache;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
