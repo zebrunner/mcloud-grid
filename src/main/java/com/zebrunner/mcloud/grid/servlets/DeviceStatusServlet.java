@@ -163,6 +163,7 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append(".kill-btn { margin-left: 8px; text-decoration: none; font-weight: bold; color: #dc3545; }")
                 .append(".kill-btn:hover { color: #a71d2a; }")
                 .append(".udid-cell { white-space: nowrap; }")
+                .append(".session-cell { white-space: nowrap; }")
                 .append("</style>");
         html.append("</head><body>");
 
@@ -205,9 +206,9 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append(" let elapsedCell = d.sessionStartMillis>0 ? `<span data-start='${d.sessionStartMillis}' class='elapsed'></span>` : '—';")
                 .append(" let killBtn = d.sessionId && d.sessionId !== '—' ? `<a href='#' class='kill-btn' title='Terminate session' data-sid='${d.sessionId}'>&times;</a>` : '';")
                 .append(" let tr=document.createElement('tr');")
-                .append(" tr.innerHTML = `<td class='udid-cell'><a href='#' onclick='showCaps(\"${d.udid}\")'>${d.udid}</a>${killBtn}</td>`")
+                .append(" tr.innerHTML = `<td class='udid-cell'><a href='#' onclick='showCaps(\"${d.udid}\")'>${d.udid}</a></td>`")
                 .append(" + `<td class='${d.status==='Free'?'text-success':'text-danger'}'>${d.status}</td>`")
-                .append(" + `<td>${d.sessionId}</td>`")
+                .append(" + `<td class='session-cell'>${d.sessionId}${killBtn}</td>`")
                 .append(" + `<td>${d.sessionStart}</td>`")
                 .append(" + `<td>${elapsedCell}</td>`")
                 .append(" + `<td>${d.address}</td>`;")
@@ -219,6 +220,7 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("function showCaps(udid){")
                 .append(" let dev=devices.find(x=>x.udid===udid);")
                 .append(" if(!dev) return;")
+                .append(" localStorage.setItem('openModalUdid', udid);")
                 .append(" document.getElementById('capsContent').textContent=JSON.stringify(dev.capabilities,null,2);")
                 .append(" new bootstrap.Modal(document.getElementById('capsModal')).show();")
                 .append("}")
@@ -261,19 +263,26 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append(" }")
                 .append("});")
 
-                // Auto-refresh checkbox with persistence
+                // Auto-refresh checkbox with persistence, default on
                 .append("let interval;")
-                .append("document.getElementById('autoRefresh').addEventListener('change',function(){")
+                .append("const autoRefresh = document.getElementById('autoRefresh');")
+                .append("autoRefresh.addEventListener('change',function(){")
                 .append("localStorage.setItem('autoRefresh',this.checked);")
                 .append("if(this.checked) interval=setInterval(()=>location.reload(),5000); else clearInterval(interval);")
                 .append("});")
-                .append("if(localStorage.getItem('autoRefresh')==='true'){document.getElementById('autoRefresh').checked=true;interval=setInterval(()=>location.reload(),5000);}")
+                .append("if(localStorage.getItem('autoRefresh') !== 'false'){autoRefresh.checked=true;interval=setInterval(()=>location.reload(),5000);}")
 
                 // Filter input
                 .append("document.getElementById('filterInput').addEventListener('input',renderTable);")
 
-                // Initial render
+                // Modal persistence
+                .append("const modalEl = document.getElementById('capsModal');")
+                .append("modalEl.addEventListener('hidden.bs.modal', () => localStorage.removeItem('openModalUdid'));")
+
+                // Initial render and restore modal
                 .append("renderTable();renderQueue();")
+                .append("const openUdid = localStorage.getItem('openModalUdid');")
+                .append("if(openUdid) showCaps(openUdid);")
                 .append("</script>");
 
         html.append("</body></html>");
