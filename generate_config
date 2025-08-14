@@ -8,6 +8,7 @@ cat <<_EOF
   "maxSession": 1,
   "newSessionWaitTimeout": $GRID_NEW_SESSION_WAIT_TIMEOUT,
   "capabilityMatcher": "$GRID_CAPABILITY_MATCHER",
+  "registry": "$GRID_CUSTOM_REGISTRY",
   "throwOnCapabilityNotPresent": $GRID_THROW_ON_CAPABILITY_NOT_PRESENT,
   "jettyMaxThreads": $GRID_JETTY_MAX_THREADS,
   "cleanUpCycle": $GRID_CLEAN_UP_CYCLE,

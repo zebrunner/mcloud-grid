@@ -29,6 +29,8 @@ ENV GRID_BROWSER_TIMEOUT=0
 ENV GRID_TIMEOUT=150
 # Debug
 ENV GRID_DEBUG=false
+# Registry
+ENV GRID_CUSTOM_REGISTRY=com.zebrunner.mcloud.grid.CustomGridRegistry
 # Proxy
 ENV GRID_PROXY=com.zebrunner.mcloud.grid.MobileRemoteProxy
 # Capability matcher
