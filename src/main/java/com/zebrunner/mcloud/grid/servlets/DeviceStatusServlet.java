@@ -3,6 +3,7 @@ package com.zebrunner.mcloud.grid.servlets;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSession;
+import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
 import org.openqa.grid.web.Hub;
 import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.remote.DesiredCapabilities;
@@ -73,7 +74,7 @@ public class DeviceStatusServlet extends HttpServlet {
             } else {
                 resp.setStatus(httpResp.statusCode());
                 resp.setContentType("application/json;charset=UTF-8");
-                resp.getWriter().write("{\"ok\":false,\"status\":" + httpResp.statusCode() + "}");
+                resp.getWriter().write("{\"ok\":false,\"status\":" + httpResp.statusCode() + ",\"body\":\"" + httpResp.body() + "\"}");
             }
         } catch (Exception e) {
             resp.setStatus(500);
@@ -129,7 +130,7 @@ public class DeviceStatusServlet extends HttpServlet {
                         : "—";
                 long inactivity = activeSession.getInactivityTime();
                 sessionStartMillis = System.currentTimeMillis() - inactivity;
-                sessionStart = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                sessionStart = new SimpleDateFormat("HH:mm:ss")
                         .format(new Date(sessionStartMillis));
             }
 
@@ -139,6 +140,7 @@ public class DeviceStatusServlet extends HttpServlet {
             device.put("sessionStart", sessionStart);
             device.put("sessionStartMillis", sessionStartMillis);
             device.put("address", address);
+            device.put("slotInfo", getSlotInfo(proxy));
             devices.add(device);
         }
 
@@ -148,6 +150,19 @@ public class DeviceStatusServlet extends HttpServlet {
             Map<String, Object> q = new HashMap<>();
             q.put("capabilities", caps.asMap());
             queue.add(q);
+        }
+
+        // ===== Collect hub info =====
+        Map<String, Object> hubInfo = new HashMap<>();
+        Hub hub = getHub(getServletContext());
+        if (hub != null) {
+            hubInfo.put("host", hub.getConfiguration().host);
+            hubInfo.put("port", hub.getConfiguration().port);
+            hubInfo.put("timeout", hub.getConfiguration().timeout);
+            hubInfo.put("cleanUpCycle", hub.getConfiguration().cleanUpCycle);
+            hubInfo.put("newSessionWaitTimeout", hub.getConfiguration().newSessionWaitTimeout);
+            hubInfo.put("servlets", hub.getConfiguration().servlets);
+            // Add more hub config as needed
         }
 
         Json json = new Json(); // Selenium's built-in JSON serializer
@@ -160,10 +175,10 @@ public class DeviceStatusServlet extends HttpServlet {
         html.append("<style>")
                 .append("body { padding: 20px; }")
                 .append("th { cursor: pointer; }")
-                .append(".kill-btn { margin-left: 8px; text-decoration: none; font-weight: bold; color: #dc3545; }")
+                .append(".kill-btn { margin-left: 12px; text-decoration: none; font-weight: bold; color: #dc3545; }")
                 .append(".kill-btn:hover { color: #a71d2a; }")
                 .append(".udid-cell { white-space: nowrap; }")
-                .append(".session-cell { white-space: nowrap; }")
+                .append(".sticky-footer { position: fixed; left: 20px; bottom: 20px; z-index: 1000; }")
                 .append("</style>");
         html.append("</head><body>");
 
@@ -192,6 +207,22 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("<div class='modal-body'><pre id='capsContent'></pre></div>")
                 .append("</div></div></div>");
 
+        // Slot info modal
+        html.append("<div class='modal fade' id='slotModal' tabindex='-1'>")
+                .append("<div class='modal-dialog modal-lg'><div class='modal-content'>")
+                .append("<div class='modal-header'><h5 class='modal-title'>Slot Info</h5><button type='button' class='btn-close' data-bs-dismiss='modal'></button></div>")
+                .append("<div class='modal-body'><pre id='slotContent'></pre></div>")
+                .append("</div></div></div>");
+
+        // Hub info collapse
+        html.append("<div class='sticky-footer'>")
+                .append("<button class='btn btn-outline-secondary' type='button' data-bs-toggle='collapse' data-bs-target='#hubInfoCollapse' aria-expanded='false' aria-controls='hubInfoCollapse'>Config for the hub</button>")
+                .append("</div>")
+                .append("<div class='collapse' id='hubInfoCollapse'>")
+                .append("<div class='card card-body mt-3'>")
+                .append("<pre>").append(json.toJson(hubInfo)).append("</pre>")
+                .append("</div></div>");
+
         // ===== JavaScript section =====
         html.append("<script>")
                 .append("const devices = ").append(json.toJson(devices)).append(";")
@@ -208,10 +239,10 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append(" let tr=document.createElement('tr');")
                 .append(" tr.innerHTML = `<td class='udid-cell'><a href='#' onclick='showCaps(\"${d.udid}\")'>${d.udid}</a></td>`")
                 .append(" + `<td class='${d.status==='Free'?'text-success':'text-danger'}'>${d.status}</td>`")
-                .append(" + `<td class='session-cell'>${d.sessionId}${killBtn}</td>`")
+                .append(" + `<td>${d.sessionId}${killBtn}</td>`")
                 .append(" + `<td>${d.sessionStart}</td>`")
                 .append(" + `<td>${elapsedCell}</td>`")
-                .append(" + `<td>${d.address}</td>`;")
+                .append(" + `<td><a href='#' onclick='showSlot(\"${d.udid}\")'>${d.address}</a></td>`;")
                 .append(" tbody.appendChild(tr);")
                 .append("});updateElapsed();")
                 .append("}")
@@ -220,9 +251,16 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("function showCaps(udid){")
                 .append(" let dev=devices.find(x=>x.udid===udid);")
                 .append(" if(!dev) return;")
-                .append(" localStorage.setItem('openModalUdid', udid);")
                 .append(" document.getElementById('capsContent').textContent=JSON.stringify(dev.capabilities,null,2);")
                 .append(" new bootstrap.Modal(document.getElementById('capsModal')).show();")
+                .append("}")
+
+                // Show slot info modal
+                .append("function showSlot(udid){")
+                .append(" let dev=devices.find(x=>x.udid===udid);")
+                .append(" if(!dev) return;")
+                .append(" document.getElementById('slotContent').textContent=JSON.stringify(dev.slotInfo,null,2);")
+                .append(" new bootstrap.Modal(document.getElementById('slotModal')).show();")
                 .append("}")
 
                 // Render queue
@@ -275,18 +313,27 @@ public class DeviceStatusServlet extends HttpServlet {
                 // Filter input
                 .append("document.getElementById('filterInput').addEventListener('input',renderTable);")
 
-                // Modal persistence
-                .append("const modalEl = document.getElementById('capsModal');")
-                .append("modalEl.addEventListener('hidden.bs.modal', () => localStorage.removeItem('openModalUdid'));")
-
-                // Initial render and restore modal
+                // Initial render
                 .append("renderTable();renderQueue();")
-                .append("const openUdid = localStorage.getItem('openModalUdid');")
-                .append("if(openUdid) showCaps(openUdid);")
                 .append("</script>");
 
         html.append("</body></html>");
 
         resp.getWriter().write(html.toString());
+    }
+
+    // Helper to get slot info
+    private static Map<String, Object> getSlotInfo(RemoteProxy proxy) {
+        Map<String, Object> slotInfo = new HashMap<>();
+        GridNodeConfiguration cfg = proxy.getConfig();
+        slotInfo.put("host", cfg.host);
+        slotInfo.put("port", cfg.port);
+        slotInfo.put("maxSession", cfg.maxSession);
+        slotInfo.put("timeout", cfg.timeout);
+        slotInfo.put("cleanUpCycle", cfg.cleanUpCycle);
+        slotInfo.put("servlets", cfg.servlets);
+        slotInfo.put("proxy", proxy.getClass().getName());
+        slotInfo.put("remoteHost", proxy.getRemoteHost().toString());
+        return slotInfo;
     }
 }
