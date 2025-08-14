@@ -3,6 +3,7 @@ package com.zebrunner.mcloud.grid.servlets;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSession;
+import org.openqa.grid.internal.utils.configuration.GridHubConfiguration;
 import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
 import org.openqa.grid.web.Hub;
 import org.openqa.selenium.MutableCapabilities;
@@ -21,6 +22,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class DeviceStatusServlet extends HttpServlet {
 
@@ -74,7 +76,7 @@ public class DeviceStatusServlet extends HttpServlet {
             } else {
                 resp.setStatus(httpResp.statusCode());
                 resp.setContentType("application/json;charset=UTF-8");
-                resp.getWriter().write("{\"ok\":false,\"status\":" + httpResp.statusCode() + ",\"body\":\"" + httpResp.body() + "\"}");
+                resp.getWriter().write("{\"ok\":false,\"status\":" + httpResp.statusCode() + ",\"body\":\"" + httpResp.body().replace("\"", "\\\"") + "\"}");
             }
         } catch (Exception e) {
             resp.setStatus(500);
@@ -156,13 +158,21 @@ public class DeviceStatusServlet extends HttpServlet {
         Map<String, Object> hubInfo = new HashMap<>();
         Hub hub = getHub(getServletContext());
         if (hub != null) {
-            hubInfo.put("host", hub.getConfiguration().host);
-            hubInfo.put("port", hub.getConfiguration().port);
-            hubInfo.put("timeout", hub.getConfiguration().timeout);
-            hubInfo.put("cleanUpCycle", hub.getConfiguration().cleanUpCycle);
-            hubInfo.put("newSessionWaitTimeout", hub.getConfiguration().newSessionWaitTimeout);
-            hubInfo.put("servlets", hub.getConfiguration().servlets);
-            // Add more hub config as needed
+            GridHubConfiguration cfg = hub.getConfiguration();
+            hubInfo.put("host", cfg.host);
+            hubInfo.put("port", cfg.port);
+            hubInfo.put("timeout", cfg.timeout);
+            hubInfo.put("browserTimeout", cfg.browserTimeout);
+            hubInfo.put("cleanUpCycle", cfg.cleanUpCycle);
+            hubInfo.put("newSessionWaitTimeout", cfg.newSessionWaitTimeout);
+            hubInfo.put("servlets", cfg.servlets);
+            hubInfo.put("capabilityMatcher", cfg.capabilityMatcher != null ? cfg.capabilityMatcher.toString() : "default");
+            hubInfo.put("throwOnCapabilityNotPresent", cfg.throwOnCapabilityNotPresent);
+            hubInfo.put("registry", cfg.registry != null ? cfg.registry.getClass().getName() : "default");
+            hubInfo.put("jettyMaxThreads", cfg.jettyMaxThreads);
+            hubInfo.put("debug", cfg.debug);
+        } else {
+            hubInfo.put("error", "Hub not available");
         }
 
         Json json = new Json(); // Selenium's built-in JSON serializer
@@ -177,7 +187,7 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("th { cursor: pointer; }")
                 .append(".kill-btn { margin-left: 12px; text-decoration: none; font-weight: bold; color: #dc3545; }")
                 .append(".kill-btn:hover { color: #a71d2a; }")
-                .append(".udid-cell { white-space: nowrap; }")
+                .append(".udid-cell, .session-cell { white-space: nowrap; }")
                 .append(".sticky-footer { position: fixed; left: 20px; bottom: 20px; z-index: 1000; }")
                 .append("</style>");
         html.append("</head><body>");
@@ -239,7 +249,7 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append(" let tr=document.createElement('tr');")
                 .append(" tr.innerHTML = `<td class='udid-cell'><a href='#' onclick='showCaps(\"${d.udid}\")'>${d.udid}</a></td>`")
                 .append(" + `<td class='${d.status==='Free'?'text-success':'text-danger'}'>${d.status}</td>`")
-                .append(" + `<td>${d.sessionId}${killBtn}</td>`")
+                .append(" + `<td class='session-cell'>${d.sessionId}${killBtn}</td>`")
                 .append(" + `<td>${d.sessionStart}</td>`")
                 .append(" + `<td>${elapsedCell}</td>`")
                 .append(" + `<td><a href='#' onclick='showSlot(\"${d.udid}\")'>${d.address}</a></td>`;")
@@ -251,6 +261,8 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("function showCaps(udid){")
                 .append(" let dev=devices.find(x=>x.udid===udid);")
                 .append(" if(!dev) return;")
+                .append(" localStorage.setItem('openModal', 'caps');")
+                .append(" localStorage.setItem('openModalUdid', udid);")
                 .append(" document.getElementById('capsContent').textContent=JSON.stringify(dev.capabilities,null,2);")
                 .append(" new bootstrap.Modal(document.getElementById('capsModal')).show();")
                 .append("}")
@@ -259,6 +271,8 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("function showSlot(udid){")
                 .append(" let dev=devices.find(x=>x.udid===udid);")
                 .append(" if(!dev) return;")
+                .append(" localStorage.setItem('openModal', 'slot');")
+                .append(" localStorage.setItem('openModalUdid', udid);")
                 .append(" document.getElementById('slotContent').textContent=JSON.stringify(dev.slotInfo,null,2);")
                 .append(" new bootstrap.Modal(document.getElementById('slotModal')).show();")
                 .append("}")
@@ -297,7 +311,10 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("   const sid = e.target.getAttribute('data-sid');")
                 .append("   if (!sid || !confirm('Terminate session ' + sid + '?')) return;")
                 .append("   const res = await fetch(window.location.pathname + '?action=terminate&sessionId=' + encodeURIComponent(sid), { method: 'POST' });")
-                .append("   if (res.ok) { location.reload(); } else { alert('Failed to terminate session'); }")
+                .append("   if (res.ok) { location.reload(); } else {")
+                .append("     const json = await res.json();")
+                .append("     alert('Failed to terminate session: ' + (json.error || json.status || 'Unknown error'));")
+                .append("   }")
                 .append(" }")
                 .append("});")
 
@@ -309,6 +326,18 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("if(this.checked) interval=setInterval(()=>location.reload(),5000); else clearInterval(interval);")
                 .append("});")
                 .append("if(localStorage.getItem('autoRefresh') !== 'false'){autoRefresh.checked=true;interval=setInterval(()=>location.reload(),5000);}")
+
+                // Modal persistence
+                .append("const capsModalEl = document.getElementById('capsModal');")
+                .append("const slotModalEl = document.getElementById('slotModal');")
+                .append("capsModalEl.addEventListener('hidden.bs.modal', () => { if(localStorage.getItem('openModal') === 'caps') localStorage.removeItem('openModal'); localStorage.removeItem('openModalUdid'); });")
+                .append("slotModalEl.addEventListener('hidden.bs.modal', () => { if(localStorage.getItem('openModal') === 'slot') localStorage.removeItem('openModal'); localStorage.removeItem('openModalUdid'); });")
+                .append("const openModal = localStorage.getItem('openModal');")
+                .append("const openUdid = localStorage.getItem('openModalUdid');")
+                .append("if(openModal && openUdid) {")
+                .append(" if(openModal === 'caps') showCaps(openUdid);")
+                .append(" else if(openModal === 'slot') showSlot(openUdid);")
+                .append("}")
 
                 // Filter input
                 .append("document.getElementById('filterInput').addEventListener('input',renderTable);")
@@ -334,6 +363,9 @@ public class DeviceStatusServlet extends HttpServlet {
         slotInfo.put("servlets", cfg.servlets);
         slotInfo.put("proxy", proxy.getClass().getName());
         slotInfo.put("remoteHost", proxy.getRemoteHost().toString());
+        slotInfo.put("capabilities", proxy.getConfig().capabilities.stream()
+                .map(MutableCapabilities::asMap)
+                .collect(Collectors.toList()));
         return slotInfo;
     }
 }
