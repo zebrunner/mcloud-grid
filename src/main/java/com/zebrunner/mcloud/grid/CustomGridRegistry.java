@@ -237,7 +237,7 @@ public class CustomGridRegistry extends BaseGridRegistry implements GridRegistry
         if (sessionCreated) {
             activeTestSessions.add(session);
             handler.bindSession(session);
-            LOG.info("Session was created: " + session.getExternalKey());
+            LOG.info("Session was created: " + session.getExternalKey().getKey());
         }
         return sessionCreated;
     }
