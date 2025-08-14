@@ -5,19 +5,26 @@ import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.json.Json;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
+/**
+ * DeviceStatusServlet
+ *
+ * Displays device and session status for Selenium Grid 3.141.59.
+ * Uses Bootstrap for UI, JSON data for rendering, sorting, filtering, auto-refresh,
+ * and real-time elapsed session time updates.
+ */
 public class DeviceStatusServlet extends HttpServlet {
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-            throws IOException {
-
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         GridRegistry registry = (GridRegistry) getServletContext()
                 .getAttribute("org.openqa.grid.internal.GridRegistry");
 
@@ -28,79 +35,31 @@ public class DeviceStatusServlet extends HttpServlet {
 
         resp.setContentType("text/html;charset=UTF-8");
 
-        StringBuilder html = new StringBuilder();
-        html.append("<html><head><title>📱 Device Status</title>");
-
-        // Styles
-        html.append("<style>")
-                .append("body { font-family: sans-serif; }")
-                .append("table { border-collapse: collapse; width: 100%; margin-top: 10px; }")
-                .append("th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }")
-                .append(".status-free { color: green; font-weight: bold; }")
-                .append(".status-busy { color: red; font-weight: bold; }")
-                .append(".udid-link { cursor: pointer; color: blue; text-decoration: underline; }")
-                .append("#controls { margin-top: 10px; margin-bottom: 10px; }")
-                .append("</style>");
-
-        // Scripts: auto-refresh, show caps, filtering
-        html.append("<script>")
-                // Auto-refresh logic
-                .append("let refreshInterval;")
-                .append("function toggleAutoRefresh(checkbox) {")
-                .append("  if (checkbox.checked) {")
-                .append("    refreshInterval = setInterval(() => window.location.reload(), 5000);")
-                .append("  } else {")
-                .append("    clearInterval(refreshInterval);")
-                .append("  }")
-                .append("}")
-
-                // Show capabilities
-                .append("function showCapabilities(capsJson) {")
-                .append("  alert('Capabilities:\\n' + capsJson);")
-                .append("}")
-
-                // Filter table
-                .append("function filterTable() {")
-                .append("  const filter = document.getElementById('filterInput').value.toLowerCase();")
-                .append("  const rows = document.querySelectorAll('#deviceTable tbody tr');")
-                .append("  rows.forEach(row => {")
-                .append("    const text = row.innerText.toLowerCase();")
-                .append("    row.style.display = text.includes(filter) ? '' : 'none';")
-                .append("  });")
-                .append("}")
-                .append("</script>");
-
-        html.append("</head><body>");
-        html.append("<h1>📱 Devices & Sessions</h1>");
-
-        // Controls
-        html.append("<div id='controls'>")
-                .append("<label><input type='checkbox' onchange='toggleAutoRefresh(this)'> Auto-refresh (5s)</label>")
-                .append("&nbsp;&nbsp;&nbsp;")
-                .append("<label>Filter: <input type='text' id='filterInput' onkeyup='filterTable()' placeholder='Enter UDID or Status'></label>")
-                .append("</div>");
-
-        html.append("<table id='deviceTable'><thead><tr><th>UDID</th><th>Status</th><th>Session ID</th><th>Session Start</th></tr></thead><tbody>");
-
+        // ===== Collect device data =====
+        List<Map<String, Object>> devices = new ArrayList<>();
         for (RemoteProxy proxy : registry.getAllProxies()) {
+            Map<String, Object> device = new HashMap<>();
             String udid = "—";
             String sessionId = "—";
             String sessionStart = "—";
+            long sessionStartMillis = 0;
             boolean isBusy = false;
+            String address = proxy.getRemoteHost().toString();
 
-            // Extract UDID
+            // Extract UDID and capabilities
             if (!proxy.getConfig().capabilities.isEmpty()) {
                 MutableCapabilities caps = proxy.getConfig().capabilities.get(0);
                 Object udidObj = caps.getCapability("udid");
-                if (udidObj != null) {
-                    udid = udidObj.toString();
-                }
+                if (udidObj != null) udid = udidObj.toString();
+                device.put("capabilities", caps.asMap());
+            } else {
+                device.put("capabilities", Collections.emptyMap());
             }
 
-            // Check for active session
+            // Check active session
             TestSession activeSession = proxy.getTestSlots().stream()
                     .map(slot -> slot.getSession())
-                    .filter(session -> session != null)
+                    .filter(Objects::nonNull)
                     .findFirst()
                     .orElse(null);
 
@@ -109,43 +68,137 @@ public class DeviceStatusServlet extends HttpServlet {
                 sessionId = activeSession.getExternalKey() != null
                         ? activeSession.getExternalKey().getKey()
                         : "—";
-                long startTime = activeSession.getInactivityTime(); // ms
-                sessionStart = startTime > 0 ? (System.currentTimeMillis() - startTime) / 1000 + "s ago" : "—";
+
+                long inactivity = activeSession.getInactivityTime();
+                sessionStartMillis = System.currentTimeMillis() - inactivity;
+                sessionStart = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                        .format(new Date(sessionStartMillis));
             }
 
-            String status = isBusy
-                    ? "<span class='status-busy'>🔴 Busy</span>"
-                    : "<span class='status-free'>🟢 Free</span>";
-
-            // Capabilities JSON
-            List<MutableCapabilities> capsList = proxy.getConfig().capabilities;
-            String capsJson = capsList.isEmpty() ? "{}" : capsList.get(0).toString();
-            capsJson = capsJson.replace("\"", "\\\"").replace("\n", "\\n");
-
-            html.append("<tr>")
-                    .append("<td><span class='udid-link' onclick=\"showCapabilities('").append(capsJson).append("')\">")
-                    .append(udid)
-                    .append("</span></td>")
-                    .append("<td>").append(status).append("</td>")
-                    .append("<td>").append(sessionId).append("</td>")
-                    .append("<td>").append(sessionStart).append("</td>")
-                    .append("</tr>");
+            device.put("udid", udid);
+            device.put("status", isBusy ? "Busy" : "Free");
+            device.put("sessionId", sessionId);
+            device.put("sessionStart", sessionStart);
+            device.put("sessionStartMillis", sessionStartMillis);
+            device.put("address", address);
+            devices.add(device);
         }
-        html.append("</tbody></table>");
 
-        // Request queue
-        int numUnprocessedRequests = registry.getNewSessionRequestCount();
-        html.append("<h2>Pending Requests</h2>");
-        if (numUnprocessedRequests > 0) {
-            html.append("<p>").append(numUnprocessedRequests).append(" request(s) waiting for a free slot</p>");
-            html.append("<ul>");
-            for (DesiredCapabilities caps : registry.getDesiredCapabilities()) {
-                html.append("<li>").append(caps.toString()).append("</li>");
-            }
-            html.append("</ul>");
-        } else {
-            html.append("<p>The queue is empty.</p>");
+        // ===== Collect queue data =====
+        List<Map<String, Object>> queue = new ArrayList<>();
+        for (DesiredCapabilities caps : registry.getDesiredCapabilities()) {
+            Map<String, Object> q = new HashMap<>();
+            q.put("capabilities", caps.asMap());
+            queue.add(q);
         }
+
+        Json json = new Json(); // Selenium's built-in JSON serializer
+
+        // ===== HTML with Bootstrap & JS rendering =====
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>📱 Device Status</title>");
+        html.append("<link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>");
+        html.append("<script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>");
+        html.append("<style>body { padding: 20px; } th { cursor: pointer; }</style>");
+        html.append("</head><body>");
+
+        html.append("<h1>📱 Devices & Sessions</h1>");
+        html.append("<div class='mb-3'>")
+                .append("<label class='form-check-label me-3'><input type='checkbox' id='autoRefresh' class='form-check-input'> Auto-refresh (5s)</label>")
+                .append("<input type='text' id='filterInput' class='form-control d-inline-block' style='width:250px' placeholder='Filter by UDID or Status'>")
+                .append("</div>");
+
+        html.append("<table class='table table-striped' id='deviceTable'>")
+                .append("<thead><tr>")
+                .append("<th onclick='sortTable(0)'>UDID</th>")
+                .append("<th onclick='sortTable(1)'>Status</th>")
+                .append("<th>Session ID</th>")
+                .append("<th onclick='sortTable(3)'>Session Start</th>")
+                .append("<th>Elapsed</th>")
+                .append("<th>Address</th>")
+                .append("</tr></thead><tbody></tbody></table>");
+
+        html.append("<h2>Pending Requests</h2><div id='queueBlock'></div>");
+
+        // Capabilities modal
+        html.append("<div class='modal fade' id='capsModal' tabindex='-1'>")
+                .append("<div class='modal-dialog modal-lg'><div class='modal-content'>")
+                .append("<div class='modal-header'><h5 class='modal-title'>Capabilities</h5><button type='button' class='btn-close' data-bs-dismiss='modal'></button></div>")
+                .append("<div class='modal-body'><pre id='capsContent'></pre></div>")
+                .append("</div></div></div>");
+
+        // ===== JavaScript section =====
+        html.append("<script>")
+                .append("const devices = ").append(json.toJson(devices)).append(";")
+                .append("const queue = ").append(json.toJson(queue)).append(";")
+
+                // Render table
+                .append("function renderTable(){")
+                .append("let tbody=document.querySelector('#deviceTable tbody');tbody.innerHTML='';")
+                .append("let filter=document.getElementById('filterInput').value.toLowerCase();")
+                .append("devices.forEach(d=>{")
+                .append(" if(!d.udid.toLowerCase().includes(filter) && !d.status.toLowerCase().includes(filter)) return;")
+                .append(" let elapsedCell = d.sessionStartMillis>0 ? `<span data-start='${d.sessionStartMillis}' class='elapsed'></span>` : '—';")
+                .append(" let tr=document.createElement('tr');")
+                .append(" tr.innerHTML = `<td><a href='#' onclick='showCaps(\"${d.udid}\")'>${d.udid}</a></td>`")
+                .append(" + `<td class='${d.status==='Free'?'text-success':'text-danger'}'>${d.status}</td>`")
+                .append(" + `<td>${d.sessionId}</td>`")
+                .append(" + `<td>${d.sessionStart}</td>`")
+                .append(" + `<td>${elapsedCell}</td>`")
+                .append(" + `<td>${d.address}</td>`;")
+                .append(" tbody.appendChild(tr);")
+                .append("});updateElapsed();")
+                .append("}")
+
+                // Show capabilities modal
+                .append("function showCaps(udid){")
+                .append(" let dev=devices.find(x=>x.udid===udid);")
+                .append(" if(!dev) return;")
+                .append(" document.getElementById('capsContent').textContent=JSON.stringify(dev.capabilities,null,2);")
+                .append(" new bootstrap.Modal(document.getElementById('capsModal')).show();")
+                .append("}")
+
+                // Render queue
+                .append("function renderQueue(){")
+                .append("let q=document.getElementById('queueBlock');")
+                .append("if(queue.length===0){q.innerHTML='<p>The queue is empty.</p>';return;}")
+                .append("q.innerHTML=`<p>${queue.length} request(s) waiting for a free slot</p>`+'<ul>'+queue.map(c=>`<li>${JSON.stringify(c.capabilities)}</li>`).join('')+'</ul>';")
+                .append("}")
+
+                // Sorting
+                .append("function sortTable(n){")
+                .append("let table=document.getElementById('deviceTable'),rows=Array.from(table.rows).slice(1);")
+                .append("let asc=table.getAttribute('data-sort-dir')!=='asc';")
+                .append("rows.sort((a,b)=>a.cells[n].innerText.localeCompare(b.cells[n].innerText,undefined,{numeric:true})*(asc?1:-1));")
+                .append("rows.forEach(r=>table.tBodies[0].appendChild(r));")
+                .append("table.setAttribute('data-sort-dir',asc?'asc':'desc');")
+                .append("}")
+
+                // Real-time elapsed time update
+                .append("function updateElapsed(){")
+                .append("document.querySelectorAll('.elapsed').forEach(el=>{")
+                .append(" let start=parseInt(el.getAttribute('data-start'));")
+                .append(" let diff=Math.floor((Date.now()-start)/1000);")
+                .append(" let h=Math.floor(diff/3600), m=Math.floor((diff%3600)/60), s=diff%60;")
+                .append(" el.textContent=`${h}h ${m}m ${s}s`;")
+                .append("});")
+                .append("}")
+                .append("setInterval(updateElapsed,1000);")
+
+                // Auto-refresh checkbox with persistence
+                .append("let interval;")
+                .append("document.getElementById('autoRefresh').addEventListener('change',function(){")
+                .append("localStorage.setItem('autoRefresh',this.checked);")
+                .append("if(this.checked) interval=setInterval(()=>location.reload(),5000); else clearInterval(interval);")
+                .append("});")
+                .append("if(localStorage.getItem('autoRefresh')==='true'){document.getElementById('autoRefresh').checked=true;interval=setInterval(()=>location.reload(),5000);}")
+
+                // Filter input
+                .append("document.getElementById('filterInput').addEventListener('input',renderTable);")
+
+                // Initial render
+                .append("renderTable();renderQueue();")
+                .append("</script>");
 
         html.append("</body></html>");
 
