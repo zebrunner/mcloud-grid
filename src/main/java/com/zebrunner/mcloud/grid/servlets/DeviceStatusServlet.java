@@ -3,7 +3,6 @@ package com.zebrunner.mcloud.grid.servlets;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSession;
-import org.openqa.grid.internal.utils.configuration.GridHubConfiguration;
 import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
 import org.openqa.grid.web.Hub;
 import org.openqa.selenium.MutableCapabilities;
@@ -15,7 +14,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.ServletContext;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -25,12 +23,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class DeviceStatusServlet extends HttpServlet {
-
-    // Extract Hub from context if available
-    private static Hub getHub(ServletContext ctx) {
-        Object hub = ctx.getAttribute("org.openqa.grid.web.Hub");
-        return (hub instanceof Hub) ? (Hub) hub : null;
-    }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -50,16 +42,8 @@ public class DeviceStatusServlet extends HttpServlet {
             return;
         }
 
-        Hub hub = getHub(getServletContext());
-        if (hub == null) {
-            resp.sendError(500, "Hub not found");
-            return;
-        }
-
-        String host = hub.getConfiguration().host;
-        int port = hub.getConfiguration().port;
-        if (host == null || host.isBlank()) host = "localhost";
-        String base = "http://" + host + ":" + port;
+        // Build base URL from current request
+        String base = req.getScheme() + "://" + req.getServerName() + ":" + req.getServerPort();
 
         try {
             HttpClient client = HttpClient.newHttpClient();
@@ -76,7 +60,8 @@ public class DeviceStatusServlet extends HttpServlet {
             } else {
                 resp.setStatus(httpResp.statusCode());
                 resp.setContentType("application/json;charset=UTF-8");
-                resp.getWriter().write("{\"ok\":false,\"status\":" + httpResp.statusCode() + ",\"body\":\"" + httpResp.body().replace("\"", "\\\"") + "\"}");
+                resp.getWriter().write("{\"ok\":false,\"status\":" + httpResp.statusCode()
+                        + ",\"body\":\"" + httpResp.body().replace("\"", "\\\"") + "\"}");
             }
         } catch (Exception e) {
             resp.setStatus(500);
@@ -154,27 +139,6 @@ public class DeviceStatusServlet extends HttpServlet {
             queue.add(q);
         }
 
-        // ===== Collect hub info =====
-        Map<String, Object> hubInfo = new HashMap<>();
-        Hub hub = getHub(getServletContext());
-        if (hub != null) {
-            GridHubConfiguration cfg = hub.getConfiguration();
-            hubInfo.put("host", cfg.host);
-            hubInfo.put("port", cfg.port);
-            hubInfo.put("timeout", cfg.timeout);
-            hubInfo.put("browserTimeout", cfg.browserTimeout);
-            hubInfo.put("cleanUpCycle", cfg.cleanUpCycle);
-            hubInfo.put("newSessionWaitTimeout", cfg.newSessionWaitTimeout);
-            hubInfo.put("servlets", cfg.servlets);
-            hubInfo.put("capabilityMatcher", cfg.capabilityMatcher != null ? cfg.capabilityMatcher.toString() : "default");
-            hubInfo.put("throwOnCapabilityNotPresent", cfg.throwOnCapabilityNotPresent);
-            hubInfo.put("registry", cfg.registry != null ? cfg.registry.getClass().getName() : "default");
-            hubInfo.put("jettyMaxThreads", cfg.jettyMaxThreads);
-            hubInfo.put("debug", cfg.debug);
-        } else {
-            hubInfo.put("error", "Hub not available");
-        }
-
         Json json = new Json(); // Selenium's built-in JSON serializer
 
         // ===== HTML with Bootstrap & JS rendering =====
@@ -230,7 +194,7 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("</div>")
                 .append("<div class='collapse' id='hubInfoCollapse'>")
                 .append("<div class='card card-body mt-3'>")
-                .append("<pre>").append(json.toJson(hubInfo)).append("</pre>")
+                .append("<h3>Active sessions:</h3>")
                 .append("</div></div>");
 
         // ===== JavaScript section =====
