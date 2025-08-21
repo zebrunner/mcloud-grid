@@ -310,7 +310,11 @@ public class DeviceStatusServlet extends HttpServlet {
                 .append("   e.preventDefault();")
                 .append("   const sid = e.target.getAttribute('data-sid');")
                 .append("   if (!sid || !confirm('Terminate session ' + sid + '?')) return;")
-                .append("   const res = await fetch(window.location.pathname + '?action=terminate&sessionId=' + encodeURIComponent(sid), { method: 'POST' });")
+                .append("   const res = await fetch(window.location.pathname, {\n" +
+                        "  method: 'POST',\n" +
+                        "  headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" },\n" +
+                        "  body: \"action=terminate&sessionId=\" + encodeURIComponent(sid)\n" +
+                        "});")
                 .append("   if (res.ok) { location.reload(); } else {")
                 .append("     const json = await res.json();")
                 .append("     alert('Failed to terminate session: ' + (json.error || json.status || 'Unknown error'));")
