@@ -116,7 +116,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                         slot.getCapabilities())))
                 .toString();
         deviceName = CapabilityUtils.getAppiumCapability(slot.getCapabilities(), "deviceName")
-                .orElseThrow(() -> new GridException(String.format("Appium node must have 'UDID' capability. Slot capabilities: %s",
+                .orElseThrow(() -> new GridException(String.format("Appium node must have 'deviceName' capability. Slot capabilities: %s",
                         slot.getCapabilities())))
                 .toString();
         deviceType = CapabilityUtils.getZebrunnerCapability(slot.getCapabilities(), ZEBRUNNER_DEVICE_TYPE_CAPABILITY)
@@ -132,8 +132,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
                         LOGGER.warning(() ->
-                                String.format("[%s] Device is not ready for a session. /status-adb error: %s.",
-                                        sessionUUID, response.getObject()));
+                                String.format("[%s][%s] Device is not ready for a session. /status-adb error: %s.",
+                                        udid, sessionUUID, response.getObject()));
                         return false;
                     }
                     return true;
@@ -146,8 +146,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
                         LOGGER.warning(() ->
-                                String.format("[NODE-%s] Device is not ready for a session. /status-wda error: %s.",
-                                        sessionUUID, response.getObject()));
+                                String.format("[NODE-%s][%s] Device is not ready for a session. /status-wda error: %s.",
+                                        udid, sessionUUID, response.getObject()));
                         return false;
                     }
                     return true;
@@ -172,12 +172,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     public void beforeCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.beforeCommand(session, request, response);
-        LOGGER.finest(() ->String.format("[%s] before command: %s", udid, request.getRequestURI()));
+        LOGGER.finest(() ->String.format("[%s][%s] before command: %s", udid, session.getInternalKey(), request.getRequestURI()));
     }
 
     public void afterCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.afterCommand(session, request, response);
-        LOGGER.finest(() ->String.format("[%s] after command: %s", udid, request.getRequestURI()));
+        LOGGER.finest(() ->String.format("[%s][%s] after command: %s", udid, session.getInternalKey(), request.getRequestURI()));
     }
 
     @Override
@@ -211,19 +211,22 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 LOGGER.warning(() -> String.format("[%s] 'TestSession session = testslot.getNewSession(requestedCapability);' return null.", udid));
                 return null;
             }
-            LOGGER.warning(() ->String.format("[%s] 'TestSession session = testslot.getNewSession(requestedCapability);' return SESSION.", udid));
+
+            String internalKey = session.getInternalKey();
+            LOGGER.info(() -> String.format("[%s][%s] Started internal session", udid, internalKey));
+            LOGGER.warning(() ->String.format("[%s][%s] 'TestSession session = testslot.getNewSession(requestedCapability);' return SESSION.", udid, internalKey));
 
             // additional check if device is ready for session with custom Appium's status verification
-            if (!appiumCheck.apply(testslot.getRemoteURL(), udid)) {
+            if (!appiumCheck.apply(testslot.getRemoteURL(), internalKey)) {
                 DEVICE_IGNORE_AUTOMATION_TIMERS.put(udid, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_MOBILE_TIMEOUT));
-                LOGGER.warning(() -> String.format("Node appium check failed: '[%s]-'%s'. Will be ignored %s seconds.",
-                        deviceName, udid, UNHEALTHY_MOBILE_TIMEOUT.toSeconds()));
+                LOGGER.warning(() -> String.format("[%s][%s] Node appium check failed: '%s'. Will be ignored %s seconds.",
+                        udid, internalKey, deviceName, UNHEALTHY_MOBILE_TIMEOUT.toSeconds()));
                 testslot.doFinishRelease();
                 return null;
             }
 
             if (STFClient.isSTFEnabled()) {
-                STFDevice device = STFClient.reserveSTFDevice(udid, requestedCapability, udid);
+                STFDevice device = STFClient.reserveSTFDevice(udid, requestedCapability, internalKey);
                 if (device == null) {
                     testslot.doFinishRelease();
                     return null;
@@ -237,10 +240,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
                 Map<String, Object> slotCapabilities = getSlotCapabilities(testslot, deviceType, device);
                 LOGGER.info(() ->
-                        String.format("[%s] slotCapabilities will be added to the session capabilities: %s.", udid, slotCapabilities));
+                        String.format("[%s][%s] slotCapabilities will be added to the session capabilities: %s.", udid, internalKey, slotCapabilities));
                 requestedCapability.put("zebrunner:slotCapabilities", slotCapabilities);
             }
-            LOGGER.warning(() -> String.format("[%s] Session will be launched on '%s'.", udid, deviceName));
+            LOGGER.warning(() -> String.format("[%s][%s] Session will be launched on '%s'.", udid, internalKey, deviceName));
             return session;
         }
         return null;
@@ -248,11 +251,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public void beforeSession(TestSession session) {
-        LOGGER.info(() -> String.format("[%s] Before session.", udid));
+        String internalKey = session.getInternalKey();
+        LOGGER.info(() -> String.format("[%s][%s] Before session.", udid, internalKey));
         if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
             //override platformName for the appium capabilities into tvOS
-            LOGGER.info(() -> String.format("[%s] Detected 'tvOS' 'deviceType' capability, so 'platformName' will be overrided by 'tvOS'.",
-                    udid));
+            LOGGER.info(() -> String.format("[%s][%s] Detected 'tvOS' 'deviceType' capability, so 'platformName' will be overrided by 'tvOS'.",
+                    internalKey, udid));
             session.getRequestedCapabilities()
                     .put(CapabilityType.PLATFORM_NAME, "tvOS");
         }
@@ -260,9 +264,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     @Override
     public void afterSession(TestSession session) {
-        LOGGER.warning(() -> String.format("[%s] After session. Last command: '%s'", udid, session.get("lastCommand")));
+        String internalKey = session.getInternalKey();
+        LOGGER.warning(() -> String.format("[%s][%s] After session. Last command: '%s'", udid, internalKey, session.get("lastCommand")));
         String sessionId = getExternalSessionId(session);
-        LOGGER.warning(() -> String.format("[%s] Session on [%s]  will be closed. Ext.id: [%s]", udid, deviceName, sessionId));
+        LOGGER.warning(() -> String.format("[%s][%s] Session on [%s]  will be closed. Ext.id: [%s]", udid, internalKey, deviceName, sessionId));
         if (STFClient.isSTFEnabled()) {
             STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), udid);
         }
@@ -272,16 +277,18 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public void beforeRelease(TestSession session) {
         super.beforeRelease(session);
-        LOGGER.info(() -> String.format("[%s] Before release. Last command: '%s'", udid, session.get("lastCommand")));
-        LOGGER.warning(() -> String.format("[CRITICAL] [%s] [%s] (%s) Session [%s] will be released by timeout.",
+        String internalKey = session.getInternalKey();
+        LOGGER.info(() -> String.format("[%s][%s] Before release. Last command: '%s'", udid, internalKey, session.get("lastCommand")));
+        LOGGER.warning(() -> String.format("[CRITICAL] [%s] [%s] [%s] (%s) Session [%s] will be released by timeout.",
                 udid,
+                internalKey,
                 deviceName,
                 udid,
                 String.valueOf(getExternalSessionId(session)))
         );
         if(session.getExternalKey() == null) {
             LOGGER.warning(() ->
-                    String.format("[%s] Session ext id is null, so device will be ignored %s seconds.", udid, INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
+                    String.format("[%s][%s] Session ext id is null, so device will be ignored %s seconds.", udid, internalKey, INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
             DEVICE_IGNORE_AUTOMATION_TIMERS.put(udid, Duration.ofMillis(System.currentTimeMillis()).plus(INACTIVITY_RELEASE_TIMEOUT));
 //            try {
 //                getTestSlots().stream()
@@ -293,7 +300,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 //            }
         }
         if (STFClient.isSTFEnabled()) {
-            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), udid);
+            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), internalKey);
         }
     }
 
