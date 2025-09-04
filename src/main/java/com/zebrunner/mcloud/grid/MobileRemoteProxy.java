@@ -269,7 +269,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         String sessionId = getExternalSessionId(session);
         LOGGER.warning(() -> String.format("[%s][%s] Session on [%s]  will be closed. Ext.id: [%s]", udid, internalKey, deviceName, sessionId));
         if (STFClient.isSTFEnabled()) {
-            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), udid);
+            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), internalKey);
         }
     }
 
