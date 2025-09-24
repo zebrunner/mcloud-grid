@@ -171,12 +171,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     public void beforeCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.beforeCommand(session, request, response);
-        LOGGER.finest(() ->String.format("[%s][%s] before command: %s", udid, session.getInternalKey(), request.getRequestURI()));
+        LOGGER.finest(() -> String.format("[%s][%s] before command: %s", udid, session.getInternalKey(), request.getRequestURI()));
     }
 
     public void afterCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.afterCommand(session, request, response);
-        LOGGER.finest(() ->String.format("[%s][%s] after command: %s", udid, session.getInternalKey(), request.getRequestURI()));
+        LOGGER.finest(() -> String.format("[%s][%s] after command: %s", udid, session.getInternalKey(), request.getRequestURI()));
     }
 
     @Override
@@ -213,7 +213,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
             String internalKey = session.getInternalKey();
             LOGGER.info(() -> String.format("[%s][%s] Started internal session", udid, internalKey));
-            LOGGER.warning(() ->String.format("[%s][%s] 'TestSession session = testslot.getNewSession(requestedCapability);' return SESSION.", udid, internalKey));
+            LOGGER.warning(() -> String.format("[%s][%s] 'TestSession session = testslot.getNewSession(requestedCapability);' return SESSION.", udid, internalKey));
 
             // additional check if device is ready for session with custom Appium's status verification
             if (!appiumCheck.apply(testslot.getRemoteURL(), internalKey)) {
