@@ -6,7 +6,7 @@ WORKDIR /src
 RUN mvn -U clean compile assembly:single package
 
 
-FROM openjdk:11
+FROM eclipse-temurin:11.0.20_8-jdk
 LABEL authors=Zebrunner
 
 EXPOSE 4444
