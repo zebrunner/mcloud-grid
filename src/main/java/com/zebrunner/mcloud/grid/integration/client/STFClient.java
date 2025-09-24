@@ -221,7 +221,7 @@ public final class STFClient {
                     .findFirst();
 
             if (_optionalSTFDevice.isEmpty()) {
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not find STF device", deviceUDID, sessionUUID));
+                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not find STF device with UDID '%s'", deviceUDID, sessionUUID, deviceUDID));
                 return null;
             }
             STFDevice _stfDevice = _optionalSTFDevice.get();
