@@ -255,7 +255,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
             //override platformName for the appium capabilities into tvOS
             LOGGER.info(() -> String.format("[%s][%s] Detected 'tvOS' 'deviceType' capability, so 'platformName' will be overrided by 'tvOS'.",
-                    internalKey, udid));
+                    udid, internalKey));
             session.getRequestedCapabilities()
                     .put(CapabilityType.PLATFORM_NAME, "tvOS");
         }
