@@ -75,7 +75,7 @@ public final class STFClient {
      * Reserve STF device
      */
     public static synchronized STFDevice reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
-        LOGGER.info(() -> String.format("[STF-%s] Reserve STF Device.", sessionUUID));
+        LOGGER.info(() -> String.format("[STF-%s][%s] Reserve STF Device.", deviceUDID, sessionUUID));
 
         String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TOKEN")
                 .map(String::valueOf)
@@ -91,7 +91,7 @@ public final class STFClient {
 
         if (user.getStatus() != 200) {
             LOGGER.warning(() ->
-                    String.format("[STF-%s] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", sessionUUID, STF_URL, stfToken));
+                    String.format("[STF-%s][%s] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", deviceUDID, sessionUUID, STF_URL, stfToken));
             return null;
         }
 
@@ -100,7 +100,7 @@ public final class STFClient {
                 .get(Devices.class);
 
         if (devices.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[STF-%s] Unable to get devices status. HTTP status: %s", sessionUUID, devices.getStatus()));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Unable to get devices status. HTTP status: %s", deviceUDID, sessionUUID, devices.getStatus()));
             return null;
         }
 
@@ -109,32 +109,32 @@ public final class STFClient {
                 .findFirst();
 
         if (optionalSTFDevice.isEmpty()) {
-            LOGGER.warning(() -> String.format("[STF-%s] Could not find STF device with udid: %s", sessionUUID, deviceUDID));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not find STF device", deviceUDID, sessionUUID));
             return null;
         }
 
         STFDevice stfDevice = optionalSTFDevice.get();
         STFDevice finalStfDevice2 = stfDevice;
-        LOGGER.info(() -> String.format("[STF-%s] STF device info: %s", sessionUUID, finalStfDevice2));
+        LOGGER.info(() -> String.format("[STF-%s][%s] STF device info: %s", deviceUDID, sessionUUID, finalStfDevice2));
 
         if (stfDevice.getStatus() == null) {
             DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
-            LOGGER.warning(() -> String.format("[STF-%s] STF device status is null. It will be ignored: %s seconds.", sessionUUID,
+            LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status is null. It will be ignored: %s seconds.", deviceUDID, sessionUUID,
                     INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (stfDevice.getStatus().intValue() == 2) {
             DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
-            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s seconds.", sessionUUID,
-                    UNAUTHORIZED_TIMEOUT.toSeconds()));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s seconds.", deviceUDID,
+                    sessionUUID, UNAUTHORIZED_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (stfDevice.getStatus() == 7) {
             DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
-            LOGGER.warning(() -> String.format("[STF-%s] STF device status 'UNHEALTHY'. It will be ignored: %s seconds.", sessionUUID,
-                    UNHEALTHY_TIMEOUT.toSeconds()));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status 'UNHEALTHY'. It will be ignored: %s seconds.", deviceUDID,
+                    sessionUUID, UNHEALTHY_TIMEOUT.toSeconds()));
             return null;
         }
 
@@ -142,8 +142,8 @@ public final class STFClient {
                 stfDevice.getPresent() &&
                 stfDevice.getReady()) {
             STFDevice finalStfDevice1 = stfDevice;
-            LOGGER.warning(() -> String.format("[STF-%s] Device [%s] already reserved manually by the same user: %s.",
-                    sessionUUID, deviceUDID, finalStfDevice1.getOwner().getName()));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Device already reserved manually by the same user: %s.",
+                    deviceUDID, sessionUUID, finalStfDevice1.getOwner().getName()));
         } else if (stfDevice.getOwner() == null && stfDevice.getPresent() && stfDevice.getReady()) {
             Map<String, Object> entity = new HashMap<>();
             entity.put("serial", deviceUDID);
@@ -152,19 +152,19 @@ public final class STFClient {
                     .withAuthorization(buildAuthToken(stfToken))
                     .post(Void.class, entity);
             if (response.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s] Could not reserve STF device with udid: %s. Status: %s. Response: %s",
-                        sessionUUID, deviceUDID, response.getStatus(), response.getObject()));
-                LOGGER.warning(() -> String.format("[STF-%s] Device [%s] will be ignored %s seconds.",
-                        sessionUUID, deviceUDID, INVALID_STF_RESPONSE_TIMEOUT));
+                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not reserve STF device. Status: %s. Response: %s",
+                        deviceUDID, sessionUUID, response.getStatus(), response.getObject()));
+                LOGGER.warning(() -> String.format("[STF-%s][%s] Device will be ignored %s seconds.",
+                        deviceUDID, sessionUUID, INVALID_STF_RESPONSE_TIMEOUT));
                 DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
                 if (response.getStatus() == 0) {
-                    LOGGER.warning(() -> String.format("[STF-%s] Device will be marked as unhealthy due to response status '0'.", sessionUUID));
+                    LOGGER.warning(() -> String.format("[STF-%s][%s] Device will be marked as unhealthy due to response status '0'.", deviceUDID, sessionUUID));
                     entity.put("body", Map.of("status", "Unhealthy"));
                     HttpClient.Response r = HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, deviceUDID)
                             .withAuthorization(buildAuthToken(stfToken))
                             .put(Void.class, entity);
                     if (r.getStatus() != 200) {
-                        LOGGER.warning(() -> String.format("[STF-%s] Could not mark device as unhealthy. Status: %s. Response: %s", sessionUUID,
+                        LOGGER.warning(() -> String.format("[STF-%s][%s] Could not mark device as unhealthy. Status: %s. Response: %s", deviceUDID, sessionUUID,
                                 r.getStatus(), r.getObject()));
                     }
                 }
@@ -173,18 +173,18 @@ public final class STFClient {
         } else if (stfDevice.getOwner() != null && !StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName())){
             STFDevice finalStfDevice1 = stfDevice;
             DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(STF_DEVICE_MANUALLY_RESERVED_TIMEOUT));
-            LOGGER.warning(() -> String.format("[STF-%s] Device [%s] reserved manually by user: %s. Will be ignored %s seconds.",
-                    sessionUUID, deviceUDID, finalStfDevice1.getOwner().getName(), STF_DEVICE_MANUALLY_RESERVED_TIMEOUT.toSeconds()));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Device reserved manually by user: %s. Will be ignored %s seconds.",
+                    deviceUDID, sessionUUID, finalStfDevice1.getOwner().getName(), STF_DEVICE_MANUALLY_RESERVED_TIMEOUT.toSeconds()));
             return null;
         } else {
             DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
-            LOGGER.warning(() -> String.format("[STF-%s] Device [%s] is not ready. Will be ignored %s seconds.",
-                    sessionUUID, deviceUDID, UNHEALTHY_TIMEOUT.toSeconds()));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Device is not ready. Will be ignored %s seconds.",
+                    deviceUDID, sessionUUID, UNHEALTHY_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities))) {
-            LOGGER.info(() -> String.format("[STF-%s] Additionally call 'remoteConnect'.", sessionUUID));
+            LOGGER.info(() -> String.format("[STF-%s][%s] Additionally call 'remoteConnect'.", deviceUDID, sessionUUID));
 
             HttpClient.Response<RemoteConnectUserDevice> remoteConnectUserDevice = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
                             STF_URL, deviceUDID)
@@ -193,8 +193,8 @@ public final class STFClient {
 
             if (remoteConnectUserDevice.getStatus() != 200) {
                 LOGGER.warning(
-                        () -> String.format("[STF-%s] Unsuccessful remoteConnect. Status: %s. Response: %s",
-                                sessionUUID, remoteConnectUserDevice.getStatus(), remoteConnectUserDevice.getObject()));
+                        () -> String.format("[STF-%s][%s] Unsuccessful remoteConnect. Status: %s. Response: %s",
+                                deviceUDID, sessionUUID, remoteConnectUserDevice.getStatus(), remoteConnectUserDevice.getObject()));
                 return null;
             }
         }
@@ -211,7 +211,7 @@ public final class STFClient {
                     .get(Devices.class);
 
             if (_devices.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s] Unable to get devices status. HTTP status: %s", sessionUUID, _devices.getStatus()));
+                LOGGER.warning(() -> String.format("[STF-%s][%s] Unable to get devices status. HTTP status: %s", deviceUDID, sessionUUID, _devices.getStatus()));
                 return null;
             }
 
@@ -221,50 +221,50 @@ public final class STFClient {
                     .findFirst();
 
             if (_optionalSTFDevice.isEmpty()) {
-                LOGGER.warning(() -> String.format("[STF-%s] Could not find STF device with udid: %s", sessionUUID, deviceUDID));
+                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not find STF device with UDID '%s'", deviceUDID, sessionUUID, deviceUDID));
                 return null;
             }
             STFDevice _stfDevice = _optionalSTFDevice.get();
             stfDevice = _stfDevice;
             if (StringUtils.isBlank((String) _stfDevice.getRemoteConnectUrl())) {
-                LOGGER.warning(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", sessionUUID));
+                LOGGER.warning(() -> String.format("[STF-%s][%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", deviceUDID, sessionUUID));
                 return null;
             } else {
-                LOGGER.info(() -> String.format("[STF-%s] Detected 'true' enableAdb capability, and remoteURL is present.", sessionUUID));
+                LOGGER.info(() -> String.format("[STF-%s][%s] Detected 'true' enableAdb capability, and remoteURL is present.", deviceUDID, sessionUUID));
             }
         }
         STFDevice finalStfDevice = stfDevice;
         LOGGER.info(
-                () -> String.format("[STF-%s] Device '%s' successfully reserved.", sessionUUID, finalStfDevice.getSerial()));
+                () -> String.format("[STF-%s][%s] Device '%s' successfully reserved.", deviceUDID, sessionUUID, finalStfDevice.getSerial()));
         return stfDevice;
     }
 
     public static synchronized void disconnectSTFDevice(String udid, Platform platform, boolean isReservedManually, String sessionUUID) {
         // it seems like return and remote disconnect guarantee that device becomes free asap
         if (Platform.ANDROID.equals(platform)) {
-            LOGGER.info(() -> String.format("[STF-%s] Additionally disconnect 'remoteConnect'.", sessionUUID));
+            LOGGER.info(() -> String.format("[STF-%s][%s] Additionally disconnect 'remoteConnect'.", udid, sessionUUID));
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
                     .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                     .delete(Void.class);
             if (response.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s] Could not disconnect 'remoteConnect'.", sessionUUID));
+                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not disconnect 'remoteConnect'.", udid, sessionUUID));
             }
         }
 
         if (isReservedManually) {
-            LOGGER.info(() -> String.format("[STF-%s] Device '%s' will not be returned as it was reserved manually.",
-                    sessionUUID, udid));
+            LOGGER.info(() -> String.format("[STF-%s][%s] Device will not be returned as it was reserved manually.",
+                    udid, sessionUUID));
             return;
         }
-        LOGGER.info(() -> String.format("[STF-%s] Return STF Device.", sessionUUID));
+        LOGGER.info(() -> String.format("[STF-%s][%s] Return STF Device.", udid, sessionUUID));
 
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                 .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                 .delete(Void.class);
         if (response.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[STF-%s] Could not return device to the STF. Status: %s", sessionUUID, response.getStatus()));
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not return device to the STF. Status: %s", udid, sessionUUID, response.getStatus()));
         } else {
-            LOGGER.info(() -> String.format("[STF-%s] Device '%s' successfully returned to the STF.", sessionUUID, udid));
+            LOGGER.info(() -> String.format("[STF-%s][%s] Device successfully returned to the STF.", udid, sessionUUID));
         }
 
     }
