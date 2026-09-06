@@ -38,6 +38,7 @@ java ${JAVA_OPTS} -Xms1G -Xmx4G -Djava.net.preferIPv4Stack=true -Djava.net.prefe
   org.openqa.grid.selenium.GridLauncherV3 \
   -role hub \
   -hubConfig $CONF \
+  -servlets com.zebrunner.mcloud.grid.servlets.AllSessionsServlet \
 #  -jettyThreads 1000 \
   ${SE_OPTS} &
 NODE_PID=$!
