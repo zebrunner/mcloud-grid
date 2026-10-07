@@ -41,7 +41,7 @@ COPY --from=builder /src/target/mcloud-grid-jar-with-dependencies.jar \
 COPY --from=builder /src/target/mcloud-grid-1.0.jar \
     /opt/selenium/
 COPY generate_config \
-    entry_point.sh \
+    entrypoint.sh \
     /opt/bin/
 COPY logger.properties \
     /opt/selenium
@@ -50,4 +50,4 @@ COPY logger.properties \
 # When logging into the container
 RUN /opt/bin/generate_config > /opt/selenium/config.json
 
-CMD ["/opt/bin/entry_point.sh"]
+CMD ["/opt/bin/entrypoint.sh"]
