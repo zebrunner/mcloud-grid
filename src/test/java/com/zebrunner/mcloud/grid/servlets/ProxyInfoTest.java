@@ -40,11 +40,23 @@ public class ProxyInfoTest {
         new ProxyInfo(registry).doGet(stub(HttpServletRequest.class, (method, args) -> null), response);
 
         Assert.assertEquals(calls.get("setContentType"), "application/json");
+        Assert.assertEquals(calls.get("setStatus"), 200);
         JsonNode json = new ObjectMapper().readTree(body.toString());
         Assert.assertTrue(json.isArray());
         Assert.assertEquals(json.size(), 2);
         Assert.assertTrue(body.toString().contains("\"remoteHost\":\"http://node-1:4723\""));
         Assert.assertTrue(body.toString().contains("\"remoteHost\":\"http://node-2:4723\""));
+        JsonNode capabilities = null;
+        for (JsonNode proxy : json) {
+            if ("http://node-1:4723".equals(proxy.get("configuration").get("remoteHost").asText())) {
+                capabilities = proxy.get("configuration").get("capabilities").get(0);
+            }
+        }
+        Assert.assertNotNull(capabilities);
+        Assert.assertNotNull(capabilities.get("appium:udid"), "capability values are serialized: " + capabilities);
+        Assert.assertEquals(capabilities.get("appium:udid").asText(), "udid-1");
+        Assert.assertEquals(capabilities.get("platformName").asText(), "ANDROID");
+        Assert.assertEquals(capabilities.get("appium:deviceName").asText(), "Pixel-udid-1");
         registry.stop();
     }
 
