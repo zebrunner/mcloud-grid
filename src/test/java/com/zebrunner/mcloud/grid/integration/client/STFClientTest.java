@@ -1,7 +1,7 @@
 package com.zebrunner.mcloud.grid.integration.client;
 
 import com.github.tomakehurst.wiremock.http.Fault;
-import com.zebrunner.mcloud.grid.MobileRemoteProxy;
+import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import org.testng.Assert;
@@ -56,7 +56,7 @@ public class STFClientTest {
     @BeforeMethod(alwaysRun = true)
     public void reset() {
         stf.reset();
-        MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.clear();
+        IgnoredDevices.clear();
         stf.user(DEFAULT_TOKEN, BOT_USER);
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(okJson("{\"success\":true}")));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect"))
@@ -74,9 +74,10 @@ public class STFClientTest {
     }
 
     private void assertIgnoredFor(Duration expected) {
-        Duration until = MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.get(UDID);
-        Assert.assertNotNull(until, "device should be ignored");
-        long left = until.toMillis() - System.currentTimeMillis();
+        IgnoredDevices.Entry entry = IgnoredDevices.get(UDID).orElse(null);
+        Assert.assertNotNull(entry, "device should be ignored");
+        Assert.assertNotNull(entry.getReason());
+        long left = entry.getUntil().toEpochMilli() - System.currentTimeMillis();
         Assert.assertTrue(left > expected.toMillis() - 5000 && left <= expected.toMillis(), "ignored for " + left + "ms, expected ~" + expected);
     }
 
@@ -217,6 +218,7 @@ public class STFClientTest {
 
         Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(3));
+        Assert.assertEquals(IgnoredDevices.get(UDID).get().getReason(), "device is reserved in STF by someone-else");
         assertNoReservationRequest();
     }
 

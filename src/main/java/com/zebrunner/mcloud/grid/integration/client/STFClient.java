@@ -15,6 +15,7 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.integration.client;
 
+import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
 import com.zebrunner.mcloud.grid.models.stf.Devices;
 import com.zebrunner.mcloud.grid.models.stf.RemoteConnectUserDevice;
@@ -33,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import static com.zebrunner.mcloud.grid.MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS;
 
 @SuppressWarnings("rawtypes")
 public final class STFClient {
@@ -101,21 +101,21 @@ public final class STFClient {
         LOGGER.info(() -> String.format("[STF-%s][%s] STF device info: %s", deviceUDID, sessionUUID, finalStfDevice2));
 
         if (stfDevice.getStatus() == null) {
-            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
+            IgnoredDevices.ignore(deviceUDID, INVALID_STF_RESPONSE_TIMEOUT, "STF device status is unknown");
             LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status is null. It will be ignored: %s seconds.", deviceUDID, sessionUUID,
                     INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (stfDevice.getStatus().intValue() == 2) {
-            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNAUTHORIZED_TIMEOUT));
+            IgnoredDevices.ignore(deviceUDID, UNAUTHORIZED_TIMEOUT, "device is unauthorized in STF");
             LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s seconds.", deviceUDID,
                     sessionUUID, UNAUTHORIZED_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (stfDevice.getStatus() == 7) {
-            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
+            IgnoredDevices.ignore(deviceUDID, UNHEALTHY_TIMEOUT, "device is unhealthy in STF");
             LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status 'UNHEALTHY'. It will be ignored: %s seconds.", deviceUDID,
                     sessionUUID, UNHEALTHY_TIMEOUT.toSeconds()));
             return null;
@@ -141,7 +141,7 @@ public final class STFClient {
                         deviceUDID, sessionUUID, response.getStatus(), response.getObject()));
                 LOGGER.warning(() -> String.format("[STF-%s][%s] Device will be ignored %s seconds.",
                         deviceUDID, sessionUUID, INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
-                DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
+                IgnoredDevices.ignore(deviceUDID, INVALID_STF_RESPONSE_TIMEOUT, "STF did not reserve the device");
                 if (response.getStatus() == 0) {
                     markUnhealthy(deviceUDID, sessionUUID);
                 }
@@ -150,12 +150,12 @@ public final class STFClient {
             reservedNow = true;
         } else if (stfDevice.getOwner() != null && !StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName())){
             STFDevice finalStfDevice1 = stfDevice;
-            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(STF_DEVICE_MANUALLY_RESERVED_TIMEOUT));
+            IgnoredDevices.ignore(deviceUDID, STF_DEVICE_MANUALLY_RESERVED_TIMEOUT, "device is reserved in STF by " + stfDevice.getOwner().getName());
             LOGGER.warning(() -> String.format("[STF-%s][%s] Device reserved manually by user: %s. Will be ignored %s seconds.",
                     deviceUDID, sessionUUID, finalStfDevice1.getOwner().getName(), STF_DEVICE_MANUALLY_RESERVED_TIMEOUT.toSeconds()));
             return null;
         } else {
-            DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_TIMEOUT));
+            IgnoredDevices.ignore(deviceUDID, UNHEALTHY_TIMEOUT, "device is not present or not ready in STF");
             LOGGER.warning(() -> String.format("[STF-%s][%s] Device is not ready. Will be ignored %s seconds.",
                     deviceUDID, sessionUUID, UNHEALTHY_TIMEOUT.toSeconds()));
             return null;

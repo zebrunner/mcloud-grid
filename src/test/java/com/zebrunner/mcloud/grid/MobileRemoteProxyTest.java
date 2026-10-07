@@ -24,12 +24,12 @@ public class MobileRemoteProxyTest {
     @BeforeMethod
     public void setUp() {
         registry = GridFixtures.registry();
-        MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.clear();
+        IgnoredDevices.clear();
     }
 
     @AfterMethod(alwaysRun = true)
     public void tearDown() {
-        MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.clear();
+        IgnoredDevices.clear();
     }
 
     private static Map<String, Object> request(String platform) {
@@ -99,25 +99,25 @@ public class MobileRemoteProxyTest {
     @Test
     public void deviceIsSkippedWhileIgnoreTimerIsActive() {
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, NODE_URL, GridFixtures.androidNodeCaps(UDID));
-        MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.put(UDID, Duration.ofMillis(System.currentTimeMillis()).plusMinutes(5));
+        IgnoredDevices.ignore(UDID, Duration.ofMinutes(5), "test");
 
         Assert.assertNull(proxy.getNewSession(request("Android")));
-        Assert.assertTrue(MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.containsKey(UDID));
+        Assert.assertTrue(IgnoredDevices.isIgnored(UDID));
     }
 
     @Test
     public void expiredIgnoreTimerIsRemoved() {
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, NODE_URL, GridFixtures.androidNodeCaps(UDID));
-        MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.put(UDID, Duration.ofMillis(System.currentTimeMillis()).minusSeconds(1));
+        IgnoredDevices.ignore(UDID, Duration.ofSeconds(-1), "test");
 
         Assert.assertNotNull(proxy.getNewSession(request("Android")));
-        Assert.assertFalse(MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.containsKey(UDID));
+        Assert.assertTrue(IgnoredDevices.snapshot().isEmpty());
     }
 
     @Test
     public void ignoreTimerOfAnotherDeviceDoesNotAffectThisOne() {
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, NODE_URL, GridFixtures.androidNodeCaps(UDID));
-        MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.put("other", Duration.ofMillis(System.currentTimeMillis()).plusMinutes(5));
+        IgnoredDevices.ignore("other", Duration.ofMinutes(5), "test");
 
         Assert.assertNotNull(proxy.getNewSession(request("Android")));
     }
@@ -173,6 +173,6 @@ public class MobileRemoteProxyTest {
 
         proxy.beforeRelease(session);
 
-        Assert.assertTrue(MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.containsKey(UDID));
+        Assert.assertTrue(IgnoredDevices.isIgnored(UDID));
     }
 }

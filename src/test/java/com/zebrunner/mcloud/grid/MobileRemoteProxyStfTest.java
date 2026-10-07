@@ -55,7 +55,7 @@ public class MobileRemoteProxyStfTest {
     @BeforeMethod(alwaysRun = true)
     public void reset() {
         stf.reset();
-        MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.clear();
+        IgnoredDevices.clear();
         registry = GridFixtures.registry();
         stf.user(DEFAULT_TOKEN, BOT_USER);
         stf.devices(device(ANDROID_UDID).toString(), device(IOS_UDID).toString());
@@ -101,7 +101,7 @@ public class MobileRemoteProxyStfTest {
 
         Assert.assertNull(proxy.getNewSession(request("Android")));
         Assert.assertEquals(proxy.getTotalUsed(), 0);
-        Assert.assertTrue(MobileRemoteProxy.DEVICE_IGNORE_AUTOMATION_TIMERS.containsKey(ANDROID_UDID));
+        Assert.assertEquals(IgnoredDevices.get(ANDROID_UDID).map(IgnoredDevices.Entry::getReason).orElse(null), "Appium status check failed");
         stf.server().verify(0, postRequestedFor(urlEqualTo("/api/v1/user/devices")));
     }
 

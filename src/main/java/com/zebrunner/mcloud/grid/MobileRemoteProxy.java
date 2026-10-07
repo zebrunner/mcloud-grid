@@ -43,7 +43,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.logging.Logger;
 
@@ -79,7 +78,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return true;
         }
     };
-    public static final Map<String, Duration> DEVICE_IGNORE_AUTOMATION_TIMERS = new ConcurrentHashMap<>();
 
     // adb/wda timeout
     private static final Duration UNHEALTHY_MOBILE_TIMEOUT = EnvUtils.getDurationInSeconds("UNHEALTHY_MOBILE_TIMEOUT", Duration.ofMinutes(1));
@@ -208,13 +206,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return null;
         }
 
-        if (DEVICE_IGNORE_AUTOMATION_TIMERS.get(udid) != null) {
-            Duration timeout = DEVICE_IGNORE_AUTOMATION_TIMERS.get(udid);
-            if (Duration.ofMillis(System.currentTimeMillis()).compareTo(timeout) < 0) {
-                return null;
-            } else {
-                DEVICE_IGNORE_AUTOMATION_TIMERS.remove(udid);
-            }
+        if (IgnoredDevices.isIgnored(udid)) {
+            return null;
         }
 
         for (TestSlot testslot : getTestSlots()) {
@@ -229,7 +222,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
             // additional check if device is ready for session with custom Appium's status verification
             if (!appiumCheck.apply(testslot.getRemoteURL(), internalKey)) {
-                DEVICE_IGNORE_AUTOMATION_TIMERS.put(udid, Duration.ofMillis(System.currentTimeMillis()).plus(UNHEALTHY_MOBILE_TIMEOUT));
+                IgnoredDevices.ignore(udid, UNHEALTHY_MOBILE_TIMEOUT, "Appium status check failed");
                 LOGGER.warning(() -> String.format("[%s][%s] Node appium check failed: '%s'. Will be ignored %s seconds.",
                         udid, internalKey, deviceName, UNHEALTHY_MOBILE_TIMEOUT.toSeconds()));
                 testslot.doFinishRelease();
@@ -325,7 +318,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         if (session.getExternalKey() == null) {
             LOGGER.warning(() ->
                     String.format("[%s][%s] Session ext id is null, so device will be ignored %s seconds.", udid, internalKey, INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
-            DEVICE_IGNORE_AUTOMATION_TIMERS.put(udid, Duration.ofMillis(System.currentTimeMillis()).plus(INACTIVITY_RELEASE_TIMEOUT));
+            IgnoredDevices.ignore(udid, INACTIVITY_RELEASE_TIMEOUT, "session timed out before it was started on the device");
         }
         disconnectSTFDevice(session);
     }
