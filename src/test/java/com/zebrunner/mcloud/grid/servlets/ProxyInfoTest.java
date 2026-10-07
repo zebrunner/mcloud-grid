@@ -7,13 +7,6 @@ import org.openqa.grid.internal.GridRegistry;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.lang.reflect.Proxy;
-import java.util.HashMap;
-import java.util.Map;
 
 
 public class ProxyInfoTest {
@@ -24,28 +17,18 @@ public class ProxyInfoTest {
         registry.add(GridFixtures.proxy(registry, "http://node-1:4723", GridFixtures.androidNodeCaps("udid-1")));
         registry.add(GridFixtures.proxy(registry, "http://node-2:4723", GridFixtures.iosNodeCaps("udid-2")));
 
-        StringWriter body = new StringWriter();
-        Map<String, Object> calls = new HashMap<>();
-        PrintWriter writer = new PrintWriter(body);
-        HttpServletResponse response = stub(HttpServletResponse.class, (method, args) -> {
-            if ("getWriter".equals(method)) {
-                return writer;
-            }
-            if (args != null && args.length == 1) {
-                calls.put(method, args[0]);
-            }
-            return null;
-        });
+        ServletStubs.Response response = new ServletStubs.Response();
 
-        new ProxyInfo(registry).doGet(stub(HttpServletRequest.class, (method, args) -> null), response);
+        new ProxyInfo(registry).doGet(ServletStubs.request(), response.servletResponse);
 
-        Assert.assertEquals(calls.get("setContentType"), "application/json");
-        Assert.assertEquals(calls.get("setStatus"), 200);
-        JsonNode json = new ObjectMapper().readTree(body.toString());
+        Assert.assertEquals(response.calls.get("setContentType"), "application/json");
+        Assert.assertEquals(response.calls.get("setStatus"), 200);
+        String body = response.body();
+        JsonNode json = new ObjectMapper().readTree(body);
         Assert.assertTrue(json.isArray());
         Assert.assertEquals(json.size(), 2);
-        Assert.assertTrue(body.toString().contains("\"remoteHost\":\"http://node-1:4723\""));
-        Assert.assertTrue(body.toString().contains("\"remoteHost\":\"http://node-2:4723\""));
+        Assert.assertTrue(body.contains("\"remoteHost\":\"http://node-1:4723\""));
+        Assert.assertTrue(body.contains("\"remoteHost\":\"http://node-2:4723\""));
         JsonNode capabilities = null;
         for (JsonNode proxy : json) {
             if ("http://node-1:4723".equals(proxy.get("configuration").get("remoteHost").asText())) {
@@ -58,14 +41,5 @@ public class ProxyInfoTest {
         Assert.assertEquals(capabilities.get("platformName").asText(), "ANDROID");
         Assert.assertEquals(capabilities.get("appium:deviceName").asText(), "Pixel-udid-1");
         registry.stop();
-    }
-
-    interface Handler {
-        Object handle(String method, Object[] args);
-    }
-
-    private static <T> T stub(Class<T> type, Handler handler) {
-        return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
-                (proxy, method, args) -> handler.handle(method.getName(), args)));
     }
 }
