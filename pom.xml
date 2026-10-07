@@ -196,7 +196,7 @@
 
 	<profiles>
 		<profile>
-			<!-- Static analysis: mvn -Plint verify (shell/Dockerfile linters: scripts/lint.sh) -->
+			<!-- Static analysis: mvn -Plint verify (all linters: make lint) -->
 			<id>lint</id>
 			<build>
 				<plugins>

@@ -1,3 +1,4 @@
+---
 ignored:
   # STF_TOKEN is declared empty as documentation of the supported env vars; the real value is passed at runtime
   - DL3064
