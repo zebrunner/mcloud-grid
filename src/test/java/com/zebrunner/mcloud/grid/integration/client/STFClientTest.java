@@ -190,17 +190,38 @@ public class STFClientTest {
         assertIgnoredFor(Duration.ofMinutes(10));
     }
 
-    public void failedRemoteConnectFailsReservation() {
+    public void failedRemoteConnectFailsReservationAndReturnsDevice() {
         stf.devices(device(UDID).toString());
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(aResponse().withStatus(500)));
 
         Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android"), SESSION));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID)));
     }
 
-    public void enableAdbRequiresRemoteConnectUrl() {
+    public void enableAdbRequiresRemoteConnectUrlAndReturnsDevice() {
         stf.devices(device(UDID).toString());
 
         Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android", "zebrunner:enableAdb", true), SESSION));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID + "/remoteConnect")));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID)));
+    }
+
+    public void failedPostReservationStepDoesNotReturnDeviceReservedBefore() {
+        stf.devices(device(UDID).owner(BOT_USER).toString());
+        stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(aResponse().withStatus(500)));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android"), SESSION));
+        stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID)));
+    }
+
+    public void returnAfterFailureUsesTokenOfReservation() {
+        stf.user("personal-token", "john");
+        stf.devices(device(UDID).toString());
+        stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(aResponse().withStatus(500)));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android", "zebrunner:STF_TOKEN", "personal-token"), SESSION));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID))
+                .withHeader("Authorization", equalTo("Bearer personal-token")));
     }
 
     public void enableAdbReturnsDeviceWithRemoteConnectUrl() {
