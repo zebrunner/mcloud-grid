@@ -26,10 +26,10 @@ The test can register in-process fake Appium nodes (`MobileRemoteProxy`, answeri
 `/status-adb`, `/status-wda` and session endpoints), so the hub logic and its throughput can be
 stressed without devices. The hub must be able to reach this machine at `load.fakeNodes.host`.
 
-Local hub in Docker (builds the image from this repo):
+Local hub in Docker (builds the image from this repo; `make load` runs a short version):
 
 ```bash
-scripts/load-local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
+tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
 ```
 
 Remote hub (STF must be disabled on it, fake devices are not in STF):
