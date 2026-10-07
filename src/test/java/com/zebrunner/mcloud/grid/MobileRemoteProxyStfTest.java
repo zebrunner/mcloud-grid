@@ -112,6 +112,15 @@ public class MobileRemoteProxyStfTest {
         Assert.assertEquals(proxy.getTotalUsed(), 0);
     }
 
+    public void nodeOfOtherPlatformRegistersWithoutAppiumCheck() {
+        Map<String, Object> caps = GridFixtures.androidNodeCaps(ANDROID_UDID);
+        caps.put("platformName", "WINDOWS");
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, caps);
+
+        Assert.assertNotNull(proxy.getNewSession(request("WINDOWS")));
+        stf.server().verify(0, getRequestedFor(urlMatching("/wd/hub/status-.*")));
+    }
+
     public void nodeNotPresentInStfIsRejected() {
         Assert.expectThrows(GridException.class,
                 () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps("not-in-stf")));

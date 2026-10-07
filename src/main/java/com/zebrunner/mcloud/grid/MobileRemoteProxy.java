@@ -156,7 +156,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             default:
                 LOGGER.warning(() -> String.format("Could not find suitable appium check for platform %s. Will be used no-op check.", platform));
                 appiumCheck = (remoteURL, sessionUUID) -> true;
-                throw new GridException("Invalid platform: " + platform);
+                break;
             }
         } else {
             appiumCheck = (remoteURL, sessionUUID) -> true;
