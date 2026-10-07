@@ -143,15 +143,7 @@ public final class STFClient {
                         deviceUDID, sessionUUID, INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
                 DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
                 if (response.getStatus() == 0) {
-                    LOGGER.warning(() -> String.format("[STF-%s][%s] Device will be marked as unhealthy due to response status '0'.", deviceUDID, sessionUUID));
-                    entity.put("body", Map.of("status", "Unhealthy"));
-                    HttpClient.Response r = HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, deviceUDID)
-                            .withAuthorization(buildAuthToken(stfToken))
-                            .put(Void.class, entity);
-                    if (r.getStatus() != 200) {
-                        LOGGER.warning(() -> String.format("[STF-%s][%s] Could not mark device as unhealthy. Status: %s. Response: %s", deviceUDID, sessionUUID,
-                                r.getStatus(), r.getObject()));
-                    }
+                    markUnhealthy(deviceUDID, sessionUUID);
                 }
                 return null;
             }
@@ -273,6 +265,22 @@ public final class STFClient {
             LOGGER.info(() -> String.format("[STF-%s][%s] Device successfully returned to the STF.", udid, sessionUUID));
         }
 
+    }
+
+    /**
+     * Marks the device as unhealthy in STF when it does not answer the reservation request.
+     * It is an admin operation of the STF API, so it works only when STF_TOKEN belongs to an STF admin.
+     */
+    private static void markUnhealthy(String udid, String sessionUUID) {
+        LOGGER.warning(() -> String.format("[STF-%s][%s] STF did not respond to the reservation, device will be marked as unhealthy.", udid, sessionUUID));
+        HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, udid)
+                .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                .put(Void.class, Map.of("device", Map.of("status", "unhealthy")));
+        if (response.getStatus() == 403) {
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not mark device as unhealthy: the STF_TOKEN user is not an STF admin.", udid, sessionUUID));
+        } else if (response.getStatus() != 200) {
+            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not mark device as unhealthy. Status: %s", udid, sessionUUID, response.getStatus()));
+        }
     }
 
     /**

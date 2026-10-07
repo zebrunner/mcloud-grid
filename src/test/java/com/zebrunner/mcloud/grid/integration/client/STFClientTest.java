@@ -1,5 +1,6 @@
 package com.zebrunner.mcloud.grid.integration.client;
 
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.zebrunner.mcloud.grid.MobileRemoteProxy;
 import com.zebrunner.mcloud.grid.Platform;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
@@ -27,6 +28,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.put;
+import static com.github.tomakehurst.wiremock.client.WireMock.putRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.zebrunner.mcloud.grid.integration.client.StfStub.BOT_USER;
@@ -244,6 +247,29 @@ public class STFClientTest {
 
         Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(10));
+    }
+
+    public void reservationWithoutResponseMarksDeviceUnhealthyWithGridToken() {
+        stf.devices(device(UDID).toString());
+        stf.user("personal-token", "john");
+        stf.server().stubFor(post("/api/v1/user/devices").willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+        stf.server().stubFor(put("/api/v1/devices/" + UDID).willReturn(okJson("{\"success\":true}")));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS", "zebrunner:STF_TOKEN", "personal-token"), SESSION));
+
+        // STF reads the update from the 'device' field; the operation needs an admin token, so the grid one is used
+        stf.server().verify(putRequestedFor(urlEqualTo("/api/v1/devices/" + UDID))
+                .withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN))
+                .withRequestBody(equalToJson("{\"device\":{\"status\":\"unhealthy\"}}")));
+        assertIgnoredFor(Duration.ofMinutes(10));
+    }
+
+    public void rejectedReservationDoesNotMarkDeviceUnhealthy() {
+        stf.devices(device(UDID).toString());
+        stf.server().stubFor(post("/api/v1/user/devices").willReturn(aResponse().withStatus(403)));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        stf.server().verify(0, putRequestedFor(urlMatching("/api/v1/devices/.*")));
     }
 
     public void failedRemoteConnectFailsReservationAndReturnsDevice() {
