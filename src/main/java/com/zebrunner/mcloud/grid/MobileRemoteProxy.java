@@ -33,6 +33,7 @@ import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
+import org.openqa.grid.internal.utils.HtmlRenderer;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import org.openqa.selenium.remote.CapabilityType;
 
@@ -96,6 +97,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private final String deviceType;
     private final Platform platform;
     private final BiFunction<URL, String, Boolean> appiumCheck;
+    private final HtmlRenderer htmlRenderer;
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
         super(request, registry);
@@ -171,6 +173,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         } else {
             appiumCheck = (remoteURL, sessionUUID) -> true;
         }
+
+        htmlRenderer = new ProxyHtmlRenderer(this, udid);
 
         if (STFClient.isSTFEnabled()) {
             if (!STFClient.isDevicePresentInSTF(udid)) {
@@ -335,6 +339,23 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 .map(String::valueOf)
                 .orElse(STFClient.DEFAULT_STF_TOKEN);
         STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), stfToken, session.getInternalKey());
+    }
+
+    @Override
+    public HtmlRenderer getHtmlRender() {
+        return htmlRenderer;
+    }
+
+    public String getUdid() {
+        return udid;
+    }
+
+    public String getDeviceName() {
+        return deviceName;
+    }
+
+    public String getDeviceType() {
+        return deviceType;
     }
 
     private static Map<String, Object> getSlotCapabilities(TestSlot slot, String deviceType, STFDevice stfDevice) {

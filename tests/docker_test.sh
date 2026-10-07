@@ -17,8 +17,7 @@ cleanup() {
 }
 
 section "image"
-build_output="$(docker build --quiet --tag "$IMAGE" . 2>&1)"
-if [[ $? -ne 0 ]]; then
+if ! build_output="$(docker build --quiet --tag "$IMAGE" . 2>&1)"; then
   fail "image builds" "docker build failed" "$build_output"
   finish
 fi
@@ -49,6 +48,13 @@ check_contains "config.json takes GRID_TIMEOUT" '"timeout": 77,' "$config"
 check_contains "config.json takes GRID_NEW_SESSION_WAIT_TIMEOUT" '"newSessionWaitTimeout": 12345,' "$config"
 check_contains "config.json uses the mobile proxy" '"proxy": "com.zebrunner.mcloud.grid.MobileRemoteProxy"' "$config"
 check_contains "config.json uses the mobile capability matcher" '"capabilityMatcher": "com.zebrunner.mcloud.grid.MobileCapabilityMatcher"' "$config"
+
+for servlet in DevicesServlet AllSessionsServlet; do
+  check "${servlet} is registered" '{"value":[]}' \
+    "$(docker exec "$CONTAINER" curl -s "http://localhost:4444/grid/admin/${servlet}")"
+done
+check "grid console responds" "200" \
+  "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
 
 cmdline="$(docker exec "$CONTAINER" sh -c 'tr "\0" " " < /proc/$(pgrep java)/cmdline')"
 check_contains "JAVA_HEAP_OPTS reach the JVM" "-Xms64m -Xmx512m" "$cmdline"
