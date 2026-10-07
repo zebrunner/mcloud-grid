@@ -252,12 +252,20 @@ public final class STFClient {
         return stfDevice;
     }
 
-    public static synchronized void disconnectSTFDevice(String udid, Platform platform, boolean isReservedManually, String sessionUUID) {
+    public static void disconnectSTFDevice(String udid, Platform platform, boolean isReservedManually, String sessionUUID) {
+        disconnectSTFDevice(udid, platform, isReservedManually, DEFAULT_STF_TOKEN, sessionUUID);
+    }
+
+    /**
+     * @param stfToken token the device was reserved with
+     */
+    public static synchronized void disconnectSTFDevice(String udid, Platform platform, boolean isReservedManually, String stfToken,
+            String sessionUUID) {
         // it seems like return and remote disconnect guarantee that device becomes free asap
         if (Platform.ANDROID.equals(platform)) {
             LOGGER.info(() -> String.format("[STF-%s][%s] Additionally disconnect 'remoteConnect'.", udid, sessionUUID));
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
-                    .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                    .withAuthorization(buildAuthToken(stfToken))
                     .delete(Void.class);
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[STF-%s][%s] Could not disconnect 'remoteConnect'.", udid, sessionUUID));
@@ -272,7 +280,7 @@ public final class STFClient {
         LOGGER.info(() -> String.format("[STF-%s][%s] Return STF Device.", udid, sessionUUID));
 
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
-                .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                .withAuthorization(buildAuthToken(stfToken))
                 .delete(Void.class);
         if (response.getStatus() != 200) {
             LOGGER.warning(() -> String.format("[STF-%s][%s] Could not return device to the STF. Status: %s", udid, sessionUUID, response.getStatus()));

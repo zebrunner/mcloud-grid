@@ -16,6 +16,7 @@ import java.util.Map;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.delete;
 import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -156,6 +157,21 @@ public class MobileRemoteProxyStfTest {
         proxy.afterSession(session);
 
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
+    }
+
+    public void remoteConnectIsStoppedWithTokenOfReservation() {
+        stf.user("personal-token", "john");
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        Map<String, Object> requested = request("Android");
+        requested.put("zebrunner:STF_TOKEN", "personal-token");
+        TestSession session = proxy.getNewSession(requested);
+        Assert.assertNotNull(session);
+
+        proxy.afterSession(session);
+
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID + "/remoteConnect"))
+                .withHeader("Authorization", equalTo("Bearer personal-token")));
+        stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
     }
 
     public void deviceReservedWithPersonalTokenIsNotReturned() {

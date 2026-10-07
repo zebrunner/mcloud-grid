@@ -58,6 +58,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String IS_MANUALLY_RESERVED = "IS_MANUALLY_RESERVED";
     private static final String STF_DISCONNECTED = "STF_DISCONNECTED";
+    private static final String STF_TOKEN = "STF_TOKEN";
     private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
         @Override
         protected Object initialize() throws ConcurrentException {
@@ -232,12 +233,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     testslot.doFinishRelease();
                     return null;
                 }
-                session.put(IS_MANUALLY_RESERVED, false);
-                CapabilityUtils.getZebrunnerCapability(requestedCapability, "STF_TOKEN").ifPresent(token -> {
-                    if (!StringUtils.equals(String.valueOf(token), STFClient.DEFAULT_STF_TOKEN)) {
-                        session.put(IS_MANUALLY_RESERVED, true);
-                    }
-                });
+                String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapability, "STF_TOKEN")
+                        .map(String::valueOf)
+                        .orElse(STFClient.DEFAULT_STF_TOKEN);
+                session.put(STF_TOKEN, stfToken);
+                session.put(IS_MANUALLY_RESERVED, !StringUtils.equals(stfToken, STFClient.DEFAULT_STF_TOKEN));
 
                 Map<String, Object> slotCapabilities = getSlotCapabilities(testslot, deviceType, device);
                 LOGGER.info(() ->
@@ -309,7 +309,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return;
         }
         session.put(STF_DISCONNECTED, true);
-        STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), session.getInternalKey());
+        String stfToken = Optional.ofNullable(session.get(STF_TOKEN))
+                .map(String::valueOf)
+                .orElse(STFClient.DEFAULT_STF_TOKEN);
+        STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), stfToken, session.getInternalKey());
     }
 
     private static Map<String, Object> getSlotCapabilities(TestSlot slot, String deviceType, STFDevice stfDevice) {
