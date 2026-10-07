@@ -22,6 +22,7 @@ import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
+import com.zebrunner.mcloud.grid.util.LogLevels;
 import com.zebrunner.mcloud.grid.util.NodeReachability;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
@@ -74,6 +75,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final LazyInitializer<Boolean> INITIAL_GRID_CONFIGURATION_LOGS = new LazyInitializer<Boolean>() {
         @Override
         protected Boolean initialize() throws ConcurrentException {
+            LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
             LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
                             + "node reachability check: %s; newCommandTimeout limit: %s; device is ignored after a failed Appium check for %ss, "
                             + "after a session timed out before start for %ss.",
