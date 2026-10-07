@@ -98,14 +98,22 @@ jobs:
           JUNIT_DIR: ${{ runner.temp }}/junit
       - name: Load test of the image with fake Appium nodes
         run: tests/load_local.sh -Dload.fakeNodes=10 -Dload.sessions=200 -Dload.concurrency=20 -Dload.maxErrorRate=0
-      - name: Docker report
+      # one report per path: the action pairs report_paths with check_name items
+      - name: Docker image report
         if: ${{ !cancelled() }}
         uses: mikepenz/action-junit-report@b7b80d7ac5b1da46d6aaff9fb57ad50d8453bcb3 # v6.6.0
         with:
-          report_paths: |
-            ${{ runner.temp }}/junit/*.xml
-            target/surefire-reports/**/TEST-*.xml
-          check_name: docker report
+          report_paths: ${{ runner.temp }}/junit/*.xml
+          check_name: docker image report
+          annotate_only: true
+          detailed_summary: true
+          require_tests: true
+      - name: Load test report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@b7b80d7ac5b1da46d6aaff9fb57ad50d8453bcb3 # v6.6.0
+        with:
+          report_paths: target/surefire-reports/**/TEST-*.xml
+          check_name: load test report
           annotate_only: true
           detailed_summary: true
           require_tests: true
