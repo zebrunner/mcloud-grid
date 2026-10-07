@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cat <<_EOF
+cat << _EOF
 {
   "host": null,
   "port": 4444,

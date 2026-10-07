@@ -18,7 +18,7 @@
 ROOT=/opt/selenium
 CONF=$ROOT/config.json
 
-/opt/bin/generate_config >"$CONF"
+/opt/bin/generate_config > "$CONF"
 
 echo "starting selenium hub with configuration:"
 cat "$CONF"
@@ -28,10 +28,10 @@ if [ ! -z "$SE_OPTS" ]; then
 fi
 
 function shutdown {
-    echo "shutting down hub.."
-    kill -s SIGTERM $NODE_PID
-    wait $NODE_PID
-    echo "shutdown complete"
+  echo "shutting down hub.."
+  kill -s SIGTERM $NODE_PID
+  wait $NODE_PID
+  echo "shutdown complete"
 }
 
 trap shutdown SIGTERM SIGINT
