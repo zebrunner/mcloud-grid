@@ -62,6 +62,15 @@ public class MobileRemoteProxyTest {
     }
 
     @Test
+    public void nodeOfUnknownPlatformIsAccepted() {
+        Map<String, Object> caps = GridFixtures.androidNodeCaps(UDID);
+        caps.put("platformName", "Tizen");
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, NODE_URL, caps);
+
+        Assert.assertNotNull(proxy.getNewSession(request("Tizen")));
+    }
+
+    @Test
     public void createsSessionForMatchingRequest() {
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, NODE_URL, GridFixtures.androidNodeCaps(UDID));
 

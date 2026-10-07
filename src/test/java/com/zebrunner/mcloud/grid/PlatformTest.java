@@ -16,6 +16,12 @@ public class PlatformTest {
     }
 
     @Test
+    public void unknownPlatformIsAny() {
+        Assert.assertEquals(Platform.fromCapabilities(Map.of("platformName", "Tizen")), Platform.ANY);
+        Assert.assertEquals(Platform.fromCapabilities(Map.of("platformName", " android ")), Platform.ANDROID);
+    }
+
+    @Test
     public void missingPlatformIsAny() {
         Assert.assertEquals(Platform.fromCapabilities(null), Platform.ANY);
         Assert.assertEquals(Platform.fromCapabilities(Map.of()), Platform.ANY);
