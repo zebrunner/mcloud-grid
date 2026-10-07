@@ -18,10 +18,10 @@
 ROOT=/opt/selenium
 CONF=$ROOT/config.json
 
-/opt/bin/generate_config >$CONF
+/opt/bin/generate_config >"$CONF"
 
 echo "starting selenium hub with configuration:"
-cat $CONF
+cat "$CONF"
 
 if [ ! -z "$SE_OPTS" ]; then
   echo "appending selenium options: ${SE_OPTS}"
@@ -34,13 +34,15 @@ function shutdown {
     echo "shutdown complete"
 }
 
+trap shutdown SIGTERM SIGINT
+
+# JAVA_OPTS and SE_OPTS hold several space-separated options, so they are intentionally unquoted
+# shellcheck disable=SC2086
 java ${JAVA_OPTS} -Xms1G -Xmx4G -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv6Stack=false -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.util.logging.config.file=/opt/selenium/logger.properties -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
   org.openqa.grid.selenium.GridLauncherV3 \
   -role hub \
-  -hubConfig $CONF \
-#  -jettyThreads 1000 \
+  -hubConfig "$CONF" \
   ${SE_OPTS} &
 NODE_PID=$!
 
-trap shutdown SIGTERM SIGINT
 wait $NODE_PID
