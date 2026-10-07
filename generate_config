@@ -18,7 +18,8 @@ cat << _EOF
   "servlets": [
     "com.zebrunner.mcloud.grid.servlets.AllSessionsServlet",
     "com.zebrunner.mcloud.grid.servlets.DevicesServlet",
-    "com.zebrunner.mcloud.grid.servlets.MetricsServlet"
+    "com.zebrunner.mcloud.grid.servlets.MetricsServlet",
+    "com.zebrunner.mcloud.grid.servlets.TerminateSessionServlet"
   ]
 }
 _EOF

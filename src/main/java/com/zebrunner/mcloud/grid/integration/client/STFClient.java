@@ -285,6 +285,36 @@ public final class STFClient {
     }
 
     /**
+     * Releases a device in STF with the given token, for the termination of a session through the API.
+     * STF releases a device only for its owner or an STF admin, so with a token of another user it answers 403:
+     * the device is reserved by the grid user (STF_TOKEN) unless the session used a personal 'STF_TOKEN' capability.
+     *
+     * @return HTTP status of the release in STF, 0 if STF did not answer
+     */
+    public static int releaseDevice(String udid, Platform platform, String stfToken, String sessionUUID) {
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
+                .withAuthorization(buildAuthToken(stfToken))
+                .delete(Void.class);
+        if (response.getStatus() != 200) {
+            LOGGER.warning(() -> String.format("[%s][%s] STF did not release the device with the given key (HTTP %s, key: %s).",
+                    udid, sessionUUID, response.getStatus(), maskToken(stfToken)));
+            return response.getStatus();
+        }
+        if (Platform.ANDROID.equals(platform)) {
+            HttpClient.Response remoteConnect = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
+                    .withAuthorization(buildAuthToken(stfToken))
+                    .delete(Void.class);
+            if (remoteConnect.getStatus() != 200) {
+                // STF usually stops remoteConnect itself when the device is released
+                LOGGER.fine(() -> String.format("[%s][%s] remoteConnect was not stopped after the release (HTTP %s).",
+                        udid, sessionUUID, remoteConnect.getStatus()));
+            }
+        }
+        LOGGER.info(() -> String.format("[%s][%s] Device is released in STF with the key %s.", udid, sessionUUID, maskToken(stfToken)));
+        return response.getStatus();
+    }
+
+    /**
      * Returns a device reserved by {@link #reserveSTFDevice} when the reservation could not be completed.
      */
     private static void returnDevice(String udid, String stfToken, boolean remoteConnected, String sessionUUID) {

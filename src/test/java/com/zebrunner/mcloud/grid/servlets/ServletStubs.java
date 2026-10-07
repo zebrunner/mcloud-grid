@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * Minimal servlet request/response stubs without a servlet container.
  */
-final class ServletStubs {
+public final class ServletStubs {
 
     private ServletStubs() {
         //hide
@@ -28,6 +28,18 @@ final class ServletStubs {
 
     static HttpServletRequest request() {
         return stub(HttpServletRequest.class, (method, args) -> null);
+    }
+
+    static HttpServletRequest request(Map<String, String> headers, Map<String, String> parameters) {
+        return stub(HttpServletRequest.class, (method, args) -> {
+            if ("getHeader".equals(method)) {
+                return headers.get((String) args[0]);
+            }
+            if ("getParameter".equals(method)) {
+                return parameters.get((String) args[0]);
+            }
+            return null;
+        });
     }
 
     /**

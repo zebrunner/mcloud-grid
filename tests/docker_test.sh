@@ -55,6 +55,9 @@ for servlet in DevicesServlet AllSessionsServlet; do
 done
 check_contains "MetricsServlet is registered" "mcloud_grid_new_session_requests 0" \
   "$(docker exec "$CONTAINER" curl -s http://localhost:4444/grid/admin/MetricsServlet)"
+check "TerminateSessionServlet is registered (needs STF)" "501" \
+  "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Authorization: Bearer key' \
+    'http://localhost:4444/grid/admin/TerminateSessionServlet?udid=x')"
 check "grid console responds" "200" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
 

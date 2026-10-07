@@ -101,7 +101,19 @@ and gets a device that registers meanwhile (a restarted device, a new emulator),
 | `/grid/admin/DevicesServlet` | Devices as JSON: platform, type, node, status `free`/`busy`/`ignored`/`down`, why and until when a device is ignored, its session (Appium session id, start, inactivity, last command) |
 | `/grid/admin/AllSessionsServlet` | Active sessions as JSON with the requested capabilities and the device |
 | `/grid/admin/MetricsServlet` | Prometheus metrics: `mcloud_grid_devices{platform,status}`, `mcloud_grid_sessions`, `mcloud_grid_new_session_requests` (the queue) |
+| `POST /grid/admin/TerminateSessionServlet?udid=<udid>` or `?sessionId=<id>` | Terminates the session of a device and releases it in STF, see below |
 | `/wd/hub/status` | Hub status, also the healthcheck of the image |
+
+### Terminating a session
+
+```bash
+curl -X POST -H "Authorization: Bearer <STF access token>" "http://grid:4444/grid/admin/TerminateSessionServlet?udid=emulator-5554"
+```
+
+The hub releases the device in STF with the given key first and terminates the session only when STF allows it.
+STF releases a device for the user it is reserved by or for an STF admin. Devices are reserved by the grid user
+(`STF_TOKEN`), so the key of a regular STF user may not work (`403`, the session keeps running) unless the session was
+started with that user's `zebrunner:STF_TOKEN`; an STF admin key works. Without the STF integration the endpoint answers `501`.
 
 The servlets are registered in the hub config by `generate_config`.
 `com.zebrunner.mcloud.grid.servlets.ProxyInfo` (registration requests of the nodes) is not registered by default.

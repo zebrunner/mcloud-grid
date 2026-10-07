@@ -32,6 +32,7 @@ import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
+import org.openqa.grid.internal.SessionTerminationReason;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.internal.utils.HtmlRenderer;
@@ -354,6 +355,31 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 .map(String::valueOf)
                 .orElse(STFClient.DEFAULT_STF_TOKEN);
         STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), stfToken, session.getInternalKey());
+    }
+
+    /**
+     * Terminates the session running on the device, e.g. when automation is stopped while the client is still alive (#65).
+     * The device is released in STF with the key of the caller first: STF allows it only for the user the device is reserved by
+     * or for an STF admin, so a key of any other user is refused (403) and the session keeps running. Whether the key belongs
+     * to an admin is not checked here, STF decides.
+     *
+     * @return HTTP status of the STF release: 200 when the session is terminated
+     */
+    public int terminateSession(TestSession session, String stfToken) {
+        String internalKey = session.getInternalKey();
+        int status = STFClient.releaseDevice(udid, platform, stfToken, internalKey);
+        if (status != 200) {
+            return status;
+        }
+        // the device is already released in STF, afterSession must not return it again with the grid token
+        session.put(STF_DISCONNECTED, true);
+        if (session.getExternalKey() != null && !session.sendDeleteSessionRequest()) {
+            LOGGER.warning(() -> String.format("[%s][%s] Node did not delete the Appium session %s, the device is released anyway.",
+                    udid, internalKey, describeExternalSession(session)));
+        }
+        LOGGER.info(() -> String.format("[%s][%s] Session %s is terminated through the API.", udid, internalKey, describeExternalSession(session)));
+        getRegistry().terminate(session, SessionTerminationReason.CLIENT_STOPPED_SESSION);
+        return status;
     }
 
     @Override
