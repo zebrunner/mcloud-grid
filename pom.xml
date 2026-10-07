@@ -24,12 +24,12 @@
 		<spotbugs-maven-plugin.version>4.8.6.2</spotbugs-maven-plugin.version>
 		<selenium.version>3.141.59</selenium.version>
 		<commons-logging.version>1.2</commons-logging.version>
-		<commons-io.version>2.16.1</commons-io.version>
-		<commons-lang3.version>3.18.0</commons-lang3.version>
-		<jackson-databind.version>2.17.2</jackson-databind.version>
+		<commons-io.version>2.22.0</commons-io.version>
+		<commons-lang3.version>3.21.0</commons-lang3.version>
+		<jackson-databind.version>2.22.3</jackson-databind.version>
 		<httpclient.version>4.5.14</httpclient.version>
-		<lombok.version>1.18.30</lombok.version>
-		<testng.version>7.4.0</testng.version>
+		<lombok.version>1.18.48</lombok.version>
+		<testng.version>7.12.0</testng.version>
 		<wiremock.version>2.35.2</wiremock.version>
 		<!-- fixed port of the WireMock-based STF stub used by the 'stf' test group -->
 		<stf.stub.port>18089</stf.stub.port>
