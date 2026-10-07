@@ -10,8 +10,14 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.delete;
@@ -115,6 +121,48 @@ public class STFClientTest {
 
         Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS", "zebrunner:STF_TOKEN", "wrong"), SESSION));
         assertNoReservationRequest();
+    }
+
+    public void tokensAreNotLogged() {
+        List<String> messages = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                messages.add(record.getMessage());
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger logger = Logger.getLogger(STFClient.class.getName());
+        Level level = logger.getLevel();
+        logger.setLevel(Level.ALL);
+        logger.addHandler(handler);
+        try {
+            stf.devices(device(UDID).toString());
+            STFClient.reserveSTFDevice(UDID, caps("iOS", "zebrunner:STF_TOKEN", "secret-personal-token"), SESSION);
+            stf.server().stubFor(com.github.tomakehurst.wiremock.client.WireMock.get("/api/v1/user").willReturn(aResponse().withStatus(401)));
+            STFClient.disconnectAllDevices();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(level);
+        }
+        Assert.assertFalse(messages.isEmpty());
+        messages.forEach(message -> {
+            Assert.assertFalse(message.contains("secret-personal-token"), message);
+            Assert.assertFalse(message.contains(DEFAULT_TOKEN), message);
+        });
+    }
+
+    public void maskTokenKeepsOnlyTail() {
+        Assert.assertNull(STFClient.maskToken(null));
+        Assert.assertEquals(STFClient.maskToken("short"), "****");
+        Assert.assertEquals(STFClient.maskToken("0123456789abcdef"), "****cdef");
     }
 
     public void unknownDeviceIsNotReserved() {

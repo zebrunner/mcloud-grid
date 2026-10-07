@@ -90,7 +90,8 @@ public final class STFClient {
 
         if (user.getStatus() != 200) {
             LOGGER.warning(() ->
-                    String.format("[STF-%s][%s] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", deviceUDID, sessionUUID, STF_URL, stfToken));
+                    String.format("[STF-%s][%s] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", deviceUDID, sessionUUID, STF_URL,
+                            maskToken(stfToken)));
             return null;
         }
 
@@ -315,7 +316,7 @@ public final class STFClient {
 
         if (user.getStatus() != 200) {
             LOGGER.warning(() ->
-                    String.format("[STF] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", STF_URL, DEFAULT_STF_TOKEN));
+                    String.format("[STF] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", STF_URL, maskToken(DEFAULT_STF_TOKEN)));
             return;
         }
 
@@ -346,6 +347,16 @@ public final class STFClient {
                         LOGGER.warning(() -> String.format("[STF] Device '%s' successfully returned to the STF.", udid));
                     }
                 });
+    }
+
+    /**
+     * Keeps only the last 4 characters of a token, so it can be told apart in logs without being leaked.
+     */
+    static String maskToken(String token) {
+        if (token == null) {
+            return null;
+        }
+        return token.length() <= 8 ? "****" : "****" + token.substring(token.length() - 4);
     }
 
     private static String buildAuthToken(String authToken) {
