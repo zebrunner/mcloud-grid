@@ -17,6 +17,11 @@
 		<maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
 		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
 		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
+		<maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+		<jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
+		<maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
+		<checkstyle.version>10.12.7</checkstyle.version>
+		<spotbugs-maven-plugin.version>4.8.6.2</spotbugs-maven-plugin.version>
 		<selenium.version>3.141.59</selenium.version>
 		<commons-logging.version>1.2</commons-logging.version>
 		<commons-io.version>2.7</commons-io.version>
@@ -27,6 +32,10 @@
 		<jersey-bundle.version>1.19.4</jersey-bundle.version>
 		<lombok.version>1.18.30</lombok.version>
 		<testng.version>7.4.0</testng.version>
+		<mockito.version>4.11.0</mockito.version>
+		<wiremock.version>2.35.2</wiremock.version>
+		<!-- fixed port of the WireMock-based STF stub used by the 'stf' test group -->
+		<stf.stub.port>18089</stf.stub.port>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -93,10 +102,75 @@
 			<version>${testng.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>${mockito.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.github.tomakehurst</groupId>
+			<artifactId>wiremock-jre8-standalone</artifactId>
+			<version>${wiremock.version}</version>
+			<scope>test</scope>
+		</dependency>
 
 	</dependencies>
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>${maven-surefire-plugin.version}</version>
+				<configuration>
+					<!-- 'load' tests hit a real grid and are run only via the 'load' profile -->
+					<excludedGroups>stf,load</excludedGroups>
+				</configuration>
+				<executions>
+					<execution>
+						<!-- STF configuration is read from env vars once per JVM, so STF-enabled tests run in a separate fork -->
+						<id>stf-tests</id>
+						<goals>
+							<goal>test</goal>
+						</goals>
+						<configuration>
+							<groups>stf</groups>
+							<excludedGroups>load</excludedGroups>
+							<reuseForks>false</reuseForks>
+							<reportsDirectory>${project.build.directory}/surefire-reports/stf</reportsDirectory>
+							<environmentVariables>
+								<STF_URL>http://localhost:${stf.stub.port}</STF_URL>
+								<STF_TOKEN>default-token</STF_TOKEN>
+								<STF_TIMEOUT>3600</STF_TIMEOUT>
+								<CHECK_APPIUM_STATUS>true</CHECK_APPIUM_STATUS>
+							</environmentVariables>
+							<systemPropertyVariables>
+								<stf.stub.port>${stf.stub.port}</stf.stub.port>
+							</systemPropertyVariables>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco-maven-plugin.version}</version>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -135,4 +209,85 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<!-- Static analysis: mvn -Plint verify (shell/Dockerfile linters: scripts/lint.sh) -->
+			<id>lint</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-checkstyle-plugin</artifactId>
+						<version>${maven-checkstyle-plugin.version}</version>
+						<dependencies>
+							<dependency>
+								<groupId>com.puppycrawl.tools</groupId>
+								<artifactId>checkstyle</artifactId>
+								<version>${checkstyle.version}</version>
+							</dependency>
+						</dependencies>
+						<configuration>
+							<configLocation>config/checkstyle/checkstyle.xml</configLocation>
+							<includeTestSourceDirectory>true</includeTestSourceDirectory>
+							<consoleOutput>true</consoleOutput>
+							<violationSeverity>warning</violationSeverity>
+						</configuration>
+						<executions>
+							<execution>
+								<id>checkstyle</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>com.github.spotbugs</groupId>
+						<artifactId>spotbugs-maven-plugin</artifactId>
+						<version>${spotbugs-maven-plugin.version}</version>
+						<configuration>
+							<effort>Max</effort>
+							<threshold>Medium</threshold>
+							<excludeFilterFile>config/spotbugs/exclude.xml</excludeFilterFile>
+						</configuration>
+						<executions>
+							<execution>
+								<id>spotbugs</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<!-- Load tests against a running grid: mvn -Pload test -Dgrid.url=http://host:4444/wd/hub (see LOAD_TESTING.md) -->
+			<id>load</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<groups>load</groups>
+							<excludedGroups combine.self="override"/>
+						</configuration>
+						<executions>
+							<execution>
+								<id>stf-tests</id>
+								<configuration>
+									<skip>true</skip>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
