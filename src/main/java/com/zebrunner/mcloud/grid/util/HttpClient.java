@@ -129,7 +129,10 @@ public final class HttpClient {
                     }
                 }
             } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, String.format("%s. URL: %s", e.getMessage(), url), e);
+                // status 0 tells the caller the request failed; the stack trace is useful only for debugging
+                LOGGER.warning(() -> String.format("STF request %s %s failed: %s: %s", method.apply(url).getMethod(), url,
+                        e.getClass().getSimpleName(), e.getMessage()));
+                LOGGER.log(Level.FINE, "STF request failure", e);
             }
             return rs;
         }

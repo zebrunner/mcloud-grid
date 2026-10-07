@@ -137,7 +137,8 @@ public final class HttpClientApache {
             result.setStatus(response.getStatusLine().getStatusCode());
             result.setObject(EntityUtils.toString(response.getEntity()));
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, e.getMessage(), e);
+            LOGGER.warning(() -> String.format("Request %s %s failed: %s: %s", req.getMethod(), req.getURI(), e.getClass().getSimpleName(), e.getMessage()));
+            LOGGER.log(Level.FINE, "Request failure", e);
         }
         return result;
     }

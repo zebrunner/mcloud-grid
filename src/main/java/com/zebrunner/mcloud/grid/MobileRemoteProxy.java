@@ -41,9 +41,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.net.URL;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.logging.Logger;
 
@@ -61,6 +63,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final String IS_MANUALLY_RESERVED = "IS_MANUALLY_RESERVED";
     private static final String STF_DISCONNECTED = "STF_DISCONNECTED";
     private static final String STF_TOKEN = "STF_TOKEN";
+    private static final String STARTED_LOGGED = "STARTED_LOGGED";
     private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
         @Override
         protected Object initialize() throws ConcurrentException {
@@ -71,11 +74,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final LazyInitializer<Boolean> INITIAL_GRID_CONFIGURATION_LOGS = new LazyInitializer<Boolean>() {
         @Override
         protected Boolean initialize() throws ConcurrentException {
-            if (CHECK_APPIUM_STATUS) {
-                LOGGER.warning(() -> "[CONFIGURATION] 'CHECK_APPIUM_STATUS' is enabled so additional Appium health-check will be verified.");
-            } else {
-                LOGGER.warning(() -> "[CONFIGURATION] 'CHECK_APPIUM_STATUS' is not enabled.");
-            }
+            LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
+                            + "node reachability check: %s; newCommandTimeout limit: %s; device is ignored after a failed Appium check for %ss, "
+                            + "after a session timed out before start for %ss.",
+                    STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
+                    CHECK_APPIUM_STATUS ? "on" : "off",
+                    CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
+                    MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
+                    UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
             return true;
         }
     };
@@ -88,6 +94,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     // a node registered with an address the hub cannot reach is rejected, see #144
     private static final boolean CHECK_NODE_REACHABILITY = !"false".equalsIgnoreCase(System.getenv("CHECK_NODE_REACHABILITY"));
+    private static final Duration UNREACHABLE_NODE_WARNING_PERIOD = Duration.ofMinutes(10);
+    private static final Map<String, Instant> UNREACHABLE_NODE_WARNINGS = new ConcurrentHashMap<>();
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
 
     private static final Duration INACTIVITY_RELEASE_TIMEOUT = EnvUtils.getDurationInSeconds("INACTIVITY_RELEASE_TIMEOUT", Duration.ofMinutes(1));
@@ -116,7 +124,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             NodeReachability.check(nodeUrl, NODE_REACHABILITY_TIMEOUT).ifPresent(reason -> {
                 String message = String.format("Node %s is not reachable from the hub (%s), so it is not registered. "
                         + "Check the address the node registers with: it must be accessible from the hub.", nodeUrl, reason);
-                LOGGER.warning(() -> "[NODE REGISTRATION] " + message);
+                // the node retries the registration every few seconds: warn once per node in a while
+                Instant lastWarning = UNREACHABLE_NODE_WARNINGS.get(nodeUrl.toString());
+                if (lastWarning == null || lastWarning.plus(UNREACHABLE_NODE_WARNING_PERIOD).isBefore(Instant.now())) {
+                    UNREACHABLE_NODE_WARNINGS.put(nodeUrl.toString(), Instant.now());
+                    LOGGER.warning(() -> "[NODE REGISTRATION] " + message);
+                } else {
+                    LOGGER.fine(() -> "[NODE REGISTRATION] " + message);
+                }
                 throw new GridException(message);
             });
         }
@@ -144,8 +159,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
                         LOGGER.warning(() ->
-                                String.format("[%s][%s] Device is not ready for a session. /status-adb error: %s.",
-                                        udid, sessionUUID, response.getObject()));
+                                String.format("[%s][%s] Appium /status-adb check failed (HTTP %s): %s",
+                                        udid, sessionUUID, response.getStatus(), response.getObject()));
                         return false;
                     }
                     return true;
@@ -158,15 +173,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
                         LOGGER.warning(() ->
-                                String.format("[NODE-%s][%s] Device is not ready for a session. /status-wda error: %s.",
-                                        udid, sessionUUID, response.getObject()));
+                                String.format("[%s][%s] Appium /status-wda check failed (HTTP %s): %s",
+                                        udid, sessionUUID, response.getStatus(), response.getObject()));
                         return false;
                     }
                     return true;
                 };
                 break;
             default:
-                LOGGER.warning(() -> String.format("Could not find suitable appium check for platform %s. Will be used no-op check.", platform));
+                LOGGER.fine(() -> String.format("[%s] No Appium status check for platform %s, the device is not checked.", udid, platform));
                 appiumCheck = (remoteURL, sessionUUID) -> true;
                 break;
             }
@@ -191,6 +206,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     public void afterCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
         super.afterCommand(session, request, response);
+        if (session.getExternalKey() != null && session.get(STARTED_LOGGED) == null) {
+            session.put(STARTED_LOGGED, true);
+            LOGGER.info(() -> String.format("[%s][%s] Appium session '%s' is started on '%s'.",
+                    udid, session.getInternalKey(), session.getExternalKey().getKey(), deviceName));
+        }
         LOGGER.finest(() -> String.format("[%s][%s] after command: %s", udid, session.getInternalKey(), request.getRequestURI()));
     }
 
@@ -198,7 +218,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
 
         if (isDown()) {
-            LOGGER.warning(() -> String.format("Node is down: '[%s]-'%s'.", deviceName, udid));
+            LOGGER.fine(() -> String.format("[%s] Node %s is down, the device is skipped.", udid, getRemoteHost()));
             return null;
         }
 
@@ -210,24 +230,26 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return null;
         }
 
-        if (IgnoredDevices.isIgnored(udid)) {
+        Optional<IgnoredDevices.Entry> ignored = IgnoredDevices.get(udid);
+        if (ignored.isPresent()) {
+            LOGGER.fine(() -> String.format("[%s] Device is ignored for %ss more (%s), it is skipped.",
+                    udid, ignored.get().secondsLeft(), ignored.get().getReason()));
             return null;
         }
 
         for (TestSlot testslot : getTestSlots()) {
             TestSession session = testslot.getNewSession(requestedCapability);
             if (session == null) {
-                LOGGER.warning(() -> String.format("[%s] Test slot did not create a session for capabilities: %s", udid, requestedCapability));
+                LOGGER.fine(() -> String.format("[%s] Test slot did not create a session (it is busy or does not match).", udid));
                 return null;
             }
 
             String internalKey = session.getInternalKey();
-            LOGGER.info(() -> String.format("[%s][%s] Started internal session", udid, internalKey));
 
             // additional check if device is ready for session with custom Appium's status verification
             if (!appiumCheck.apply(testslot.getRemoteURL(), internalKey)) {
                 IgnoredDevices.ignore(udid, UNHEALTHY_MOBILE_TIMEOUT, "Appium status check failed");
-                LOGGER.warning(() -> String.format("[%s][%s] Node appium check failed: '%s'. Will be ignored %s seconds.",
+                LOGGER.warning(() -> String.format("[%s][%s] Device '%s' is not ready for a session, it is ignored for %s seconds.",
                         udid, internalKey, deviceName, UNHEALTHY_MOBILE_TIMEOUT.toSeconds()));
                 testslot.doFinishRelease();
                 return null;
@@ -246,11 +268,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 session.put(IS_MANUALLY_RESERVED, !StringUtils.equals(stfToken, STFClient.DEFAULT_STF_TOKEN));
 
                 Map<String, Object> slotCapabilities = getSlotCapabilities(testslot, deviceType, device);
-                LOGGER.info(() ->
-                        String.format("[%s][%s] slotCapabilities will be added to the session capabilities: %s.", udid, internalKey, slotCapabilities));
+                LOGGER.fine(() -> String.format("[%s][%s] 'zebrunner:slotCapabilities' of the session: %s", udid, internalKey, slotCapabilities));
                 requestedCapability.put("zebrunner:slotCapabilities", slotCapabilities);
             }
-            LOGGER.warning(() -> String.format("[%s][%s] Session will be launched on '%s'.", udid, internalKey, deviceName));
+            LOGGER.info(() -> String.format("[%s][%s] Device '%s' (%s %s) is selected for the session, starting the Appium session.",
+                    udid, internalKey, deviceName, platform, CapabilityUtils.getAppiumCapability(testslot.getCapabilities(), "platformVersion").orElse("")));
             return session;
         }
         return null;
@@ -259,11 +281,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public void beforeSession(TestSession session) {
         String internalKey = session.getInternalKey();
-        LOGGER.info(() -> String.format("[%s][%s] Before session.", udid, internalKey));
         if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
             //override platformName for the appium capabilities into tvOS
-            LOGGER.info(() -> String.format("[%s][%s] Detected 'tvOS' 'deviceType' capability, so 'platformName' will be overrided by 'tvOS'.",
-                    udid, internalKey));
+            LOGGER.fine(() -> String.format("[%s][%s] tvOS device: 'platformName' of the session is tvOS.", udid, internalKey));
             session.getRequestedCapabilities()
                     .put(CapabilityType.PLATFORM_NAME, "tvOS");
         }
@@ -300,9 +320,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public void afterSession(TestSession session) {
         String internalKey = session.getInternalKey();
-        LOGGER.warning(() -> String.format("[%s][%s] After session. Last command: '%s'", udid, internalKey, session.get("lastCommand")));
-        String sessionId = getExternalSessionId(session);
-        LOGGER.warning(() -> String.format("[%s][%s] Session on [%s]  will be closed. Ext.id: [%s]", udid, internalKey, deviceName, sessionId));
+        LOGGER.info(() -> String.format("[%s][%s] Session %s is finished after %s. Last command: %s",
+                udid, internalKey, describeExternalSession(session), sessionDuration(), session.get("lastCommand")));
         disconnectSTFDevice(session);
     }
 
@@ -311,17 +330,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     public void beforeRelease(TestSession session) {
         super.beforeRelease(session);
         String internalKey = session.getInternalKey();
-        LOGGER.info(() -> String.format("[%s][%s] Before release. Last command: '%s'", udid, internalKey, session.get("lastCommand")));
-        LOGGER.warning(() -> String.format("[CRITICAL] [%s] [%s] [%s] (%s) Session [%s] will be released by timeout.",
-                udid,
-                internalKey,
-                deviceName,
-                udid,
-                String.valueOf(getExternalSessionId(session)))
-        );
+        LOGGER.warning(() -> String.format("[%s][%s] Session %s timed out: no commands from the client for %ss, the device is released. Last command: %s",
+                udid, internalKey, describeExternalSession(session), session.getInactivityTime() / 1000, session.get("lastCommand")));
         if (session.getExternalKey() == null) {
-            LOGGER.warning(() ->
-                    String.format("[%s][%s] Session ext id is null, so device will be ignored %s seconds.", udid, internalKey, INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
+            LOGGER.warning(() -> String.format("[%s][%s] The Appium session was not started, the device is ignored for %s seconds.",
+                    udid, internalKey, INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
             IgnoredDevices.ignore(udid, INACTIVITY_RELEASE_TIMEOUT, "session timed out before it was started on the device");
         }
         disconnectSTFDevice(session);
@@ -371,8 +384,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         return slotCapabilities;
     }
 
-    private static String getExternalSessionId(TestSession session) {
-        // external key if exists correlates with valid appium sessionId. Internal key is unique uuid value inside hub
-        return session.getExternalKey() != null ? session.getExternalKey().getKey() : StringUtils.EMPTY;
+    /**
+     * The external key is the Appium session id, the internal key is the id of the session inside the hub.
+     */
+    private static String describeExternalSession(TestSession session) {
+        return session.getExternalKey() != null ? "'" + session.getExternalKey().getKey() + "'" : "(no Appium session)";
+    }
+
+    private String sessionDuration() {
+        long started = getTestSlots().get(0).getLastSessionStart();
+        return started > 0 ? (System.currentTimeMillis() - started) / 1000 + "s" : "unknown time";
     }
 }

@@ -60,7 +60,7 @@ public final class STFClient {
      * Reserve STF device
      */
     public static synchronized STFDevice reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
-        LOGGER.info(() -> String.format("[STF-%s][%s] Reserve STF Device.", deviceUDID, sessionUUID));
+        LOGGER.fine(() -> String.format("[%s][%s] Reserving the device in STF.", deviceUDID, sessionUUID));
 
         String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TOKEN")
                 .map(String::valueOf)
@@ -73,7 +73,8 @@ public final class STFClient {
 
         if (user.getStatus() != 200) {
             LOGGER.warning(() ->
-                    String.format("[STF-%s][%s] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", deviceUDID, sessionUUID, STF_URL,
+                    String.format("[%s][%s] STF did not accept the token (HTTP %s), the device is not reserved. URL: '%s', token: '%s'.", deviceUDID, sessionUUID,
+                            user.getStatus(), STF_URL,
                             maskToken(stfToken)));
             return null;
         }
@@ -83,7 +84,7 @@ public final class STFClient {
                 .get(Devices.class);
 
         if (devices.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Unable to get devices status. HTTP status: %s", deviceUDID, sessionUUID, devices.getStatus()));
+            LOGGER.warning(() -> String.format("[%s][%s] Could not get the devices from STF (HTTP %s), the device is not reserved.", deviceUDID, sessionUUID, devices.getStatus()));
             return null;
         }
 
@@ -92,31 +93,31 @@ public final class STFClient {
                 .findFirst();
 
         if (optionalSTFDevice.isEmpty()) {
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not find STF device", deviceUDID, sessionUUID));
+            LOGGER.warning(() -> String.format("[%s][%s] Device is not found in STF, it is not reserved.", deviceUDID, sessionUUID));
             return null;
         }
 
         STFDevice stfDevice = optionalSTFDevice.get();
         STFDevice finalStfDevice2 = stfDevice;
-        LOGGER.info(() -> String.format("[STF-%s][%s] STF device info: %s", deviceUDID, sessionUUID, finalStfDevice2));
+        LOGGER.fine(() -> String.format("[%s][%s] STF device: %s", deviceUDID, sessionUUID, finalStfDevice2));
 
         if (stfDevice.getStatus() == null) {
             IgnoredDevices.ignore(deviceUDID, INVALID_STF_RESPONSE_TIMEOUT, "STF device status is unknown");
-            LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status is null. It will be ignored: %s seconds.", deviceUDID, sessionUUID,
+            LOGGER.warning(() -> String.format("[%s][%s] STF returned no status of the device, it is ignored for %s seconds.", deviceUDID, sessionUUID,
                     INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (stfDevice.getStatus().intValue() == 2) {
             IgnoredDevices.ignore(deviceUDID, UNAUTHORIZED_TIMEOUT, "device is unauthorized in STF");
-            LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status 'UNAUTHORIZED'. It will be ignored: %s seconds.", deviceUDID,
+            LOGGER.warning(() -> String.format("[%s][%s] Device is unauthorized in STF, it is ignored for %s seconds.", deviceUDID,
                     sessionUUID, UNAUTHORIZED_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (stfDevice.getStatus() == 7) {
             IgnoredDevices.ignore(deviceUDID, UNHEALTHY_TIMEOUT, "device is unhealthy in STF");
-            LOGGER.warning(() -> String.format("[STF-%s][%s] STF device status 'UNHEALTHY'. It will be ignored: %s seconds.", deviceUDID,
+            LOGGER.warning(() -> String.format("[%s][%s] Device is unhealthy in STF, it is ignored for %s seconds.", deviceUDID,
                     sessionUUID, UNHEALTHY_TIMEOUT.toSeconds()));
             return null;
         }
@@ -127,7 +128,7 @@ public final class STFClient {
                 stfDevice.getPresent() &&
                 stfDevice.getReady()) {
             STFDevice finalStfDevice1 = stfDevice;
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Device already reserved manually by the same user: %s.",
+            LOGGER.info(() -> String.format("[%s][%s] Device is already reserved in STF by the grid user %s, the reservation is reused.",
                     deviceUDID, sessionUUID, finalStfDevice1.getOwner().getName()));
         } else if (stfDevice.getOwner() == null && stfDevice.getPresent() && stfDevice.getReady()) {
             Map<String, Object> entity = new HashMap<>();
@@ -137,10 +138,8 @@ public final class STFClient {
                     .withAuthorization(buildAuthToken(stfToken))
                     .post(Void.class, entity);
             if (response.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not reserve STF device. Status: %s. Response: %s",
-                        deviceUDID, sessionUUID, response.getStatus(), response.getObject()));
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Device will be ignored %s seconds.",
-                        deviceUDID, sessionUUID, INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
+                LOGGER.warning(() -> String.format("[%s][%s] STF did not reserve the device (HTTP %s), it is ignored for %s seconds.",
+                        deviceUDID, sessionUUID, response.getStatus(), INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
                 IgnoredDevices.ignore(deviceUDID, INVALID_STF_RESPONSE_TIMEOUT, "STF did not reserve the device");
                 if (response.getStatus() == 0) {
                     markUnhealthy(deviceUDID, sessionUUID);
@@ -151,18 +150,18 @@ public final class STFClient {
         } else if (stfDevice.getOwner() != null && !StringUtils.equals(stfDevice.getOwner().getName(), user.getObject().getUser().getName())){
             STFDevice finalStfDevice1 = stfDevice;
             IgnoredDevices.ignore(deviceUDID, STF_DEVICE_MANUALLY_RESERVED_TIMEOUT, "device is reserved in STF by " + stfDevice.getOwner().getName());
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Device reserved manually by user: %s. Will be ignored %s seconds.",
+            LOGGER.warning(() -> String.format("[%s][%s] Device is reserved in STF by %s, it is ignored for %s seconds.",
                     deviceUDID, sessionUUID, finalStfDevice1.getOwner().getName(), STF_DEVICE_MANUALLY_RESERVED_TIMEOUT.toSeconds()));
             return null;
         } else {
             IgnoredDevices.ignore(deviceUDID, UNHEALTHY_TIMEOUT, "device is not present or not ready in STF");
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Device is not ready. Will be ignored %s seconds.",
+            LOGGER.warning(() -> String.format("[%s][%s] Device is not present or not ready in STF, it is ignored for %s seconds.",
                     deviceUDID, sessionUUID, UNHEALTHY_TIMEOUT.toSeconds()));
             return null;
         }
 
         if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities))) {
-            LOGGER.info(() -> String.format("[STF-%s][%s] Additionally call 'remoteConnect'.", deviceUDID, sessionUUID));
+            LOGGER.fine(() -> String.format("[%s][%s] Starting remoteConnect of the device.", deviceUDID, sessionUUID));
 
             HttpClient.Response<RemoteConnectUserDevice> remoteConnectUserDevice = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
                             STF_URL, deviceUDID)
@@ -171,7 +170,7 @@ public final class STFClient {
 
             if (remoteConnectUserDevice.getStatus() != 200) {
                 LOGGER.warning(
-                        () -> String.format("[STF-%s][%s] Unsuccessful remoteConnect. Status: %s. Response: %s",
+                        () -> String.format("[%s][%s] STF could not start remoteConnect (HTTP %s), the device is not reserved. Response: %s",
                                 deviceUDID, sessionUUID, remoteConnectUserDevice.getStatus(), remoteConnectUserDevice.getObject()));
                 if (reservedNow) {
                     returnDevice(deviceUDID, stfToken, false, sessionUUID);
@@ -192,7 +191,8 @@ public final class STFClient {
                     .get(Devices.class);
 
             if (_devices.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Unable to get devices status. HTTP status: %s", deviceUDID, sessionUUID, _devices.getStatus()));
+                LOGGER.warning(() -> String.format("[%s][%s] Could not get the devices from STF (HTTP %s), the device is not reserved.",
+                        deviceUDID, sessionUUID, _devices.getStatus()));
                 if (reservedNow) {
                     returnDevice(deviceUDID, stfToken, true, sessionUUID);
                 }
@@ -205,7 +205,7 @@ public final class STFClient {
                     .findFirst();
 
             if (_optionalSTFDevice.isEmpty()) {
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not find STF device with UDID '%s'", deviceUDID, sessionUUID, deviceUDID));
+                LOGGER.warning(() -> String.format("[%s][%s] Device disappeared from STF after the reservation, it is not reserved.", deviceUDID, sessionUUID));
                 if (reservedNow) {
                     returnDevice(deviceUDID, stfToken, true, sessionUUID);
                 }
@@ -214,18 +214,19 @@ public final class STFClient {
             STFDevice _stfDevice = _optionalSTFDevice.get();
             stfDevice = _stfDevice;
             if (StringUtils.isBlank((String) _stfDevice.getRemoteConnectUrl())) {
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Detected 'true' enableAdb capability, but remoteURL is blank or empty.", deviceUDID, sessionUUID));
+                LOGGER.warning(() -> String.format("[%s][%s] 'enableAdb' is requested, but STF has no remote ADB URL of the device, it is not reserved.", deviceUDID, sessionUUID));
                 if (reservedNow) {
                     returnDevice(deviceUDID, stfToken, true, sessionUUID);
                 }
                 return null;
             } else {
-                LOGGER.info(() -> String.format("[STF-%s][%s] Detected 'true' enableAdb capability, and remoteURL is present.", deviceUDID, sessionUUID));
+                LOGGER.fine(() -> String.format("[%s][%s] Remote ADB URL of the device is ready.", deviceUDID, sessionUUID));
             }
         }
         STFDevice finalStfDevice = stfDevice;
         LOGGER.info(
-                () -> String.format("[STF-%s][%s] Device '%s' successfully reserved.", deviceUDID, sessionUUID, finalStfDevice.getSerial()));
+                () -> String.format("[%s][%s] Device is reserved in STF%s.", deviceUDID, sessionUUID,
+                        finalStfDevice.getRemoteConnectUrl() == null ? "" : ", remote ADB: " + finalStfDevice.getRemoteConnectUrl()));
         return stfDevice;
     }
 
@@ -240,29 +241,29 @@ public final class STFClient {
             String sessionUUID) {
         // it seems like return and remote disconnect guarantee that device becomes free asap
         if (Platform.ANDROID.equals(platform)) {
-            LOGGER.info(() -> String.format("[STF-%s][%s] Additionally disconnect 'remoteConnect'.", udid, sessionUUID));
+            LOGGER.fine(() -> String.format("[%s][%s] Stopping remoteConnect of the device.", udid, sessionUUID));
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
                     .withAuthorization(buildAuthToken(stfToken))
                     .delete(Void.class);
             if (response.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not disconnect 'remoteConnect'.", udid, sessionUUID));
+                LOGGER.warning(() -> String.format("[%s][%s] Could not stop remoteConnect of the device (HTTP %s).", udid, sessionUUID, response.getStatus()));
             }
         }
 
         if (isReservedManually) {
-            LOGGER.info(() -> String.format("[STF-%s][%s] Device will not be returned as it was reserved manually.",
+            LOGGER.info(() -> String.format("[%s][%s] Device stays reserved in STF: it was reserved with a personal STF token.",
                     udid, sessionUUID));
             return;
         }
-        LOGGER.info(() -> String.format("[STF-%s][%s] Return STF Device.", udid, sessionUUID));
+        LOGGER.fine(() -> String.format("[%s][%s] Returning the device to STF.", udid, sessionUUID));
 
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                 .withAuthorization(buildAuthToken(stfToken))
                 .delete(Void.class);
         if (response.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not return device to the STF. Status: %s", udid, sessionUUID, response.getStatus()));
+            LOGGER.warning(() -> String.format("[%s][%s] Could not return the device to STF (HTTP %s).", udid, sessionUUID, response.getStatus()));
         } else {
-            LOGGER.info(() -> String.format("[STF-%s][%s] Device successfully returned to the STF.", udid, sessionUUID));
+            LOGGER.info(() -> String.format("[%s][%s] Device is returned to STF.", udid, sessionUUID));
         }
 
     }
@@ -272,14 +273,14 @@ public final class STFClient {
      * It is an admin operation of the STF API, so it works only when STF_TOKEN belongs to an STF admin.
      */
     private static void markUnhealthy(String udid, String sessionUUID) {
-        LOGGER.warning(() -> String.format("[STF-%s][%s] STF did not respond to the reservation, device will be marked as unhealthy.", udid, sessionUUID));
+        LOGGER.warning(() -> String.format("[%s][%s] STF did not respond to the reservation, device will be marked as unhealthy.", udid, sessionUUID));
         HttpClient.Response response = HttpClient.uri(Path.STF_DEVICES_ITEM_PATH, STF_URL, udid)
                 .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                 .put(Void.class, Map.of("device", Map.of("status", "unhealthy")));
         if (response.getStatus() == 403) {
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not mark device as unhealthy: the STF_TOKEN user is not an STF admin.", udid, sessionUUID));
+            LOGGER.warning(() -> String.format("[%s][%s] Could not mark device as unhealthy: the STF_TOKEN user is not an STF admin.", udid, sessionUUID));
         } else if (response.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not mark device as unhealthy. Status: %s", udid, sessionUUID, response.getStatus()));
+            LOGGER.warning(() -> String.format("[%s][%s] Could not mark device as unhealthy. Status: %s", udid, sessionUUID, response.getStatus()));
         }
     }
 
@@ -287,20 +288,20 @@ public final class STFClient {
      * Returns a device reserved by {@link #reserveSTFDevice} when the reservation could not be completed.
      */
     private static void returnDevice(String udid, String stfToken, boolean remoteConnected, String sessionUUID) {
-        LOGGER.warning(() -> String.format("[STF-%s][%s] Reservation is not completed, so device will be returned to the STF.", udid, sessionUUID));
+        LOGGER.warning(() -> String.format("[%s][%s] Reservation is not completed, the device is returned to STF.", udid, sessionUUID));
         if (remoteConnected) {
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
                     .withAuthorization(buildAuthToken(stfToken))
                     .delete(Void.class);
             if (response.getStatus() != 200) {
-                LOGGER.warning(() -> String.format("[STF-%s][%s] Could not disconnect 'remoteConnect'. Status: %s", udid, sessionUUID, response.getStatus()));
+                LOGGER.warning(() -> String.format("[%s][%s] Could not stop remoteConnect of the device (HTTP %s).", udid, sessionUUID, response.getStatus()));
             }
         }
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                 .withAuthorization(buildAuthToken(stfToken))
                 .delete(Void.class);
         if (response.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[STF-%s][%s] Could not return device to the STF. Status: %s", udid, sessionUUID, response.getStatus()));
+            LOGGER.warning(() -> String.format("[%s][%s] Could not return the device to STF (HTTP %s).", udid, sessionUUID, response.getStatus()));
         }
     }
 
@@ -308,14 +309,15 @@ public final class STFClient {
         if (!STFClient.isSTFEnabled()) {
             return;
         }
-        LOGGER.info("[STF] All devices previously reserved for automation will be disconnected in STF.");
+        LOGGER.info("[STF] Returning the devices left reserved by the grid user (e.g. by a previous run of the hub).");
         HttpClient.Response<User> user = HttpClient.uri(Path.STF_USER_PATH, STF_URL)
                 .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                 .get(User.class);
 
         if (user.getStatus() != 200) {
             LOGGER.warning(() ->
-                    String.format("[STF] Not authenticated at STF successfully! URL: '%s'; Token: '%s';", STF_URL, maskToken(DEFAULT_STF_TOKEN)));
+                    String.format("[STF] STF did not accept the token (HTTP %s), the devices left reserved are not returned. URL: '%s', token: '%s'.",
+                            user.getStatus(), STF_URL, maskToken(DEFAULT_STF_TOKEN)));
             return;
         }
 
@@ -324,7 +326,7 @@ public final class STFClient {
                 .get(Devices.class);
 
         if (devices.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[STF] Unable to get devices status. HTTP status: %s", devices.getStatus()));
+            LOGGER.warning(() -> String.format("[STF] Could not get the devices from STF (HTTP %s), the devices left reserved are not returned.", devices.getStatus()));
             return;
         }
 
@@ -341,9 +343,9 @@ public final class STFClient {
                             .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                             .delete(Void.class);
                     if (response.getStatus() != 200) {
-                        LOGGER.warning(() -> String.format("[STF] Could not return device to the STF. Status: %s", response.getStatus()));
+                        LOGGER.warning(() -> String.format("[STF] Could not return the device '%s' to STF (HTTP %s).", udid, response.getStatus()));
                     } else {
-                        LOGGER.warning(() -> String.format("[STF] Device '%s' successfully returned to the STF.", udid));
+                        LOGGER.info(() -> String.format("[STF] Device '%s' left reserved by the grid user is returned to STF.", udid));
                     }
                 });
     }
@@ -372,6 +374,10 @@ public final class STFClient {
         return "Bearer " + authToken;
     }
 
+    public static String getStfUrl() {
+        return STF_URL;
+    }
+
     public static boolean isSTFEnabled() {
         return IS_STF_ENABLED;
     }
@@ -384,7 +390,7 @@ public final class STFClient {
                 .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                 .get(Devices.class);
         if (devices.getStatus() != 200) {
-            LOGGER.warning(() -> String.format("[NODE REGISTRATION] Unable to get devices status. HTTP status: %s", devices.getStatus()));
+            LOGGER.warning(() -> String.format("[NODE REGISTRATION] Could not get the devices from STF (HTTP %s), the node of '%s' is not registered.", devices.getStatus(), udid));
             return false;
         }
         return devices.getObject()
