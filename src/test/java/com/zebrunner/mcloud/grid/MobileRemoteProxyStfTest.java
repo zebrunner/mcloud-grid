@@ -1,5 +1,6 @@
 package com.zebrunner.mcloud.grid;
 
+import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.integration.client.StfStub;
 import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
@@ -55,10 +56,11 @@ public class MobileRemoteProxyStfTest {
     @BeforeMethod(alwaysRun = true)
     public void reset() {
         stf.reset();
+        STFClient.clearCache();
         IgnoredDevices.clear();
         registry = GridFixtures.registry();
         stf.user(DEFAULT_TOKEN, BOT_USER);
-        stf.devices(device(ANDROID_UDID).toString(), device(IOS_UDID).toString());
+        stf.devices(device(ANDROID_UDID), device(IOS_UDID));
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(okJson("{\"success\":true}")));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(okJson("{\"success\":true}")));
         stf.server().stubFor(delete(urlMatching("/api/v1/user/devices/.*")).willReturn(okJson("{\"success\":true}")));
@@ -106,7 +108,7 @@ public class MobileRemoteProxyStfTest {
     }
 
     public void failedStfReservationReleasesSlot() {
-        stf.devices(device(ANDROID_UDID).owner("someone-else").toString());
+        stf.devices(device(ANDROID_UDID).owner("someone-else"));
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
 
         Assert.assertNull(proxy.getNewSession(request("Android")));
@@ -166,6 +168,22 @@ public class MobileRemoteProxyStfTest {
         proxy.beforeSession(session);
 
         Assert.assertEquals(session.getRequestedCapabilities().get("newCommandTimeout"), 300L);
+    }
+
+    public void repeatedRegistrationOfKnownNodeSkipsStfCheck() {
+        registry.add(GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID)));
+        stf.server().resetRequests();
+
+        // the node registers again every few seconds
+        GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+
+        stf.server().verify(0, getRequestedFor(urlMatching("/api/v1/devices.*")));
+    }
+
+    public void newNodeIsCheckedInStf() {
+        GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+
+        stf.server().verify(1, getRequestedFor(urlEqualTo("/api/v1/devices/" + ANDROID_UDID)));
     }
 
     public void nodeNotPresentInStfIsRejected() {

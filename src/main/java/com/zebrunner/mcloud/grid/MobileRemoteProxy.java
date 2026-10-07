@@ -122,7 +122,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         } catch (Exception e) {
             LOGGER.warning(() -> String.format("Could not disconnect STF devices. Error message: %s", e.getMessage()));
         }
-        if (CHECK_NODE_REACHABILITY) {
+        // a node repeats its registration every few seconds: a node the hub already has was checked when it was added
+        boolean registered = registry.getProxyById(getId()) != null;
+        if (CHECK_NODE_REACHABILITY && !registered) {
             URL nodeUrl = getRemoteHost();
             NodeReachability.check(nodeUrl, NODE_REACHABILITY_TIMEOUT).ifPresent(reason -> {
                 String message = String.format("Node %s is not reachable from the hub (%s), so it is not registered. "
@@ -194,7 +196,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
         htmlRenderer = new ProxyHtmlRenderer(this, udid);
 
-        if (STFClient.isSTFEnabled()) {
+        if (STFClient.isSTFEnabled() && !registered) {
             if (!STFClient.isDevicePresentInSTF(udid)) {
                 throw new GridException(String.format("Could not find device with udid '%s' in STF. Slot capabilities: %s",
                         udid, slot.getCapabilities()));

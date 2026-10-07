@@ -5,9 +5,12 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.any;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 
 /**
@@ -45,9 +48,25 @@ public final class StfStub {
                 .willReturn(okJson("{\"success\":true,\"user\":{\"name\":\"" + name + "\",\"email\":\"" + name + "@example.com\"}}")));
     }
 
-    public void devices(String... devicesJson) {
+    /**
+     * Stubs the list of devices and GET /api/v1/devices/{serial} of each of them; STF answers 500 for an unknown serial.
+     */
+    /**
+     * STF answers 401 to every request with an invalid token.
+     */
+    public void rejectToken(String token) {
+        server.stubFor(any(urlMatching("/api/v1/.*")).atPriority(1)
+                .withHeader("Authorization", equalTo("Bearer " + token))
+                .willReturn(aResponse().withStatus(401).withBody("{\"success\":false,\"description\":\"Bad Credentials\"}")));
+    }
+
+    public void devices(DeviceJson... devices) {
         server.stubFor(get("/api/v1/devices")
-                .willReturn(okJson("{\"success\":true,\"devices\":[" + Arrays.stream(devicesJson).collect(Collectors.joining(",")) + "]}")));
+                .willReturn(okJson("{\"success\":true,\"devices\":[" + Arrays.stream(devices).map(DeviceJson::toString).collect(Collectors.joining(",")) + "]}")));
+        server.stubFor(get(urlMatching("/api/v1/devices/[^/]+")).atPriority(10).willReturn(aResponse().withStatus(500)));
+        for (DeviceJson device : devices) {
+            server.stubFor(get("/api/v1/devices/" + device.serial).willReturn(okJson("{\"success\":true,\"device\":" + device + "}")));
+        }
     }
 
     public static DeviceJson device(String serial) {

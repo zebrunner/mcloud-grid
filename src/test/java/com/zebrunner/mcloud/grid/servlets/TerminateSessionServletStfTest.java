@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zebrunner.mcloud.grid.GridFixtures;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.MobileRemoteProxy;
+import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.integration.client.StfStub;
 import org.openqa.grid.internal.ExternalSessionKey;
 import org.openqa.grid.internal.GridRegistry;
@@ -58,9 +59,10 @@ public class TerminateSessionServletStfTest {
     @BeforeMethod(alwaysRun = true)
     public void startSession() {
         stf.reset();
+        STFClient.clearCache();
         IgnoredDevices.clear();
         stf.user(DEFAULT_TOKEN, BOT_USER);
-        stf.devices(device(UDID).toString());
+        stf.devices(device(UDID));
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(okJson("{\"success\":true}")));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(okJson("{\"success\":true}")));
         stf.server().stubFor(delete(urlMatching("/api/v1/user/devices/.*")).willReturn(okJson("{\"success\":true}")));
