@@ -44,6 +44,18 @@ public class ValidatorsTest {
                 {"10,12", "11", false},
                 {"10.1,12.4.1", "12.4.1", true},
                 {"garbage", "11", false},
+                // trailing zeros are not significant
+                {"7", "7.0", true},
+                {"7.0", "7", true},
+                {"7.0.0", "7", true},
+                {"10-12", "12.0", true},
+                {"10.0+", "10", true},
+                {"10,12", "12.0.0", true},
+                // node version that cannot be parsed never matches a version constraint
+                {"11", "unknown", false},
+                {"10-12", "beta", false},
+                {"10+", "", false},
+                {"10,12", "x", false},
         };
     }
 
