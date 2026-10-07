@@ -28,8 +28,6 @@
 		<commons-lang3.version>3.18.0</commons-lang3.version>
 		<jackson-databind.version>2.17.2</jackson-databind.version>
 		<httpclient.version>4.5.14</httpclient.version>
-		<genson.version>0.99</genson.version>
-		<jersey-bundle.version>1.19.4</jersey-bundle.version>
 		<lombok.version>1.18.30</lombok.version>
 		<testng.version>7.4.0</testng.version>
 		<wiremock.version>2.35.2</wiremock.version>
@@ -71,16 +69,6 @@
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
 			<version>${httpclient.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.owlike</groupId>
-			<artifactId>genson</artifactId>
-			<version>${genson.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.sun.jersey</groupId>
-			<artifactId>jersey-bundle</artifactId>
-			<version>${jersey-bundle.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>

@@ -86,6 +86,21 @@ public class HttpClientTest {
     }
 
     @Test
+    public void pooledConnectionClosedByServerIsNotReused() {
+        server.stubFor(get("/api/v1/user").willReturn(okJson("{\"success\":true}")));
+        Assert.assertEquals(HttpClient.uri(Path.STF_USER_PATH, server.baseUrl()).get(User.class).getStatus(), 200);
+
+        // restart closes the keep-alive connection kept in the pool
+        int port = server.port();
+        server.stop();
+        server = new WireMockServer(options().port(port));
+        server.start();
+        server.stubFor(get("/api/v1/user").willReturn(okJson("{\"success\":true}")));
+
+        Assert.assertEquals(HttpClient.uri(Path.STF_USER_PATH, server.baseUrl()).get(User.class).getStatus(), 200);
+    }
+
+    @Test
     public void connectionErrorReturnsZeroStatus() {
         HttpClient.Response<User> response = HttpClient.uri(Path.STF_USER_PATH, "http://localhost:1").get(User.class);
         Assert.assertEquals(response.getStatus(), 0);
