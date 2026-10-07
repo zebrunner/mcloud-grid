@@ -4,6 +4,7 @@ import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 
 import javax.annotation.Nonnull;
 import java.lang.invoke.MethodHandles;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -65,15 +66,15 @@ public class PlatformVersionValidator implements Validator {
         return false;
     }
 
-    private class PlatformVersion implements Comparable<PlatformVersion> {
+    private static final class PlatformVersion implements Comparable<PlatformVersion> {
         private int[] version;
 
-        public PlatformVersion(String v) {
+        PlatformVersion(String v) {
             if (v != null && v.matches("(\\d+\\.){0,}(\\d+)$")) {
                 String[] digits = v.split("\\.");
                 this.version = new int[digits.length];
                 for (int i = 0; i < digits.length; i++) {
-                    this.version[i] = Integer.valueOf(digits[i]);
+                    this.version[i] = Integer.parseInt(digits[i]);
                 }
             }
         }
@@ -107,6 +108,16 @@ public class PlatformVersionValidator implements Validator {
                 }
             }
             return result;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof PlatformVersion && Arrays.equals(version, ((PlatformVersion) o).version);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(version);
         }
     }
 }

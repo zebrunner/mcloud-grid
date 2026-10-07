@@ -35,7 +35,7 @@ import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
-public class HttpClient {
+public final class HttpClient {
     private static final Logger LOGGER = Logger.getLogger(HttpClient.class.getName());
 
     private static final LazyInitializer<Client> CLIENT = new LazyInitializer<>() {
@@ -47,6 +47,10 @@ public class HttpClient {
             return client;
         }
     };
+
+    private HttpClient() {
+        //hide
+    }
 
     public static Executor uri(Path path, String serviceUrl, Object... parameters) {
         String url = path.build(serviceUrl, parameters);

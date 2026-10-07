@@ -36,11 +36,11 @@ import org.apache.http.util.EntityUtils;
 import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 
-public class HttpClientApache {
+public final class HttpClientApache {
 
-    private static Logger LOGGER = Logger.getLogger(HttpClientApache.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(HttpClientApache.class.getName());
 
-    private final static RequestConfig DEFAULT_REQUEST_CFG = RequestConfig.custom()
+    private static final RequestConfig DEFAULT_REQUEST_CFG = RequestConfig.custom()
             .setConnectionRequestTimeout(1000)
             .setConnectTimeout(1000)
             .setSocketTimeout(3000)

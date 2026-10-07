@@ -38,11 +38,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author Alex Khursevich (alex@qaprosoft.com)
  */
 public class ProxyInfo extends RegistryBasedServlet {
-	private static final long serialVersionUID = 1224921425278259572L;
+    private static final long serialVersionUID = 1224921425278259572L;
 
-	private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
-	public ProxyInfo() {
+    public ProxyInfo() {
         this(null);
     }
 
@@ -65,20 +65,20 @@ public class ProxyInfo extends RegistryBasedServlet {
         List<RegistrationRequest> proxies = new ArrayList<>();
         Iterator<RemoteProxy> itr = this.getRegistry().getAllProxies().iterator();
         while(itr.hasNext()) {
-        		RemoteProxy proxy = itr.next();
-        		proxies.add(proxy.getOriginalRegistrationRequest());
+                RemoteProxy proxy = itr.next();
+                proxies.add(proxy.getOriginalRegistrationRequest());
         }
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
         try {
-        		mapper.writeValue(response.getWriter(), proxies);
-        		response.setStatus(HttpStatus.SC_OK);
+                MAPPER.writeValue(response.getWriter(), proxies);
+                response.setStatus(HttpStatus.SC_OK);
         }
         catch (Exception e) {
-        		response.setStatus(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-		}
+                response.setStatus(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+        }
         finally {
-        		response.getWriter().close();
-		}
+                response.getWriter().close();
+        }
     }
 }
