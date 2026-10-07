@@ -41,6 +41,7 @@ public final class STFClient {
     public static final String DEFAULT_STF_TOKEN = System.getenv("STF_TOKEN");
     // Max time is seconds for reserving devices in STF
     private static final String DEFAULT_STF_TIMEOUT = System.getenv("STF_TIMEOUT");
+    private static final int FALLBACK_STF_TIMEOUT = 3600;
     private static final boolean IS_STF_ENABLED = (!StringUtils.isEmpty(STF_URL) && !StringUtils.isEmpty(DEFAULT_STF_TOKEN));
 
     private static final Duration INVALID_STF_RESPONSE_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_INVALID_RESPONSE_IGNORE_TIMEOUT"))
@@ -79,10 +80,7 @@ public final class STFClient {
         String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TOKEN")
                 .map(String::valueOf)
                 .orElse(DEFAULT_STF_TOKEN);
-        Integer stfTimeout = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TIMEOUT")
-                .map(String::valueOf)
-                .map(Integer::parseInt)
-                .orElse(Integer.parseInt(DEFAULT_STF_TIMEOUT));
+        int stfTimeout = stfTimeoutSeconds(requestedCapabilities, DEFAULT_STF_TIMEOUT);
 
         HttpClient.Response<User> user = HttpClient.uri(Path.STF_USER_PATH, STF_URL)
                 .withAuthorization(buildAuthToken(stfToken))
@@ -347,6 +345,16 @@ public final class STFClient {
                         LOGGER.warning(() -> String.format("[STF] Device '%s' successfully returned to the STF.", udid));
                     }
                 });
+    }
+
+    /**
+     * STF reservation timeout in seconds: 'STF_TIMEOUT' capability, then STF_TIMEOUT env var, then 1 hour.
+     */
+    static int stfTimeoutSeconds(Map<String, Object> requestedCapabilities, String defaultTimeout) {
+        return CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TIMEOUT")
+                .map(String::valueOf)
+                .map(Integer::parseInt)
+                .orElseGet(() -> StringUtils.isBlank(defaultTimeout) ? FALLBACK_STF_TIMEOUT : Integer.parseInt(defaultTimeout));
     }
 
     /**

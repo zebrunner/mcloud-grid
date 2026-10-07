@@ -165,6 +165,14 @@ public class STFClientTest {
         Assert.assertEquals(STFClient.maskToken("0123456789abcdef"), "****cdef");
     }
 
+    public void stfTimeoutResolution() {
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS", "zebrunner:STF_TIMEOUT", "60"), null), 60);
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS", "zebrunner:STF_TIMEOUT", 120), "3600"), 120);
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS"), "1800"), 1800);
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS"), null), 3600);
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS"), ""), 3600);
+    }
+
     public void unknownDeviceIsNotReserved() {
         stf.devices(device("another").toString());
 
