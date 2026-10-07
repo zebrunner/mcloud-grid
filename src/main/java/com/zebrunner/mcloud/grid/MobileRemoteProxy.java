@@ -18,6 +18,7 @@ package com.zebrunner.mcloud.grid;
 import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
+import com.zebrunner.mcloud.grid.util.AllowedNetworks;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
@@ -78,11 +79,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         protected Boolean initialize() throws ConcurrentException {
             LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
             LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
-                            + "node reachability check: %s; newCommandTimeout limit: %s; device is ignored after a failed Appium check for %ss, "
+                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; device is ignored after a failed Appium check for %ss, "
                             + "after a session timed out before start for %ss.",
                     STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
                     CHECK_APPIUM_STATUS ? "on" : "off",
                     CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
+                    NODE_ALLOWED_NETWORKS,
                     MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
                     UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
             return true;
@@ -97,8 +99,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     // a node registered with an address the hub cannot reach is rejected, see #144
     private static final boolean CHECK_NODE_REACHABILITY = !"false".equalsIgnoreCase(System.getenv("CHECK_NODE_REACHABILITY"));
-    private static final Duration UNREACHABLE_NODE_WARNING_PERIOD = Duration.ofMinutes(10);
-    private static final Map<String, Instant> UNREACHABLE_NODE_WARNINGS = new ConcurrentHashMap<>();
+    private static final Duration REJECTED_NODE_WARNING_PERIOD = Duration.ofMinutes(10);
+    private static final Map<String, Instant> REJECTED_NODE_WARNINGS = new ConcurrentHashMap<>();
+    // nodes may register only from these networks, empty = from anywhere
+    private static final AllowedNetworks NODE_ALLOWED_NETWORKS = AllowedNetworks.fromEnv("NODE_ALLOWED_NETWORKS", System.getenv("NODE_ALLOWED_NETWORKS"));
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
 
     private static final Duration INACTIVITY_RELEASE_TIMEOUT = EnvUtils.getDurationInSeconds("INACTIVITY_RELEASE_TIMEOUT", Duration.ofMinutes(1));
@@ -124,19 +128,18 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
         // a node repeats its registration every few seconds: a node the hub already has was checked when it was added
         boolean registered = registry.getProxyById(getId()) != null;
+        if (!registered && !NODE_ALLOWED_NETWORKS.allows(getRemoteHost().getHost())) {
+            String message = String.format("Node %s is not in NODE_ALLOWED_NETWORKS (%s), so it is not registered.",
+                    getRemoteHost(), NODE_ALLOWED_NETWORKS);
+            warnAboutRejectedNode(getRemoteHost(), message);
+            throw new GridException(message);
+        }
         if (CHECK_NODE_REACHABILITY && !registered) {
             URL nodeUrl = getRemoteHost();
             NodeReachability.check(nodeUrl, NODE_REACHABILITY_TIMEOUT).ifPresent(reason -> {
                 String message = String.format("Node %s is not reachable from the hub (%s), so it is not registered. "
                         + "Check the address the node registers with: it must be accessible from the hub.", nodeUrl, reason);
-                // the node retries the registration every few seconds: warn once per node in a while
-                Instant lastWarning = UNREACHABLE_NODE_WARNINGS.get(nodeUrl.toString());
-                if (lastWarning == null || lastWarning.plus(UNREACHABLE_NODE_WARNING_PERIOD).isBefore(Instant.now())) {
-                    UNREACHABLE_NODE_WARNINGS.put(nodeUrl.toString(), Instant.now());
-                    LOGGER.warning(() -> "[NODE REGISTRATION] " + message);
-                } else {
-                    LOGGER.fine(() -> "[NODE REGISTRATION] " + message);
-                }
+                warnAboutRejectedNode(nodeUrl, message);
                 throw new GridException(message);
             });
         }
@@ -382,6 +385,19 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.info(() -> String.format("[%s][%s] Session %s is terminated through the API.", udid, internalKey, describeExternalSession(session)));
         getRegistry().terminate(session, SessionTerminationReason.CLIENT_STOPPED_SESSION);
         return status;
+    }
+
+    /**
+     * A rejected node retries the registration every few seconds: it is warned about once in a while.
+     */
+    private static void warnAboutRejectedNode(URL nodeUrl, String message) {
+        Instant lastWarning = REJECTED_NODE_WARNINGS.get(nodeUrl.toString());
+        if (lastWarning == null || lastWarning.plus(REJECTED_NODE_WARNING_PERIOD).isBefore(Instant.now())) {
+            REJECTED_NODE_WARNINGS.put(nodeUrl.toString(), Instant.now());
+            LOGGER.warning(() -> "[NODE REGISTRATION] " + message);
+        } else {
+            LOGGER.fine(() -> "[NODE REGISTRATION] " + message);
+        }
     }
 
     @Override

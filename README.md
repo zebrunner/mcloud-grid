@@ -52,6 +52,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`.
 | `SE_OPTS` | | Extra hub options, e.g. `-debug`; `-servlets` replaces the [servlets](#endpoints) of the hub config |
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
+| `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
 | `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
 

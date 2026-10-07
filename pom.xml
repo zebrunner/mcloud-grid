@@ -132,6 +132,8 @@
 								<CHECK_APPIUM_STATUS>true</CHECK_APPIUM_STATUS>
 								<CHECK_NODE_REACHABILITY>true</CHECK_NODE_REACHABILITY>
 								<MAX_NEW_COMMAND_TIMEOUT>300</MAX_NEW_COMMAND_TIMEOUT>
+								<!-- WireMock of the tests listens on localhost -->
+								<NODE_ALLOWED_NETWORKS>127.0.0.0/8, ::1</NODE_ALLOWED_NETWORKS>
 							</environmentVariables>
 							<systemPropertyVariables>
 								<stf.stub.port>${stf.stub.port}</stf.stub.port>

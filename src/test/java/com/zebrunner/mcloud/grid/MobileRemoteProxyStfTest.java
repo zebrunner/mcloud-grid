@@ -186,6 +186,13 @@ public class MobileRemoteProxyStfTest {
         stf.server().verify(1, getRequestedFor(urlEqualTo("/api/v1/devices/" + ANDROID_UDID)));
     }
 
+    public void nodeOutsideOfAllowedNetworksIsRejected() {
+        // NODE_ALLOWED_NETWORKS=127.0.0.0/8, ::1 in the 'stf-tests' execution
+        GridException e = Assert.expectThrows(GridException.class,
+                () -> GridFixtures.proxy(registry, "http://192.0.2.10:4723", GridFixtures.androidNodeCaps(ANDROID_UDID)));
+        Assert.assertTrue(e.getMessage().contains("is not in NODE_ALLOWED_NETWORKS (127.0.0.0/8, ::1)"), e.getMessage());
+    }
+
     public void nodeNotPresentInStfIsRejected() {
         Assert.expectThrows(GridException.class,
                 () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps("not-in-stf")));
