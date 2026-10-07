@@ -32,7 +32,6 @@
 		<jersey-bundle.version>1.19.4</jersey-bundle.version>
 		<lombok.version>1.18.30</lombok.version>
 		<testng.version>7.4.0</testng.version>
-		<mockito.version>4.11.0</mockito.version>
 		<wiremock.version>2.35.2</wiremock.version>
 		<!-- fixed port of the WireMock-based STF stub used by the 'stf' test group -->
 		<stf.stub.port>18089</stf.stub.port>
@@ -103,12 +102,6 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.mockito</groupId>
-			<artifactId>mockito-core</artifactId>
-			<version>${mockito.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
 			<groupId>com.github.tomakehurst</groupId>
 			<artifactId>wiremock-jre8-standalone</artifactId>
 			<version>${wiremock.version}</version>
@@ -125,10 +118,13 @@
 				<configuration>
 					<!-- 'load' tests hit a real grid and are run only via the 'load' profile -->
 					<excludedGroups>stf,load</excludedGroups>
+					<systemPropertyVariables>
+						<java.util.logging.config.file>${project.basedir}/src/test/resources/logging.properties</java.util.logging.config.file>
+					</systemPropertyVariables>
 				</configuration>
 				<executions>
 					<execution>
-						<!-- STF configuration is read from env vars once per JVM, so STF-enabled tests run in a separate fork -->
+						<!-- STF configuration is read from env vars once per JVM, so STF-enabled tests run in their own forked JVM -->
 						<id>stf-tests</id>
 						<goals>
 							<goal>test</goal>
@@ -136,7 +132,6 @@
 						<configuration>
 							<groups>stf</groups>
 							<excludedGroups>load</excludedGroups>
-							<reuseForks>false</reuseForks>
 							<reportsDirectory>${project.build.directory}/surefire-reports/stf</reportsDirectory>
 							<environmentVariables>
 								<STF_URL>http://localhost:${stf.stub.port}</STF_URL>
@@ -146,6 +141,7 @@
 							</environmentVariables>
 							<systemPropertyVariables>
 								<stf.stub.port>${stf.stub.port}</stf.stub.port>
+								<java.util.logging.config.file>${project.basedir}/src/test/resources/logging.properties</java.util.logging.config.file>
 							</systemPropertyVariables>
 						</configuration>
 					</execution>
