@@ -57,6 +57,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     //to operate with RequestedCapabilities where prefix is present
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String IS_MANUALLY_RESERVED = "IS_MANUALLY_RESERVED";
+    private static final String STF_DISCONNECTED = "STF_DISCONNECTED";
     private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
         @Override
         protected Object initialize() throws ConcurrentException {
@@ -268,9 +269,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.warning(() -> String.format("[%s][%s] After session. Last command: '%s'", udid, internalKey, session.get("lastCommand")));
         String sessionId = getExternalSessionId(session);
         LOGGER.warning(() -> String.format("[%s][%s] Session on [%s]  will be closed. Ext.id: [%s]", udid, internalKey, deviceName, sessionId));
-        if (STFClient.isSTFEnabled()) {
-            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), internalKey);
-        }
+        disconnectSTFDevice(session);
     }
 
     // for 'as TIMED OUT due to client inactivity and will be released' exception
@@ -299,9 +298,18 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 //                //ignore
 //            }
         }
-        if (STFClient.isSTFEnabled()) {
-            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), internalKey);
+        disconnectSTFDevice(session);
+    }
+
+    /**
+     * Returns the device to STF once per session: on inactivity timeout the grid calls both beforeRelease and afterSession.
+     */
+    private void disconnectSTFDevice(TestSession session) {
+        if (!STFClient.isSTFEnabled() || session.get(STF_DISCONNECTED) != null) {
+            return;
         }
+        session.put(STF_DISCONNECTED, true);
+        STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), session.getInternalKey());
     }
 
     private static Map<String, Object> getSlotCapabilities(TestSlot slot, String deviceType, STFDevice stfDevice) {

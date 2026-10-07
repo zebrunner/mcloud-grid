@@ -136,6 +136,28 @@ public class MobileRemoteProxyStfTest {
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
     }
 
+    public void timedOutSessionReturnsDeviceOnlyOnce() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        TestSession session = proxy.getNewSession(request("Android"));
+
+        // grid calls both on client inactivity timeout
+        proxy.beforeRelease(session);
+        proxy.afterSession(session);
+
+        stf.server().verify(1, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID + "/remoteConnect")));
+        stf.server().verify(1, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
+    }
+
+    public void sessionWithoutReservationFlagIsReturned() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        // session created without going through MobileRemoteProxy.getNewSession
+        TestSession session = proxy.getTestSlots().get(0).getNewSession(request("Android"));
+
+        proxy.afterSession(session);
+
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
+    }
+
     public void deviceReservedWithPersonalTokenIsNotReturned() {
         stf.user("personal-token", "john");
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
