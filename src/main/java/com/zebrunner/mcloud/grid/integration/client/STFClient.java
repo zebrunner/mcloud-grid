@@ -21,6 +21,7 @@ import com.zebrunner.mcloud.grid.models.stf.RemoteConnectUserDevice;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.models.stf.User;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
+import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient;
 import org.apache.commons.lang3.StringUtils;
 
@@ -44,28 +45,12 @@ public final class STFClient {
     private static final int FALLBACK_STF_TIMEOUT = 3600;
     private static final boolean IS_STF_ENABLED = (!StringUtils.isEmpty(STF_URL) && !StringUtils.isEmpty(DEFAULT_STF_TOKEN));
 
-    private static final Duration INVALID_STF_RESPONSE_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_INVALID_RESPONSE_IGNORE_TIMEOUT"))
-            .filter(StringUtils::isNotBlank)
-            .map(Integer::parseInt)
-            .map(Duration::ofSeconds)
-            .orElse(Duration.ofMinutes(10));
-    private static final Duration UNAUTHORIZED_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_UNAUTHORIZED_IGNORE_TIMEOUT"))
-            .filter(StringUtils::isNotBlank)
-            .map(Integer::parseInt)
-            .map(Duration::ofSeconds)
-            .orElse(Duration.ofMinutes(10));
+    private static final Duration INVALID_STF_RESPONSE_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_INVALID_RESPONSE_IGNORE_TIMEOUT", Duration.ofMinutes(10));
+    private static final Duration UNAUTHORIZED_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_UNAUTHORIZED_IGNORE_TIMEOUT", Duration.ofMinutes(10));
 
-    private static final Duration UNHEALTHY_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_UNHEALTHY_IGNORE_TIMEOUT"))
-            .filter(StringUtils::isNotBlank)
-            .map(Integer::parseInt)
-            .map(Duration::ofSeconds)
-            .orElse(Duration.ofMinutes(1));
+    private static final Duration UNHEALTHY_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_UNHEALTHY_IGNORE_TIMEOUT", Duration.ofMinutes(1));
 
-    private static final Duration STF_DEVICE_MANUALLY_RESERVED_TIMEOUT = Optional.ofNullable(System.getenv("STF_DEVICE_MANUALLY_RESERVED_TIMEOUT"))
-            .filter(StringUtils::isNotBlank)
-            .map(Integer::parseInt)
-            .map(Duration::ofSeconds)
-            .orElse(Duration.ofMinutes(3));
+    private static final Duration STF_DEVICE_MANUALLY_RESERVED_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_MANUALLY_RESERVED_TIMEOUT", Duration.ofMinutes(3));
 
     private STFClient() {
         //do nothing
@@ -155,7 +140,7 @@ public final class STFClient {
                 LOGGER.warning(() -> String.format("[STF-%s][%s] Could not reserve STF device. Status: %s. Response: %s",
                         deviceUDID, sessionUUID, response.getStatus(), response.getObject()));
                 LOGGER.warning(() -> String.format("[STF-%s][%s] Device will be ignored %s seconds.",
-                        deviceUDID, sessionUUID, INVALID_STF_RESPONSE_TIMEOUT));
+                        deviceUDID, sessionUUID, INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
                 DEVICE_IGNORE_AUTOMATION_TIMERS.put(deviceUDID, Duration.ofMillis(System.currentTimeMillis()).plus(INVALID_STF_RESPONSE_TIMEOUT));
                 if (response.getStatus() == 0) {
                     LOGGER.warning(() -> String.format("[STF-%s][%s] Device will be marked as unhealthy due to response status '0'.", deviceUDID, sessionUUID));

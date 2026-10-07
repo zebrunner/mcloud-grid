@@ -19,6 +19,7 @@ import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
+import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
 import org.apache.commons.lang3.StringUtils;
@@ -80,17 +81,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     public static final Map<String, Duration> DEVICE_IGNORE_AUTOMATION_TIMERS = new ConcurrentHashMap<>();
 
     // adb/wda timeout
-    private static final Duration UNHEALTHY_MOBILE_TIMEOUT = Optional.ofNullable(System.getenv("UNHEALTHY_MOBILE_TIMEOUT"))
-            .filter(StringUtils::isNotBlank)
-            .map(Integer::parseInt)
-            .map(Duration::ofSeconds)
-            .orElse(Duration.ofMinutes(1));
+    private static final Duration UNHEALTHY_MOBILE_TIMEOUT = EnvUtils.getDurationInSeconds("UNHEALTHY_MOBILE_TIMEOUT", Duration.ofMinutes(1));
 
-    private static final Duration INACTIVITY_RELEASE_TIMEOUT = Optional.ofNullable(System.getenv("INACTIVITY_RELEASE_TIMEOUT"))
-            .filter(StringUtils::isNotBlank)
-            .map(Integer::parseInt)
-            .map(Duration::ofSeconds)
-            .orElse(Duration.ofMinutes(1));
+    private static final Duration INACTIVITY_RELEASE_TIMEOUT = EnvUtils.getDurationInSeconds("INACTIVITY_RELEASE_TIMEOUT", Duration.ofMinutes(1));
 
     private final String udid;
     private final String deviceName;
@@ -210,13 +203,12 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         for (TestSlot testslot : getTestSlots()) {
             TestSession session = testslot.getNewSession(requestedCapability);
             if (session == null) {
-                LOGGER.warning(() -> String.format("[%s] 'TestSession session = testslot.getNewSession(requestedCapability);' return null.", udid));
+                LOGGER.warning(() -> String.format("[%s] Test slot did not create a session for capabilities: %s", udid, requestedCapability));
                 return null;
             }
 
             String internalKey = session.getInternalKey();
             LOGGER.info(() -> String.format("[%s][%s] Started internal session", udid, internalKey));
-            LOGGER.warning(() -> String.format("[%s][%s] 'TestSession session = testslot.getNewSession(requestedCapability);' return SESSION.", udid, internalKey));
 
             // additional check if device is ready for session with custom Appium's status verification
             if (!appiumCheck.apply(testslot.getRemoteURL(), internalKey)) {
@@ -285,18 +277,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 udid,
                 String.valueOf(getExternalSessionId(session)))
         );
-        if(session.getExternalKey() == null) {
+        if (session.getExternalKey() == null) {
             LOGGER.warning(() ->
                     String.format("[%s][%s] Session ext id is null, so device will be ignored %s seconds.", udid, internalKey, INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
             DEVICE_IGNORE_AUTOMATION_TIMERS.put(udid, Duration.ofMillis(System.currentTimeMillis()).plus(INACTIVITY_RELEASE_TIMEOUT));
-//            try {
-//                getTestSlots().stream()
-//                        .findAny()
-//                        .orElseThrow(() -> new GridException("Node should have slot"))
-//                        .doFinishRelease();
-//            }catch (Throwable e) {
-//                //ignore
-//            }
         }
         disconnectSTFDevice(session);
     }
