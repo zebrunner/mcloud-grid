@@ -134,6 +134,40 @@ public class MobileRemoteProxyStfTest {
         Assert.assertTrue(e.getMessage().contains("Node " + unreachable + " is not reachable from the hub"), e.getMessage());
     }
 
+    public void newCommandTimeoutIsLimited() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        Map<String, Object> requested = request("iOS");
+        requested.put("appium:newCommandTimeout", 3600);
+        TestSession session = proxy.getNewSession(requested);
+
+        proxy.beforeSession(session);
+
+        // MAX_NEW_COMMAND_TIMEOUT=300 in the 'stf-tests' execution
+        Assert.assertEquals(session.getRequestedCapabilities().get("appium:newCommandTimeout"), 300L);
+    }
+
+    public void newCommandTimeoutWithinLimitIsKept() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        Map<String, Object> requested = request("iOS");
+        requested.put("appium:newCommandTimeout", "120");
+        TestSession session = proxy.getNewSession(requested);
+
+        proxy.beforeSession(session);
+
+        Assert.assertEquals(session.getRequestedCapabilities().get("appium:newCommandTimeout"), "120");
+    }
+
+    public void disabledNewCommandTimeoutIsLimited() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        Map<String, Object> requested = request("iOS");
+        requested.put("newCommandTimeout", 0);
+        TestSession session = proxy.getNewSession(requested);
+
+        proxy.beforeSession(session);
+
+        Assert.assertEquals(session.getRequestedCapabilities().get("newCommandTimeout"), 300L);
+    }
+
     public void nodeNotPresentInStfIsRejected() {
         Assert.expectThrows(GridException.class,
                 () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps("not-in-stf")));

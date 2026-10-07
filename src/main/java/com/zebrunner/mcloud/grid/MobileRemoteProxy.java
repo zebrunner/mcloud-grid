@@ -84,6 +84,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // adb/wda timeout
     private static final Duration UNHEALTHY_MOBILE_TIMEOUT = EnvUtils.getDurationInSeconds("UNHEALTHY_MOBILE_TIMEOUT", Duration.ofMinutes(1));
 
+    // optional upper limit of the 'appium:newCommandTimeout' capability, not set = no limit
+    private static final Duration MAX_NEW_COMMAND_TIMEOUT = EnvUtils.getDurationInSeconds("MAX_NEW_COMMAND_TIMEOUT", null);
+
     // a node registered with an address the hub cannot reach is rejected, see #144
     private static final boolean CHECK_NODE_REACHABILITY = !"false".equalsIgnoreCase(System.getenv("CHECK_NODE_REACHABILITY"));
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
@@ -266,6 +269,34 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     udid, internalKey));
             session.getRequestedCapabilities()
                     .put(CapabilityType.PLATFORM_NAME, "tvOS");
+        }
+        limitNewCommandTimeout(session.getRequestedCapabilities(), internalKey);
+    }
+
+    /**
+     * A big 'newCommandTimeout' keeps a device busy long after its client is gone, see #110.
+     */
+    private void limitNewCommandTimeout(Map<String, Object> capabilities, String internalKey) {
+        if (MAX_NEW_COMMAND_TIMEOUT == null) {
+            return;
+        }
+        for (String name : new String[] {"appium:newCommandTimeout", "newCommandTimeout"}) {
+            Object value = capabilities.get(name);
+            if (value == null) {
+                continue;
+            }
+            long requested;
+            try {
+                requested = Long.parseLong(String.valueOf(value).trim());
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            // 0 disables the timeout in Appium
+            if (requested <= 0 || requested > MAX_NEW_COMMAND_TIMEOUT.toSeconds()) {
+                capabilities.put(name, MAX_NEW_COMMAND_TIMEOUT.toSeconds());
+                LOGGER.info(() -> String.format("[%s][%s] '%s' %s is limited to MAX_NEW_COMMAND_TIMEOUT %s seconds.",
+                        udid, internalKey, name, requested, MAX_NEW_COMMAND_TIMEOUT.toSeconds()));
+            }
         }
     }
 

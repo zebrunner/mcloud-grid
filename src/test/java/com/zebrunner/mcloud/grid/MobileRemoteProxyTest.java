@@ -146,6 +146,18 @@ public class MobileRemoteProxyTest {
     }
 
     @Test
+    public void newCommandTimeoutIsNotLimitedByDefault() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, NODE_URL, GridFixtures.iosNodeCaps(UDID));
+        Map<String, Object> requested = request("iOS");
+        requested.put("appium:newCommandTimeout", 86400);
+        TestSession session = proxy.getNewSession(requested);
+
+        proxy.beforeSession(session);
+
+        Assert.assertEquals(session.getRequestedCapabilities().get("appium:newCommandTimeout"), 86400);
+    }
+
+    @Test
     public void afterSessionWithoutStfDoesNothing() {
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, NODE_URL, GridFixtures.androidNodeCaps(UDID));
         TestSession session = proxy.getNewSession(request("Android"));

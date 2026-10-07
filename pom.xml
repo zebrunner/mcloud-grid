@@ -131,6 +131,7 @@
 								<STF_TIMEOUT>3600</STF_TIMEOUT>
 								<CHECK_APPIUM_STATUS>true</CHECK_APPIUM_STATUS>
 								<CHECK_NODE_REACHABILITY>true</CHECK_NODE_REACHABILITY>
+								<MAX_NEW_COMMAND_TIMEOUT>300</MAX_NEW_COMMAND_TIMEOUT>
 							</environmentVariables>
 							<systemPropertyVariables>
 								<stf.stub.port>${stf.stub.port}</stf.stub.port>
