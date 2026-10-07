@@ -43,13 +43,17 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`.
 | `GRID_TIMEOUT` | `150` | Client inactivity timeout of a session, s |
 | `GRID_BROWSER_TIMEOUT` | `0` | Timeout of a command on the node, s (0 = none) |
 | `GRID_CLEAN_UP_CYCLE` | `5000` | How often the hub checks timed out sessions, ms |
-| `GRID_THROW_ON_CAPABILITY_NOT_PRESENT` | `true` | Reject requests no registered node can serve instead of queueing them |
+| `GRID_THROW_ON_CAPABILITY_NOT_PRESENT` | `true` | Reject requests no registered device can serve; see [Queueing](#queueing) |
 | `GRID_JETTY_MAX_THREADS` | `-1` | Jetty threads of the hub (-1 = default) |
 | `GRID_DEBUG` | `false` | Debug logging of the hub |
 | `GRID_PROXY`, `GRID_CAPABILITY_MATCHER` | mobile proxy and matcher | Classes of the node proxy and capability matcher |
 | `JAVA_HEAP_OPTS` | `-Xms1G -Xmx4G` | JVM heap of the hub |
 | `JAVA_OPTS` | | Other JVM options |
-| `SE_OPTS` | | Extra hub options, e.g. `-servlets com.zebrunner.mcloud.grid.servlets.ProxyInfo` |
+| `SE_OPTS` | | Extra hub options, e.g. `-debug`; `-servlets` replaces the [servlets](#endpoints) of the hub config |
+| `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
+| `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
+| `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
+| `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
 
 ### STF and device health
 
@@ -58,7 +62,7 @@ STF integration is enabled when both `STF_URL` and `STF_TOKEN` are set.
 | Env var | Default | Meaning |
 |---|---|---|
 | `STF_URL` | | STF address |
-| `STF_TOKEN` | | Access token of the STF user that reserves devices for automation |
+| `STF_TOKEN` | | Access token of the STF user that reserves devices for automation; when the user is an STF admin, a device that does not answer the reservation is also marked unhealthy in STF |
 | `STF_TIMEOUT` | `3600` | Reservation timeout of a device in STF, s |
 | `CHECK_APPIUM_STATUS` | `false` | Check `/status-adb` (Android) or `/status-wda` (iOS) of the node before a session |
 | `UNHEALTHY_MOBILE_TIMEOUT` | `60` | A device failing the Appium status check is skipped for, s |
@@ -82,21 +86,58 @@ STF integration is enabled when both `STF_URL` and `STF_TOKEN` are set.
 
 The node capabilities of the reserved device are passed to the session as `zebrunner:slotCapabilities`.
 
+### Queueing
+
+With `GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true` a request for a device that is not registered fails at once
+(`cannot find : Capabilities {...}`, or `Empty pool of VM for setup` when no device is registered at all). With `false` it waits in the queue for up to `GRID_NEW_SESSION_WAIT_TIMEOUT`
+and gets a device that registers meanwhile (a restarted device, a new emulator), otherwise it fails with
+`Request timed out waiting for a node to become available`.
+
+## Endpoints
+
+| Endpoint | Content |
+|---|---|
+| `/grid/console` | Selenium grid console, with the UDID of every device |
+| `/grid/admin/DevicesServlet` | Devices as JSON: platform, type, node, status `free`/`busy`/`ignored`/`down`, why and until when a device is ignored, its session (Appium session id, start, inactivity, last command) |
+| `/grid/admin/AllSessionsServlet` | Active sessions as JSON with the requested capabilities and the device |
+| `/grid/admin/MetricsServlet` | Prometheus metrics: `mcloud_grid_devices{platform,status}`, `mcloud_grid_sessions`, `mcloud_grid_new_session_requests` (the queue) |
+| `/wd/hub/status` | Hub status, also the healthcheck of the image |
+
+The servlets are registered in the hub config by `generate_config`.
+`com.zebrunner.mcloud.grid.servlets.ProxyInfo` (registration requests of the nodes) is not registered by default.
+
+## Logs
+
+Every line about a device starts with `[<udid>][<hub session id>]`, one line per event of a session:
+
+```text
+INFO [MobileRemoteProxy.getNewSession] - [emulator-5554][0f85...] Device 'Pixel 7' (ANDROID 14) is selected for the session, starting the Appium session.
+INFO [MobileRemoteProxy.afterCommand] - [emulator-5554][0f85...] Appium session '06c7...' is started on 'Pixel 7'.
+INFO [MobileRemoteProxy.afterSession] - [emulator-5554][0f85...] Session '06c7...' is finished after 95s. Last command: DELETE - /session/06c7... executed.
+```
+
+Warnings are problems with their cause and consequence, e.g.
+`Appium /status-adb check failed (HTTP 500): ...` and `Device 'Pixel 7' is not ready for a session, it is ignored for 60 seconds.`
+The configuration in effect is logged once as a `[CONFIGURATION]` line. `MCLOUD_LOG_LEVEL=FINE` adds the details
+(skipped devices, STF device data, remoteConnect steps); `SE_OPTS=-debug` turns on the debug logs of Selenium itself.
+
 ## Development
 
-Requirements: JDK 11, maven, docker, python 3 (for the linters), hadolint on macOS (`brew install hadolint`).
+Requirements: JDK 11 or newer, maven, docker, python 3 (for the linters), hadolint on macOS (`brew install hadolint`).
 
 ```bash
 make check   # everything CI runs
 make lint    # yaml, GitHub workflows, Dockerfile, markdown, shell scripts, checkstyle, spotbugs
 make test    # unit and STF integration tests, coverage in target/site/jacoco
-make docker  # docker image checks: user, config generation, options, graceful shutdown
+make docker  # docker image checks: user, config generation, options, endpoints, graceful shutdown
 make load    # short load test of the image with fake Appium nodes
 ```
 
 `tests/lint.sh` and `tests/docker_test.sh` write JUnit XML into `$JUNIT_DIR` when it is set, maven writes it into `target/surefire-reports`.
 Tests with STF enabled (TestNG group `stf`) run in their own JVM against a WireMock STF stub.
 Load tests against real grids are described in [LOAD_TESTING.md](LOAD_TESTING.md).
+CI (`.github/workflows/ci.yml`) runs the same checks on pushes and pull requests: jobs `lint`, `tests` and `docker`
+(the image checks and a load test with fake Appium nodes); dependabot proposes updates weekly.
 
 ## Documentation and free support
 
