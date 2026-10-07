@@ -17,7 +17,8 @@ cat << _EOF
   "proxy": "$GRID_PROXY",
   "servlets": [
     "com.zebrunner.mcloud.grid.servlets.AllSessionsServlet",
-    "com.zebrunner.mcloud.grid.servlets.DevicesServlet"
+    "com.zebrunner.mcloud.grid.servlets.DevicesServlet",
+    "com.zebrunner.mcloud.grid.servlets.MetricsServlet"
   ]
 }
 _EOF

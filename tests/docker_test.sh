@@ -53,6 +53,8 @@ for servlet in DevicesServlet AllSessionsServlet; do
   check "${servlet} is registered" '{"value":[]}' \
     "$(docker exec "$CONTAINER" curl -s "http://localhost:4444/grid/admin/${servlet}")"
 done
+check_contains "MetricsServlet is registered" "mcloud_grid_new_session_requests 0" \
+  "$(docker exec "$CONTAINER" curl -s http://localhost:4444/grid/admin/MetricsServlet)"
 check "grid console responds" "200" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
 
