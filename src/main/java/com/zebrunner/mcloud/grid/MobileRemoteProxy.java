@@ -22,6 +22,7 @@ import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
+import com.zebrunner.mcloud.grid.util.NodeReachability;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
@@ -83,6 +84,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // adb/wda timeout
     private static final Duration UNHEALTHY_MOBILE_TIMEOUT = EnvUtils.getDurationInSeconds("UNHEALTHY_MOBILE_TIMEOUT", Duration.ofMinutes(1));
 
+    // a node registered with an address the hub cannot reach is rejected, see #144
+    private static final boolean CHECK_NODE_REACHABILITY = !"false".equalsIgnoreCase(System.getenv("CHECK_NODE_REACHABILITY"));
+    private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
+
     private static final Duration INACTIVITY_RELEASE_TIMEOUT = EnvUtils.getDurationInSeconds("INACTIVITY_RELEASE_TIMEOUT", Duration.ofMinutes(1));
 
     private final String udid;
@@ -102,6 +107,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             DISCONNECT_ALL_DEVICES.get();
         } catch (Exception e) {
             LOGGER.warning(() -> String.format("Could not disconnect STF devices. Error message: %s", e.getMessage()));
+        }
+        if (CHECK_NODE_REACHABILITY) {
+            URL nodeUrl = getRemoteHost();
+            NodeReachability.check(nodeUrl, NODE_REACHABILITY_TIMEOUT).ifPresent(reason -> {
+                String message = String.format("Node %s is not reachable from the hub (%s), so it is not registered. "
+                        + "Check the address the node registers with: it must be accessible from the hub.", nodeUrl, reason);
+                LOGGER.warning(() -> "[NODE REGISTRATION] " + message);
+                throw new GridException(message);
+            });
         }
         TestSlot slot = getTestSlots().stream()
                 .findAny()

@@ -106,6 +106,10 @@
 				<configuration>
 					<!-- 'load' tests hit a real grid and are run only via the 'load' profile -->
 					<excludedGroups>stf,load</excludedGroups>
+					<environmentVariables>
+						<!-- proxies of unit tests point to nodes that do not exist; the check is covered in the 'stf' execution -->
+						<CHECK_NODE_REACHABILITY>false</CHECK_NODE_REACHABILITY>
+					</environmentVariables>
 					<systemPropertyVariables>
 						<java.util.logging.config.file>${project.basedir}/src/test/resources/logging.properties</java.util.logging.config.file>
 					</systemPropertyVariables>
@@ -126,6 +130,7 @@
 								<STF_TOKEN>default-token</STF_TOKEN>
 								<STF_TIMEOUT>3600</STF_TIMEOUT>
 								<CHECK_APPIUM_STATUS>true</CHECK_APPIUM_STATUS>
+								<CHECK_NODE_REACHABILITY>true</CHECK_NODE_REACHABILITY>
 							</environmentVariables>
 							<systemPropertyVariables>
 								<stf.stub.port>${stf.stub.port}</stf.stub.port>

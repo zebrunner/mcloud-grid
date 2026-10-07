@@ -122,6 +122,18 @@ public class MobileRemoteProxyStfTest {
         stf.server().verify(0, getRequestedFor(urlMatching("/wd/hub/status-.*")));
     }
 
+    public void unreachableNodeIsRejected() throws Exception {
+        int port;
+        try (java.net.ServerSocket socket = new java.net.ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+        String unreachable = "http://localhost:" + port;
+
+        GridException e = Assert.expectThrows(GridException.class,
+                () -> GridFixtures.proxy(registry, unreachable, GridFixtures.androidNodeCaps(ANDROID_UDID)));
+        Assert.assertTrue(e.getMessage().contains("Node " + unreachable + " is not reachable from the hub"), e.getMessage());
+    }
+
     public void nodeNotPresentInStfIsRejected() {
         Assert.expectThrows(GridException.class,
                 () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps("not-in-stf")));
