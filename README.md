@@ -19,6 +19,13 @@ mvn -U clean compile assembly:single package
 docker build . -t zebrunner/mcloud-grid:latest
 ```
 
+### Tests and linters
+```
+mvn verify                 # unit + STF integration tests, coverage report in target/site/jacoco
+scripts/lint.sh            # shellcheck, hadolint, checkstyle, spotbugs (needs shellcheck and hadolint installed)
+```
+Load tests against a running grid are described in [LOAD_TESTING.md](LOAD_TESTING.md).
+
 ### Run MCloud Grid
 ```
 docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
