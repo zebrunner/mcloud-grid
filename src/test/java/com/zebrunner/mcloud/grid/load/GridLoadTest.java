@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -31,6 +32,7 @@ public class GridLoadTest {
 
     private final LoadConfig config = LoadConfig.fromSystemProperties();
     private final List<FakeAppiumNode> fakeNodes = new ArrayList<>();
+    private FakeStf fakeStf;
     private HttpClient http;
 
     @BeforeClass(alwaysRun = true)
@@ -43,10 +45,16 @@ public class GridLoadTest {
                 .executor(Executors.newFixedThreadPool(Math.max(4, config.concurrency)))
                 .build();
         System.out.println("[load] " + config);
+        if (config.fakeStfPort > 0) {
+            fakeStf = new FakeStf(config.fakeStfPort, config.fakeStfLatencyMs);
+        }
         for (int i = 0; i < config.fakeNodes; i++) {
             FakeAppiumNode node = new FakeAppiumNode("fake-" + i + "-" + System.nanoTime(), config.fakeNodesPlatform, config.fakeNodesHost,
                     config.fakeNodeSessionDelayMs);
             fakeNodes.add(node);
+            if (fakeStf != null) {
+                fakeStf.addDevice(node.udid());
+            }
             node.register(config.hubRoot());
         }
         if (!fakeNodes.isEmpty()) {
@@ -59,6 +67,9 @@ public class GridLoadTest {
     @AfterClass(alwaysRun = true)
     public void tearDown() {
         fakeNodes.forEach(FakeAppiumNode::close);
+        if (fakeStf != null) {
+            fakeStf.close();
+        }
     }
 
     public void sessionLifecycleUnderLoad() throws Exception {
@@ -73,7 +84,8 @@ public class GridLoadTest {
             for (Future<LoadReport.SessionResult> future : futures) {
                 results.add(future.get());
             }
-            LoadReport report = new LoadReport(results, (System.nanoTime() - start) / 1_000_000);
+            LoadReport report = new LoadReport(results, (System.nanoTime() - start) / 1_000_000,
+                    fakeStf == null ? Map.of() : fakeStf.requests());
             Path file = report.write(config);
             System.out.println("[load] report: " + file.toAbsolutePath());
             System.out.println(report.toJson(config));

@@ -35,6 +35,10 @@ final class LoadConfig {
     final String fakeNodesPlatform;
     /** Artificial latency of fake node session creation, ms. */
     final long fakeNodeSessionDelayMs;
+    /** Port of the in-process fake STF the hub uses (STF_URL of the hub must point to it), 0 = no fake STF. */
+    final int fakeStfPort;
+    /** Latency of every fake STF response, ms. */
+    final long fakeStfLatencyMs;
     /** Directory for the JSON report. */
     final String reportDir;
 
@@ -52,6 +56,8 @@ final class LoadConfig {
         fakeNodesHost = System.getProperty("load.fakeNodes.host", "localhost");
         fakeNodesPlatform = System.getProperty("load.fakeNodes.platform", "ANDROID");
         fakeNodeSessionDelayMs = Long.getLong("load.fakeNodes.sessionDelayMs", 0L);
+        fakeStfPort = Integer.getInteger("load.fakeStf.port", 0);
+        fakeStfLatencyMs = Long.getLong("load.fakeStf.latencyMs", 0L);
         reportDir = System.getProperty("load.reportDir", "target/load-report");
     }
 
@@ -82,6 +88,7 @@ final class LoadConfig {
     @Override
     public String toString() {
         return "gridUrl=" + gridUrl + ", sessions=" + sessions + ", concurrency=" + concurrency + ", commands=" + commandsPerSession
-                + ", hold=" + sessionHold.toMillis() + "ms, fakeNodes=" + fakeNodes + ", caps=" + capabilities;
+                + ", hold=" + sessionHold.toMillis() + "ms, fakeNodes=" + fakeNodes
+                + (fakeStfPort > 0 ? ", fakeStf=:" + fakeStfPort + " (" + fakeStfLatencyMs + "ms latency)" : "") + ", caps=" + capabilities;
     }
 }

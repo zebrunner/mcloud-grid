@@ -16,6 +16,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -32,6 +34,11 @@ final class FakeAppiumNode implements AutoCloseable {
     private final String advertisedUrl;
     private final Set<String> sessions = ConcurrentHashMap.newKeySet();
     private final AtomicInteger createdSessions = new AtomicInteger();
+    private final ScheduledExecutorService reRegistration = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "re-registration");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     FakeAppiumNode(String udid, String platform, String advertisedHost, long sessionDelayMs) throws IOException {
         this.udid = udid;
@@ -52,7 +59,35 @@ final class FakeAppiumNode implements AutoCloseable {
         return createdSessions.get();
     }
 
+    /**
+     * Registers in the hub and, as Selenium and Appium nodes do, every 5 seconds registers again if the hub does not know the node
+     * (e.g. after a restart of the hub). Registering a known node again would terminate its sessions (PROXY_REREGISTRATION).
+     */
     void register(String hubRoot) throws IOException, InterruptedException {
+        registerOnce(hubRoot);
+        reRegistration.scheduleWithFixedDelay(() -> {
+            try {
+                if (!isRegistered(hubRoot)) {
+                    registerOnce(hubRoot);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (IOException e) {
+                // the next attempt follows
+            }
+        }, 5, 5, TimeUnit.SECONDS);
+    }
+
+    private boolean isRegistered(String hubRoot) throws IOException, InterruptedException {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+                        URI.create(hubRoot + "/grid/api/proxy?id=" + java.net.URLEncoder.encode(advertisedUrl, StandardCharsets.UTF_8)))
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build(), HttpResponse.BodyHandlers.ofString());
+        return response.statusCode() == 200 && response.body().contains("\"success\": true");
+    }
+
+    private void registerOnce(String hubRoot) throws IOException, InterruptedException {
         String caps = "{\"platformName\":\"" + platform + "\",\"appium:platformVersion\":\"" + ("IOS".equals(platform) ? "17.2" : "13")
                 + "\",\"appium:udid\":\"" + udid + "\",\"appium:deviceName\":\"" + udid + "\",\"zebrunner:deviceType\":\"phone\""
                 + ",\"maxInstances\":1,\"seleniumProtocol\":\"WebDriver\"}";
@@ -124,6 +159,7 @@ final class FakeAppiumNode implements AutoCloseable {
 
     @Override
     public void close() {
+        reRegistration.shutdownNow();
         server.stop(0);
     }
 }

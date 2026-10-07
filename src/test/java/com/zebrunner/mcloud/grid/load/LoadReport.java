@@ -35,10 +35,13 @@ final class LoadReport {
 
     private final List<SessionResult> results;
     private final long wallClockMs;
+    // requests the hub sent to the fake STF by endpoint
+    private final Map<String, Long> stfRequests;
 
-    LoadReport(List<SessionResult> results, long wallClockMs) {
+    LoadReport(List<SessionResult> results, long wallClockMs, Map<String, Long> stfRequests) {
         this.results = results;
         this.wallClockMs = wallClockMs;
+        this.stfRequests = stfRequests;
     }
 
     long total() {
@@ -95,7 +98,9 @@ final class LoadReport {
                 + ",\n  \"errorRate\":" + String.format("%.4f", errorRate()) + ",\n  \"wallClockMs\":" + wallClockMs
                 + ",\n  \"sessionsPerSecond\":" + String.format("%.2f", throughput)
                 + ",\n  \"createSessionMs\":" + stats(createLatencies()) + ",\n  \"commandMs\":" + stats(commandLatencies())
-                + ",\n  \"deleteSessionMs\":" + stats(deleteLatencies()) + ",\n  \"errors\":" + errors + "\n}\n";
+                + ",\n  \"deleteSessionMs\":" + stats(deleteLatencies()) + ",\n  \"errors\":" + errors
+                + ",\n  \"stfRequests\":" + stfRequests.entrySet().stream().map(e -> "\"" + e.getKey() + "\":" + e.getValue())
+                        .collect(Collectors.joining(",", "{", "}")) + "\n}\n";
     }
 
     Path write(LoadConfig config) throws IOException {
