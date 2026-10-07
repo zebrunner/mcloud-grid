@@ -36,9 +36,9 @@ function shutdown {
 
 trap shutdown SIGTERM SIGINT
 
-# JAVA_OPTS and SE_OPTS hold several space-separated options, so they are intentionally unquoted
+# JAVA_HEAP_OPTS, JAVA_OPTS and SE_OPTS hold several space-separated options, so they are intentionally unquoted
 # shellcheck disable=SC2086
-java ${JAVA_OPTS} -Xms1G -Xmx4G -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv6Stack=false -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.util.logging.config.file=/opt/selenium/logger.properties -cp /opt/selenium/mcloud-grid-1.0.jar:/opt/selenium/mcloud-grid-jar-with-dependencies.jar \
+java ${JAVA_HEAP_OPTS:--Xms1G -Xmx4G} ${JAVA_OPTS} -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv6Stack=false -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.util.logging.config.file=/opt/selenium/logger.properties -cp /opt/selenium/mcloud-grid-jar-with-dependencies.jar \
   org.openqa.grid.selenium.GridLauncherV3 \
   -role hub \
   -hubConfig "$CONF" \

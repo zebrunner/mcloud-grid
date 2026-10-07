@@ -15,7 +15,7 @@ Feel free to support the development with a [**donation**](https://www.paypal.co
 > Follow the installation and configuration guide in [MCloud](https://github.com/zebrunner/mcloud) to reuse this image effectively.
 
 ```
-mvn -U clean compile assembly:single package
+mvn -B -DskipTests package assembly:single
 docker build . -t zebrunner/mcloud-grid:latest
 ```
 

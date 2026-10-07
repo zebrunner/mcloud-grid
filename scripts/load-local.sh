@@ -12,7 +12,8 @@ PORT=${PORT:-4444}
 
 docker build -q -t "$IMAGE" . >/dev/null
 docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-docker run -d --name "$CONTAINER" -p "$PORT:4444" "$IMAGE" >/dev/null
+# host-gateway makes host.docker.internal resolvable on Linux too (Docker Desktop provides it itself)
+docker run -d --name "$CONTAINER" -p "$PORT:4444" --add-host=host.docker.internal:host-gateway "$IMAGE" >/dev/null
 trap 'docker logs "$CONTAINER" > target/load-report/hub.log 2>&1 || true; docker rm -f "$CONTAINER" >/dev/null' EXIT
 
 echo "waiting for hub on :$PORT"

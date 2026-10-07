@@ -1,12 +1,15 @@
-FROM maven:3.8.8-eclipse-temurin-11 AS builder
+FROM maven:3.9.16-eclipse-temurin-11 AS builder
 
-COPY . /src
 WORKDIR /src
+# dependencies are cached in their own layer while the sources change
+COPY pom.xml .
+RUN mvn -B -ntp dependency:go-offline
+COPY src ./src
+# tests and linters run in CI and `make check`, the image build only packages
+RUN mvn -B -ntp -o -DskipTests package assembly:single
 
-RUN mvn -U clean compile assembly:single package
 
-
-FROM eclipse-temurin:11.0.20_8-jdk
+FROM eclipse-temurin:11.0.32.1_1-jre
 LABEL authors=Zebrunner
 
 EXPOSE 4444
@@ -34,20 +37,18 @@ ENV GRID_PROXY=com.zebrunner.mcloud.grid.MobileRemoteProxy
 # Capability matcher
 ENV GRID_CAPABILITY_MATCHER=com.zebrunner.mcloud.grid.MobileCapabilityMatcher
 
-RUN mkdir /opt/selenium
+# JVM heap of the hub; other JVM options can be added with JAVA_OPTS
+ENV JAVA_HEAP_OPTS="-Xms1G -Xmx4G"
 
-COPY --from=builder /src/target/mcloud-grid-jar-with-dependencies.jar \
-    /opt/selenium/
-COPY --from=builder /src/target/mcloud-grid-1.0.jar \
-    /opt/selenium/
-COPY generate_config \
-    entrypoint.sh \
-    /opt/bin/
-COPY logger.properties \
-    /opt/selenium
-# Running this command as sudo just to avoid the message:
-# To run a command as administrator (user "root"), use "sudo <command>". See "man sudo_root" for details.
-# When logging into the container
-RUN /opt/bin/generate_config > /opt/selenium/config.json
+COPY --from=builder /src/target/mcloud-grid-jar-with-dependencies.jar /opt/selenium/
+COPY generate_config entrypoint.sh /opt/bin/
+COPY logger.properties /opt/selenium/
+
+# the hub writes its config.json on start, so /opt/selenium belongs to the unprivileged 'ubuntu' user of the base image
+RUN chown -R 1000:1000 /opt/selenium
+USER 1000:1000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["curl", "-sf", "-o", "/dev/null", "http://localhost:4444/wd/hub/status"]
 
 CMD ["/opt/bin/entrypoint.sh"]
