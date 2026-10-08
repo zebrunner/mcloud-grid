@@ -18,20 +18,20 @@
 ROOT=/opt/selenium
 CONF=$ROOT/config.json
 
+log() {
+  printf '{"timestamp":"%s","level":"INFO","logger":"entrypoint","component":"mcloud-grid","category":"grid","message":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1"
+}
+
 /opt/bin/generate_config > "$CONF"
 
-echo "starting selenium hub with configuration:"
-cat "$CONF"
-
-if [ ! -z "$SE_OPTS" ]; then
-  echo "appending selenium options: ${SE_OPTS}"
-fi
+log "Starting Selenium hub"
 
 function shutdown {
-  echo "shutting down hub.."
+  log "Shutting down hub"
   kill -s SIGTERM $NODE_PID
   wait $NODE_PID
-  echo "shutdown complete"
+  log "shutdown complete"
 }
 
 trap shutdown SIGTERM SIGINT

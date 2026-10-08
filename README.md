@@ -121,18 +121,20 @@ The servlets are registered in the hub config by `generate_config`.
 
 ## Logs
 
-Every line about a device starts with `[<udid>][<hub session id>]`, one line per event of a session:
+`docker logs mcloud-grid` outputs JSON Lines: one JSON object per event, including Selenium, grid and startup/shutdown logs.
+Common fields are `timestamp` (UTC), `level`, `logger`, `component`, `category` and `message`.
+Device events also have `udid` and `sessionId` (the hub's internal session ID):
 
-```text
-INFO [MobileRemoteProxy.getNewSession] - [emulator-5554][0f85...] Device 'Pixel 7' (ANDROID 14) is selected for the session, starting the Appium session.
-INFO [MobileRemoteProxy.afterCommand] - [emulator-5554][0f85...] Appium session '06c7...' is started on 'Pixel 7'.
-INFO [MobileRemoteProxy.afterSession] - [emulator-5554][0f85...] Session '06c7...' is finished after 95s. Last command: DELETE - /session/06c7... executed.
+```json
+{"timestamp":"2026-10-09T12:00:00Z","level":"INFO","logger":"com.zebrunner.mcloud.grid.MobileRemoteProxy","component":"mcloud-grid","category":"device","udid":"emulator-5554","sessionId":"0f85...","message":"Device 'Pixel 7' (ANDROID 14) is selected for the session, starting the Appium session."}
 ```
 
-Warnings are problems with their cause and consequence, e.g.
-`Appium /status-adb check failed (HTTP 500): ...` and `Device 'Pixel 7' is not ready for a session, it is ignored for 60 seconds.`
-The configuration in effect is logged once as a `[CONFIGURATION]` line. `MCLOUD_LOG_LEVEL=FINE` adds the details
-(skipped devices, STF device data, remoteConnect steps); `SE_OPTS=-debug` turns on the debug logs of Selenium itself.
+Use `docker logs mcloud-grid 2>&1 | jq -c 'select(.udid == "emulator-5554")'` to see one device,
+`select(.category == "grid")` for hub-wide events or `select(.component == "selenium")` for Selenium itself.
+Selenium's own records have no device ID unless Selenium supplies it. Exceptions are escaped into one JSON field.
+`MCLOUD_LOG_LEVEL=FINE` adds grid details (skipped devices, STF device data, remoteConnect steps);
+`SE_OPTS=-debug` turns on Selenium's debug logs without changing the grid log level.
+The generated config remains available at `/opt/selenium/config.json`, but is not dumped to logs.
 
 ## Development
 

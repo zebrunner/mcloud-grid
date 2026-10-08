@@ -1,16 +1,11 @@
 package com.zebrunner.mcloud.grid.util;
 
 import org.apache.commons.lang3.StringUtils;
-import org.openqa.selenium.remote.server.log.TerseFormatter;
-
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * MCLOUD_LOG_LEVEL (e.g. FINE) sets the log level of the grid code only: the handler of Selenium prints INFO and above
- * unless the whole hub runs with -debug, so the grid loggers get their own handler with the Selenium format.
+ * MCLOUD_LOG_LEVEL sets the grid logger level independently of Selenium's root logger.
  */
 public final class LogLevels {
     public static final String ROOT_LOGGER = "com.zebrunner";
@@ -37,13 +32,6 @@ public final class LogLevels {
             configured = true;
             Logger root = Logger.getLogger(ROOT_LOGGER);
             root.setLevel(level);
-            if (level.intValue() < Level.INFO.intValue()) {
-                Handler handler = new ConsoleHandler();
-                handler.setLevel(level);
-                handler.setFormatter(new TerseFormatter());
-                root.addHandler(handler);
-                root.setUseParentHandlers(false);
-            }
             LOGGER.info(() -> "[CONFIGURATION] Log level of the grid: " + level);
         }
     }

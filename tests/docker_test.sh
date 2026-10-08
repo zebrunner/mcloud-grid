@@ -4,6 +4,7 @@
 # IMAGE overrides the tag of the built image.
 source "$(dirname "$0")/lib.sh"
 require_cmd docker
+require_cmd python3
 docker info > /dev/null 2>&1 || skip "requires a running docker daemon"
 cd "$REPO" || exit 1
 
@@ -76,5 +77,26 @@ else
   fail "docker stop shuts the hub down gracefully" "took ${elapsed}s" "SIGTERM was not handled, docker stop waited ${elapsed}s"
 fi
 check_contains "shutdown is logged" "shutdown complete" "$(docker logs "$CONTAINER" 2>&1 | tail -5)"
+
+docker logs "$CONTAINER" > "$WORK/docker.log" 2>&1
+check "all Docker log lines are JSON (including Selenium debug and entrypoint)" "ok" \
+  "$(
+    python3 - "$WORK/docker.log" << 'PY'
+import json
+import sys
+
+components = set()
+with open(sys.argv[1], encoding="utf-8") as log:
+    for number, line in enumerate(log, 1):
+        try:
+            record = json.loads(line)
+            assert all(record.get(field) for field in ("timestamp", "level", "component", "category", "message"))
+            components.add(record["component"])
+        except (ValueError, AssertionError) as exc:
+            print(f"line {number}: {line[:160].strip()} ({exc})")
+            sys.exit(1)
+print("ok" if {"selenium", "mcloud-grid"} <= components else f"missing components: {components}")
+PY
+  )"
 
 finish
