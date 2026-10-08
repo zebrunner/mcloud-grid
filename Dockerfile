@@ -6,7 +6,7 @@ COPY pom.xml .
 RUN mvn -B -ntp dependency:go-offline
 COPY src ./src
 # tests and linters run in CI and `make check`, the image build only packages
-RUN mvn -B -ntp -o -DskipTests package assembly:single
+RUN mvn -B -ntp -o -DskipTests package
 
 
 FROM eclipse-temurin:11.0.32.1_1-jre

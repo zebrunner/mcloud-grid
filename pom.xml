@@ -13,7 +13,7 @@
 		<maven.compiler.source>${java.version}</maven.compiler.source>
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
+		<maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
 		<maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
 		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
 		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
@@ -23,6 +23,7 @@
 		<checkstyle.version>10.12.7</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.8.6.2</spotbugs-maven-plugin.version>
 		<selenium.version>3.141.59</selenium.version>
+		<jetty.version>10.0.26</jetty.version>
 		<commons-logging.version>1.2</commons-logging.version>
 		<commons-io.version>2.22.0</commons-io.version>
 		<commons-lang3.version>3.21.0</commons-lang3.version>
@@ -39,6 +40,38 @@
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-server</artifactId>
 			<version>3.141.59</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.seleniumhq.selenium</groupId>
+					<artifactId>jetty-repacked</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-servlet</artifactId>
+			<version>${jetty.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.eclipse.jetty.toolchain</groupId>
+					<artifactId>jetty-servlet-api</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-jmx</artifactId>
+			<version>${jetty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-xml</artifactId>
+			<version>${jetty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>javax.servlet-api</artifactId>
+			<version>4.0.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
@@ -106,6 +139,13 @@
 				<configuration>
 					<!-- 'load' tests hit a real grid and are run only via the 'load' profile -->
 					<excludedGroups>stf,load</excludedGroups>
+					<!-- Compile against Selenium's API, but run its rewritten Jetty references. -->
+					<classpathDependencyExcludes>
+						<classpathDependencyExclude>org.seleniumhq.selenium:selenium-server</classpathDependencyExclude>
+					</classpathDependencyExcludes>
+					<additionalClasspathElements>
+						<additionalClasspathElement>${project.build.directory}/mcloud-grid-jar-with-dependencies.jar</additionalClasspathElement>
+					</additionalClasspathElements>
 					<environmentVariables>
 						<!-- proxies of unit tests point to nodes that do not exist; the check is covered in the 'stf' execution -->
 						<CHECK_NODE_REACHABILITY>false</CHECK_NODE_REACHABILITY>
@@ -211,13 +251,59 @@
 				</configuration>
 			</plugin>
 			<plugin>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>${maven-assembly-plugin.version}</version>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.4.2</version>
+				<executions>
+					<execution>
+						<!-- Shade needs the project JAR before either Surefire execution. -->
+						<id>default-jar</id>
+						<phase>process-test-classes</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>${maven-shade-plugin.version}</version>
+				<executions>
+					<execution>
+						<phase>process-test-classes</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+					</execution>
+				</executions>
 				<configuration>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
-					<finalName>mcloud-grid</finalName>
+					<shadedArtifactAttached>true</shadedArtifactAttached>
+					<shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+					<finalName>mcloud-grid-jar-with-dependencies</finalName>
+					<createDependencyReducedPom>false</createDependencyReducedPom>
+					<relocations>
+						<!-- Rewrite Selenium references; Jetty itself keeps its native namespace. -->
+						<relocation>
+							<pattern>org.seleniumhq.jetty9</pattern>
+							<shadedPattern>org.eclipse.jetty</shadedPattern>
+						</relocation>
+					</relocations>
+					<filters>
+						<filter>
+							<artifact>*:*</artifact>
+							<excludes>
+								<exclude>META-INF/*.SF</exclude>
+								<exclude>META-INF/*.RSA</exclude>
+								<exclude>META-INF/*.DSA</exclude>
+								<exclude>module-info.class</exclude>
+								<exclude>META-INF/versions/**/module-info.class</exclude>
+							</excludes>
+						</filter>
+					</filters>
+					<transformers>
+						<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+					</transformers>
 				</configuration>
 			</plugin>
 			<plugin>
