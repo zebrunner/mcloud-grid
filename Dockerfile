@@ -9,8 +9,15 @@ COPY src ./src
 RUN mvn -B -ntp -o -DskipTests package
 
 
-FROM eclipse-temurin:11.0.32.1_1-jre
+FROM eclipse-temurin:11.0.32.1_1-jre-resolute@sha256:31ef746477f9ed27c0170585e81874f25f64be591b8c2f0bba18700d0086cbfb
 LABEL authors=Zebrunner
+
+# Apply published Ubuntu security fixes while keeping the same JRE 11.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade \
+        libfreetype6=2.14.2+dfsg-1ubuntu0.2 \
+        libpng16-16t64=1.6.57-1ubuntu0.1 \
+    && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 4444
 

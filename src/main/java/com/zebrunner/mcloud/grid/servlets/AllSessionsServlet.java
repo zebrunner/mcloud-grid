@@ -17,7 +17,7 @@ import java.util.Map;
 
 /**
  * Active sessions of the grid: GET /grid/admin/AllSessionsServlet returns
- * {"value": [{"id": <session id>, "capabilities": {<requested capabilities + device of the session>}}]}.
+ * {"value": [{"id": &lt;session id&gt;, "capabilities": {&lt;requested capabilities + device of the session&gt;}}]}.
  * The id is the Appium session id, or the internal id of the hub while the session is being started.
  */
 public class AllSessionsServlet extends RegistryBasedServlet {

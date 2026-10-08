@@ -14,16 +14,26 @@
 		<maven.compiler.target>${java.version}</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
-		<maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
-		<maven-source-plugin.version>3.0.1</maven-source-plugin.version>
-		<maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
-		<maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
-		<jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
-		<maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
+		<maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+		<maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+		<maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+		<maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
+		<jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
 		<checkstyle.version>10.12.7</checkstyle.version>
-		<spotbugs-maven-plugin.version>4.8.6.2</spotbugs-maven-plugin.version>
+		<spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
+		<plexus-utils3.version>3.6.1</plexus-utils3.version>
+		<plexus-utils4.version>4.0.3</plexus-utils4.version>
+		<commons-beanutils.version>1.11.0</commons-beanutils.version>
+		<aircompressor.version>2.0.3</aircompressor.version>
+		<snappy.version>0.5</snappy.version>
+		<httpclient5.version>5.6.3</httpclient5.version>
+		<httpcore5.version>5.4.3</httpcore5.version>
 		<selenium.version>3.141.59</selenium.version>
 		<jetty.version>10.0.26</jetty.version>
+		<guava.version>33.7.2-jre</guava.version>
+		<okhttp.version>4.12.0</okhttp.version>
+		<okio.version>3.6.0</okio.version>
 		<commons-logging.version>1.2</commons-logging.version>
 		<commons-io.version>2.22.0</commons-io.version>
 		<commons-lang3.version>3.21.0</commons-lang3.version>
@@ -31,10 +41,30 @@
 		<httpclient.version>4.5.14</httpclient.version>
 		<lombok.version>1.18.48</lombok.version>
 		<testng.version>7.12.0</testng.version>
-		<wiremock.version>2.35.2</wiremock.version>
+		<wiremock.version>3.13.2</wiremock.version>
 		<!-- fixed port of the WireMock-based STF stub used by the 'stf' test group -->
 		<stf.stub.port>18089</stf.stub.port>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<!-- Replace Selenium's old libraries; Okio matches the version required by OkHttp. -->
+			<dependency>
+				<groupId>com.google.guava</groupId>
+				<artifactId>guava</artifactId>
+				<version>${guava.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.squareup.okhttp3</groupId>
+				<artifactId>okhttp</artifactId>
+				<version>${okhttp.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.squareup.okio</groupId>
+				<artifactId>okio</artifactId>
+				<version>${okio.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
@@ -44,6 +74,11 @@
 				<exclusion>
 					<groupId>org.seleniumhq.selenium</groupId>
 					<artifactId>jetty-repacked</artifactId>
+				</exclusion>
+				<!-- The hub uses JSON configuration and does not load YAML. -->
+				<exclusion>
+					<groupId>org.yaml</groupId>
+					<artifactId>snakeyaml</artifactId>
 				</exclusion>
 			</exclusions>
 		</dependency>
@@ -115,7 +150,12 @@
 			<artifactId>javax.annotation-api</artifactId>
 			<version>1.2</version>
 		</dependency>
-		
+		<dependency>
+			<groupId>com.google.code.findbugs</groupId>
+			<artifactId>jsr305</artifactId>
+			<version>3.0.2</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.testng</groupId>
 			<artifactId>testng</artifactId>
@@ -123,8 +163,8 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.github.tomakehurst</groupId>
-			<artifactId>wiremock-jre8-standalone</artifactId>
+			<groupId>org.wiremock</groupId>
+			<artifactId>wiremock-standalone</artifactId>
 			<version>${wiremock.version}</version>
 			<scope>test</scope>
 		</dependency>
@@ -132,6 +172,60 @@
 	</dependencies>
 	<build>
 		<plugins>
+			<!-- Pin lifecycle/cache plugins for the same versions on local Maven and in Docker. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-clean-plugin</artifactId>
+				<version>3.5.0</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-utils</artifactId>
+						<version>${plexus-utils4.version}</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>3.5.0</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-utils</artifactId>
+						<version>${plexus-utils3.version}</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.11.0</version>
+				<dependencies>
+					<dependency>
+						<groupId>commons-beanutils</groupId>
+						<artifactId>commons-beanutils</artifactId>
+						<version>${commons-beanutils.version}</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-site-plugin</artifactId>
+				<version>3.22.0</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.jsoup</groupId>
+						<artifactId>jsoup</artifactId>
+						<version>1.23.2</version>
+					</dependency>
+					<dependency>
+						<groupId>commons-beanutils</groupId>
+						<artifactId>commons-beanutils</artifactId>
+						<version>${commons-beanutils.version}</version>
+					</dependency>
+				</dependencies>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
@@ -187,6 +281,13 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>${jacoco-maven-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-utils</artifactId>
+						<version>${plexus-utils3.version}</version>
+					</dependency>
+				</dependencies>
 				<executions>
 					<execution>
 						<id>prepare-agent</id>
@@ -253,7 +354,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
-				<version>3.4.2</version>
+				<version>3.5.1</version>
 				<executions>
 					<execution>
 						<!-- Shade needs the project JAR before either Surefire execution. -->
@@ -269,6 +370,13 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
 				<version>${maven-shade-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-utils</artifactId>
+						<version>${plexus-utils3.version}</version>
+					</dependency>
+				</dependencies>
 				<executions>
 					<execution>
 						<phase>process-test-classes</phase>
@@ -310,6 +418,18 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
 				<version>${maven-source-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-utils</artifactId>
+						<version>${plexus-utils4.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>io.airlift</groupId>
+						<artifactId>aircompressor</artifactId>
+						<version>${aircompressor.version}</version>
+					</dependency>
+				</dependencies>
 				<executions>
 					<execution>
 						<id>attach-sources</id>
@@ -323,6 +443,23 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<version>${maven-javadoc-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-utils</artifactId>
+						<version>${plexus-utils4.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>io.airlift</groupId>
+						<artifactId>aircompressor</artifactId>
+						<version>${aircompressor.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>commons-beanutils</groupId>
+						<artifactId>commons-beanutils</artifactId>
+						<version>${commons-beanutils.version}</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>
@@ -342,6 +479,42 @@
 								<groupId>com.puppycrawl.tools</groupId>
 								<artifactId>checkstyle</artifactId>
 								<version>${checkstyle.version}</version>
+							</dependency>
+							<!-- Plugin realms do not inherit the project's dependencyManagement. -->
+							<dependency>
+								<groupId>org.codehaus.plexus</groupId>
+								<artifactId>plexus-utils</artifactId>
+								<version>${plexus-utils4.version}</version>
+							</dependency>
+							<dependency>
+								<groupId>org.apache.commons</groupId>
+								<artifactId>commons-lang3</artifactId>
+								<version>${commons-lang3.version}</version>
+							</dependency>
+							<dependency>
+								<groupId>commons-beanutils</groupId>
+								<artifactId>commons-beanutils</artifactId>
+								<version>${commons-beanutils.version}</version>
+							</dependency>
+							<dependency>
+								<groupId>org.iq80.snappy</groupId>
+								<artifactId>snappy</artifactId>
+								<version>${snappy.version}</version>
+							</dependency>
+							<dependency>
+								<groupId>org.apache.httpcomponents.client5</groupId>
+								<artifactId>httpclient5</artifactId>
+								<version>${httpclient5.version}</version>
+							</dependency>
+							<dependency>
+								<groupId>org.apache.httpcomponents.core5</groupId>
+								<artifactId>httpcore5</artifactId>
+								<version>${httpcore5.version}</version>
+							</dependency>
+							<dependency>
+								<groupId>org.apache.httpcomponents.core5</groupId>
+								<artifactId>httpcore5-h2</artifactId>
+								<version>${httpcore5.version}</version>
 							</dependency>
 						</dependencies>
 						<configuration>
@@ -364,6 +537,13 @@
 						<groupId>com.github.spotbugs</groupId>
 						<artifactId>spotbugs-maven-plugin</artifactId>
 						<version>${spotbugs-maven-plugin.version}</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.iq80.snappy</groupId>
+								<artifactId>snappy</artifactId>
+								<version>${snappy.version}</version>
+							</dependency>
+						</dependencies>
 						<configuration>
 							<effort>Max</effort>
 							<threshold>Medium</threshold>
