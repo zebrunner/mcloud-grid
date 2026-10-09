@@ -6,14 +6,16 @@ import org.testng.annotations.Test;
 public class ProxyHtmlRendererTest {
 
     @Test
-    public void consoleCardShowsUdidBeforeNodeId() {
+    public void consoleCardUsesInfoTabInsteadOfEmptyBrowsersTab() {
         MobileRemoteProxy proxy = GridFixtures.proxy(GridFixtures.registry(), "http://node-1:4723", GridFixtures.androidNodeCaps("emulator-5554"));
 
         String html = proxy.getHtmlRender().renderSummary();
 
-        int udid = html.indexOf("<p class='proxyudid'>UDID : emulator-5554</p>");
-        Assert.assertTrue(udid >= 0, html);
-        Assert.assertTrue(udid < html.indexOf("<p class='proxyid'>"), html);
+        Assert.assertTrue(html.contains(">Info</a></li>"), html);
+        Assert.assertFalse(html.contains(">Browsers</a></li>"), html);
+        Assert.assertTrue(html.contains("<div type='info' class='content_detail'><p>UDID : emulator-5554</p>"), html);
+        Assert.assertTrue(html.contains("<p>Device name : Pixel-emulator-5554</p>"), html);
+        Assert.assertTrue(html.contains("<p>Status : free</p>"), html);
     }
 
     @Test

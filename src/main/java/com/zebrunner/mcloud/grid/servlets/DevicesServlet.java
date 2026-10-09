@@ -58,7 +58,7 @@ public class DevicesServlet extends RegistryBasedServlet {
         resp.getWriter().write(body);
     }
 
-    static Map<String, Object> describe(RemoteProxy proxy, TestSlot slot) {
+    public static Map<String, Object> describe(RemoteProxy proxy, TestSlot slot) {
         Map<String, Object> capabilities = slot.getCapabilities();
         String udid = proxy instanceof MobileRemoteProxy
                 ? ((MobileRemoteProxy) proxy).getUdid()

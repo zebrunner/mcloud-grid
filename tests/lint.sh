@@ -1,11 +1,13 @@
 #!/bin/bash
 # Static checks of the project files, every linter run is a check (also in JUnit XML with JUNIT_DIR);
-# the tools: pip install -r tests/requirements-lint.txt, a JDK 11 and maven
+# the tools: pip install -r tests/requirements-lint.txt, Docker and a JDK 11+ in the Maven container
 source "$(dirname "$0")/lib.sh"
 cd "$REPO" || exit 1
 
+MVN=${MVN:-tests/mvn.sh}
+
 missing=""
-for tool in actionlint hadolint mvn pymarkdown shellcheck shfmt yamllint; do
+for tool in actionlint hadolint pymarkdown shellcheck shfmt yamllint; do
   command -v "$tool" > /dev/null 2>&1 || missing="${missing} ${tool}"
 done
 if [[ -n "$missing" ]]; then
@@ -36,8 +38,8 @@ run_check "shellcheck" shellcheck --severity=info "${scripts[@]}"
 run_check "shfmt" shfmt -d "${scripts[@]}"
 
 section "java"
-run_check "checkstyle" mvn -B -q -Plint -DskipTests -Dspotbugs.skip=true verify
-run_check "spotbugs" mvn -B -q -Plint -DskipTests -Dcheckstyle.skip=true verify
+run_check "checkstyle" "$MVN" -B -q -Plint -DskipTests -Djacoco.skip=true -Dspotbugs.skip=true verify
+run_check "spotbugs" "$MVN" -B -q -Plint -DskipTests -Djacoco.skip=true -Dcheckstyle.skip=true verify
 
 [[ "$FAILED" -eq 0 ]] && echo "lint: ok"
 finish

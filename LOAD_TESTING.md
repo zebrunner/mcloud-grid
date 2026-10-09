@@ -11,7 +11,7 @@ Load tests are excluded from the regular build and run only with the `load` prof
 ## Against a real grid with real devices
 
 ```bash
-mvn -Pload test -Dgrid.url=http://grid.example.com:4444/wd/hub \
+tests/mvn.sh -Pload test -Dgrid.url=http://grid.example.com:4444/wd/hub \
   -Dload.caps='{"platformName":"Android","appium:automationName":"UiAutomator2"}' \
   -Dload.sessions=100 -Dload.concurrency=10 -Dload.maxErrorRate=0.05
 ```
@@ -29,7 +29,7 @@ Do not put credentials in `grid.url` or `-D` arguments: URLs and process argumen
 ```bash
 export LOAD_GRID_USERNAME='your-user'
 printf 'Grid password: '; IFS= read -rs LOAD_GRID_PASSWORD; echo; export LOAD_GRID_PASSWORD
-mvn -Pload test -Dgrid.url=https://grid.example.com/wd/hub \
+tests/mvn.sh -Pload test -Dgrid.url=https://grid.example.com/wd/hub \
   -Dload.caps='{"appium:deviceName":"ANY"}' \
   -Dload.sessions=2 -Dload.concurrency=1 \
   -Dload.commandDurationMs=5000 -Dload.commandIntervalMs=1000
@@ -60,7 +60,7 @@ tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=8
 Remote hub (STF must be disabled on it, fake devices are not in STF):
 
 ```bash
-mvn -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 -Dload.fakeNodes.host=<ip reachable from the hub>
+tests/mvn.sh -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 -Dload.fakeNodes.host=<ip reachable from the hub>
 ```
 
 ## Options

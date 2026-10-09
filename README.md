@@ -144,7 +144,8 @@ docker logs --follow --timestamps mcloud-grid 2>&1 | lnav
 
 ## Development
 
-Requirements: JDK 11 or newer, maven, docker, python 3 (for the linters), hadolint on macOS (`brew install hadolint`).
+Requirements: docker, python 3 (for the linters), hadolint on macOS (`brew install hadolint`).
+`tests/mvn.sh` runs the pinned Maven + JDK toolchain in `maven:3.9.16-eclipse-temurin-11`, so host-wide `mvn` and Java installs are optional.
 
 ```bash
 make check   # everything CI runs

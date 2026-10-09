@@ -1,4 +1,4 @@
-# Tools of tests/lint.sh: pip install -r tests/requirements-lint.txt (also needs a JDK 11 and maven)
+# Tools of tests/lint.sh: pip install -r tests/requirements-lint.txt (also needs Docker for tests/mvn.sh)
 actionlint-py==1.7.12.25
 hadolint-py==2.15.1.2
 pymarkdownlnt==0.9.40

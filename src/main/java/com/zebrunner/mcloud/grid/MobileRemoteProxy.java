@@ -197,7 +197,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             appiumCheck = (remoteURL, sessionUUID) -> true;
         }
 
-        htmlRenderer = new ProxyHtmlRenderer(this, udid);
+        htmlRenderer = new ProxyHtmlRenderer(() -> this, udid);
 
         if (STFClient.isSTFEnabled() && !registered) {
             if (!STFClient.isDevicePresentInSTF(udid)) {
