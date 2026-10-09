@@ -20,7 +20,7 @@
 		<maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
 		<jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
 		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
-		<checkstyle.version>10.12.7</checkstyle.version>
+		<checkstyle.version>14.3.0</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
 		<plexus-utils3.version>3.6.1</plexus-utils3.version>
 		<plexus-utils4.version>4.0.3</plexus-utils4.version>
