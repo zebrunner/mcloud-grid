@@ -23,8 +23,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Drives full session lifecycles (create -> commands -> delete) against a running grid in parallel
- * and checks error rate / latency thresholds. Run with: tests/mvn.sh -Pload test -Dgrid.url=http://host:4444/wd/hub
+ * Load/performance scenario: creates many real or fake sessions in parallel to measure
+ * grid throughput, latency, and failure rate under stress.
  */
 @Test(groups = "load")
 public class GridLoadTest {

@@ -6,6 +6,10 @@ import org.testng.annotations.Test;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Unit tests for platform detection from device capabilities.
+ * Verifies case-insensitive matching and the ANY fallback for missing/unknown platforms.
+ */
 public class PlatformTest {
 
     @Test

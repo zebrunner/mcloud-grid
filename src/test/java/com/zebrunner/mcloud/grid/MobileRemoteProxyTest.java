@@ -13,7 +13,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Proxy behavior with STF integration disabled (no STF_URL/STF_TOKEN in env).
+ * Core proxy behavior tests for node registration and session matching.
+ * Exercises capability matching, device reservation, ignore logic, and session lifecycle decisions.
  */
 public class MobileRemoteProxyTest {
     private static final String UDID = "emulator-5554";
