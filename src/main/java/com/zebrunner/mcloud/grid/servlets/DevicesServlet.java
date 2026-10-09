@@ -15,6 +15,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -69,7 +70,10 @@ public class DevicesServlet extends RegistryBasedServlet {
         device.put("deviceName", CapabilityUtils.getAppiumCapability(capabilities, "deviceName").orElse(null));
         device.put("platformName", capabilities.get(CapabilityType.PLATFORM_NAME));
         device.put("platformVersion", CapabilityUtils.getAppiumCapability(capabilities, "platformVersion").orElse(null));
-        device.put("deviceType", CapabilityUtils.getZebrunnerCapability(capabilities, "deviceType").orElse(null));
+        device.put("deviceType", CapabilityUtils.getZebrunnerCapability(capabilities, "deviceType")
+                .map(String::valueOf)
+                .map(DevicesServlet::normalizeDeviceType)
+                .orElse(null));
         device.put("node", String.valueOf(proxy.getRemoteHost()));
 
         Optional<IgnoredDevices.Entry> ignored = udid == null ? Optional.empty() : IgnoredDevices.get(udid);
@@ -106,5 +110,9 @@ public class DevicesServlet extends RegistryBasedServlet {
             device.put("session", null);
         }
         return device;
+    }
+
+    private static String normalizeDeviceType(String value) {
+        return value.toLowerCase(Locale.ROOT);
     }
 }
