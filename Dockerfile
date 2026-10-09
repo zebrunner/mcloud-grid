@@ -1,4 +1,4 @@
-FROM maven:3.9.16-eclipse-temurin-11 AS builder
+FROM maven:3.9-eclipse-temurin-26 AS builder
 
 WORKDIR /src
 # dependencies are cached in their own layer while the sources change
