@@ -3,6 +3,10 @@ package com.zebrunner.mcloud.grid;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+/**
+ * Rendering tests for the node HTML dashboard.
+ * Confirms that the summary card displays the expected device metadata and escapes unsafe values.
+ */
 public class ProxyHtmlRendererTest {
 
     @Test

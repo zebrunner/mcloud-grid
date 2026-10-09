@@ -3,10 +3,14 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-MVN_IMAGE=${MVN_IMAGE:-maven:3.9.16-eclipse-temurin-11}
+MVN_IMAGE=${MVN_IMAGE:-public.ecr.aws/docker/library/maven:3.9.16-eclipse-temurin-11}
 MAVEN_CACHE_DIR=${MAVEN_CACHE_DIR:-${HOME}/.m2}
 
 mkdir -p "$MAVEN_CACHE_DIR"
+
+# Default passthrough list keeps auth credentials available to load tests running inside Docker.
+# Users can still override it with a custom space-delimited list of env names.
+: "${MVN_PASSTHROUGH_ENV_VARS:=LOAD_GRID_USERNAME LOAD_GRID_PASSWORD}"
 
 docker_args=(
   --rm

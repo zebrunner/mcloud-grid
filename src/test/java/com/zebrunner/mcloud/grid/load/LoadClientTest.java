@@ -18,6 +18,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Contract tests for the load client.
+ * Verifies that preemptive HTTP Basic Auth is attached to every request and that sensitive data is not leaked into reports.
+ */
 public class LoadClientTest {
     @Test
     public void sendsBasicAuthOnEveryRequestWhileCommandsRunForConfiguredTime() throws Exception {

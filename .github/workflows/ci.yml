@@ -34,6 +34,8 @@ jobs:
       - name: Lint Java, scripts, Dockerfile, workflows and docs
         run: tests/lint.sh
         env:
+          # setup-java provides Java; the runner already has Maven, so no image pull is needed.
+          MVN: mvn
           JUNIT_DIR: ${{ runner.temp }}/junit
       - name: Lint report
         if: ${{ !cancelled() }}
@@ -96,7 +98,9 @@ jobs:
         run: tests/docker_test.sh
         env:
           JUNIT_DIR: ${{ runner.temp }}/junit
+      # Only the local disposable hub is exercised; real grids require an explicit manual run.
       - name: Load test of the image with fake Appium nodes
+        id: load_test
         run: tests/load_local.sh -Dload.fakeNodes=10 -Dload.sessions=200 -Dload.concurrency=20 -Dload.maxErrorRate=0
       # one report per path: the action pairs report_paths with check_name items
       - name: Docker image report
@@ -109,7 +113,7 @@ jobs:
           detailed_summary: true
           require_tests: true
       - name: Load test report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.load_test.outcome != 'skipped' }}
         uses: mikepenz/action-junit-report@b7b80d7ac5b1da46d6aaff9fb57ad50d8453bcb3 # v6.6.0
         with:
           report_paths: target/surefire-reports/**/TEST-*.xml
