@@ -63,7 +63,7 @@ public class STFDevice {
     private Double status;
     private Boolean using;
     private String version;
-    private String deviceType = "Phone";
+    private String deviceType = "phone";
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<>();
 

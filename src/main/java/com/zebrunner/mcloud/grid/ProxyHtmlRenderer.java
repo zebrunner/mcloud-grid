@@ -14,6 +14,15 @@ import java.util.function.Supplier;
  * Grid console card of a mobile device with an Info tab instead of the empty Browsers tab.
  */
 public class ProxyHtmlRenderer implements HtmlRenderer {
+    private static final String HEADER_PATCH_SCRIPT = "<script>(function(){"
+            + "if(window.__mcloudConsolePatched){return;}"
+            + "window.__mcloudConsolePatched=true;"
+            + "document.title='MCloud-grid';"
+            + "document.addEventListener('DOMContentLoaded',function(){"
+            + "var header=document.querySelector('#header h2');"
+            + "if(header){header.textContent='MCloud-grid';}"
+            + "});"
+            + "}());</script>";
     private final Supplier<RemoteProxy> proxySupplier;
     private final String udid;
 
@@ -26,6 +35,7 @@ public class ProxyHtmlRenderer implements HtmlRenderer {
     public String renderSummary() {
         RemoteProxy proxy = proxy();
         StringBuilder builder = new StringBuilder();
+        builder.append(HEADER_PATCH_SCRIPT);
         builder.append("<div class='proxy'>");
         builder.append("<p class='proxyname'>");
         builder.append(proxy.getClass().getSimpleName());
@@ -58,7 +68,7 @@ public class ProxyHtmlRenderer implements HtmlRenderer {
 
     private String nodeTabs() {
         return "<div class='tabs'><ul>"
-                + "<li class='tab' type='info'><a title='device details' href='#'>Info</a></li>"
+                + "<li class='tab' type='browsers'><a title='device details' href='#'>Info</a></li>"
                 + "<li class='tab' type='config'><a title='node configuration' href='#'>Configuration</a></li>"
                 + "</ul></div>";
     }
@@ -66,7 +76,7 @@ public class ProxyHtmlRenderer implements HtmlRenderer {
     private String tabInfo() {
         RemoteProxy proxy = proxy();
         StringBuilder builder = new StringBuilder();
-        builder.append("<div type='info' class='content_detail'>");
+        builder.append("<div type='browsers' class='content_detail'>");
 
         TestSlot slot = proxy.getTestSlots().stream().findFirst().orElse(null);
         if (slot == null) {

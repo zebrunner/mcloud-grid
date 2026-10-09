@@ -92,4 +92,18 @@ public class DevicesServletTest {
         Assert.assertTrue(device.get("ignored").get("secondsLeft").asLong() > 170);
         Assert.assertFalse(device.get("ignored").get("until").asText().isEmpty());
     }
+
+    @Test
+    public void deviceTypeIsRenderedInLowerCase() throws Exception {
+        registry.stop();
+        registry = GridFixtures.registry();
+        Map<String, Object> caps = GridFixtures.androidNodeCaps("udid-1");
+        caps.put("zebrunner:deviceType", "Phone");
+        android = GridFixtures.proxy(registry, "http://node-1:4723", caps);
+        registry.add(android);
+
+        JsonNode device = devices().get("udid-1");
+
+        Assert.assertEquals(device.get("deviceType").asText(), "phone");
+    }
 }
