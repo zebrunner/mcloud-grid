@@ -3,25 +3,28 @@ package com.zebrunner.mcloud.grid;
 import com.zebrunner.mcloud.grid.servlets.DevicesServlet;
 import org.openqa.grid.internal.RemoteProxy;
 import org.openqa.grid.internal.TestSlot;
+import org.openqa.grid.internal.utils.HtmlRenderer;
 import org.openqa.grid.web.servlet.console.DefaultProxyHtmlRenderer;
 
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Grid console card of a mobile device with an Info tab instead of the empty Browsers tab.
  */
-public class ProxyHtmlRenderer extends DefaultProxyHtmlRenderer {
-    private final RemoteProxy proxy;
+public class ProxyHtmlRenderer implements HtmlRenderer {
+    private final Supplier<RemoteProxy> proxySupplier;
     private final String udid;
 
-    public ProxyHtmlRenderer(RemoteProxy proxy, String udid) {
-        super(proxy);
-        this.proxy = proxy;
-        this.udid = udid;
+    public ProxyHtmlRenderer(Supplier<RemoteProxy> proxySupplier, String udid) {
+        this.proxySupplier = Objects.requireNonNull(proxySupplier, "proxySupplier must not be null");
+        this.udid = Objects.requireNonNull(udid, "udid must not be null");
     }
 
     @Override
     public String renderSummary() {
+        RemoteProxy proxy = proxy();
         StringBuilder builder = new StringBuilder();
         builder.append("<div class='proxy'>");
         builder.append("<p class='proxyname'>");
@@ -42,6 +45,7 @@ public class ProxyHtmlRenderer extends DefaultProxyHtmlRenderer {
 
     private String getHtmlNodeVersion() {
         try {
+            RemoteProxy proxy = proxy();
             Map<String, Object> object = proxy.getProxyStatus();
             Map<?, ?> value = (Map<?, ?>) object.get("value");
             Map<?, ?> build = (Map<?, ?>) value.get("build");
@@ -60,6 +64,7 @@ public class ProxyHtmlRenderer extends DefaultProxyHtmlRenderer {
     }
 
     private String tabInfo() {
+        RemoteProxy proxy = proxy();
         StringBuilder builder = new StringBuilder();
         builder.append("<div type='info' class='content_detail'>");
 
@@ -88,9 +93,14 @@ public class ProxyHtmlRenderer extends DefaultProxyHtmlRenderer {
     }
 
     private String tabConfig() {
+        RemoteProxy proxy = proxy();
         return "<div type='config' class='content_detail'>"
                 + proxy.getConfig().toString("<p>%1$s: %2$s</p>")
                 + "</div>";
+    }
+
+    private RemoteProxy proxy() {
+        return proxySupplier.get();
     }
 
     @SuppressWarnings("unchecked")

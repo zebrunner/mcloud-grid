@@ -1,7 +1,9 @@
 # Project checks; `make check` runs the linters, the unit/integration tests, the docker image checks and a short load test
 SHELL := /bin/bash
 VENV := .venv
+MVN ?= tests/mvn.sh
 export PATH := $(CURDIR)/$(VENV)/bin:$(PATH)
+export MVN
 
 .DEFAULT_GOAL := help
 .PHONY: help check lint test docker load
@@ -15,7 +17,7 @@ lint: $(VENV)/.installed ## the linters (tests/lint.sh): yaml, workflows, Docker
 	tests/lint.sh
 
 test: ## unit and STF integration tests with the coverage report in target/site/jacoco
-	mvn -B verify
+	$(MVN) -B verify
 
 docker: ## the docker image checks (tests/docker_test.sh)
 	tests/docker_test.sh

@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 
 /**
  * Drives full session lifecycles (create -> commands -> delete) against a running grid in parallel
- * and checks error rate / latency thresholds. Run with: mvn -Pload test -Dgrid.url=http://host:4444/wd/hub
+ * and checks error rate / latency thresholds. Run with: tests/mvn.sh -Pload test -Dgrid.url=http://host:4444/wd/hub
  */
 @Test(groups = "load")
 public class GridLoadTest {

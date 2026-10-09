@@ -471,7 +471,7 @@
 
 	<profiles>
 		<profile>
-			<!-- Static analysis: mvn -Plint verify (all linters: make lint) -->
+			<!-- Static analysis: tests/mvn.sh -Plint verify (all linters: make lint) -->
 			<id>lint</id>
 			<build>
 				<plugins>
@@ -568,7 +568,7 @@
 			</build>
 		</profile>
 		<profile>
-			<!-- Load tests against a running grid: mvn -Pload test -Dgrid.url=http://host:4444/wd/hub (see LOAD_TESTING.md) -->
+			<!-- Load tests against a running grid: tests/mvn.sh -Pload test -Dgrid.url=http://host:4444/wd/hub (see LOAD_TESTING.md) -->
 			<id>load</id>
 			<build>
 				<plugins>

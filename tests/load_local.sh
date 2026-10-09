@@ -8,8 +8,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+MVN=${MVN:-tests/mvn.sh}
 IMAGE=${IMAGE:-mcloud-grid:local}
 CONTAINER=${CONTAINER:-mcloud-grid-load}
+NETWORK=${NETWORK:-${CONTAINER}-net}
+TEST_CONTAINER=${TEST_CONTAINER:-${CONTAINER}-tests}
 PORT=${PORT:-4444}
 FAKE_STF_PORT=${FAKE_STF_PORT:-}
 
@@ -25,9 +28,11 @@ fi
 
 docker build -q -t "$IMAGE" . > /dev/null
 docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
+docker rm -f "$TEST_CONTAINER" > /dev/null 2>&1 || true
+docker network create "$NETWORK" > /dev/null 2>&1 || true
 # host-gateway makes host.docker.internal resolvable on Linux too (Docker Desktop provides it itself)
-docker run -d --name "$CONTAINER" -p "$PORT:4444" --add-host=host.docker.internal:host-gateway ${hub_env[@]+"${hub_env[@]}"} "$IMAGE" > /dev/null
-trap 'docker logs "$CONTAINER" > target/load-report/hub.log 2>&1 || true; docker rm -f "$CONTAINER" >/dev/null' EXIT
+docker run -d --name "$CONTAINER" --network "$NETWORK" -p "$PORT:4444" --add-host=host.docker.internal:host-gateway ${hub_env[@]+"${hub_env[@]}"} "$IMAGE" > /dev/null
+trap 'docker logs "$CONTAINER" > target/load-report/hub.log 2>&1 || true; docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true; docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; docker network rm "$NETWORK" >/dev/null 2>&1 || true' EXIT
 
 echo "waiting for hub on :$PORT"
 for _ in $(seq 1 60); do
@@ -36,10 +41,14 @@ for _ in $(seq 1 60); do
 done
 
 mkdir -p target/load-report
-mvn -B -q -Pload test \
-  -Dgrid.url="http://localhost:$PORT/wd/hub" \
+container_mvn_args="--network $NETWORK --name $TEST_CONTAINER --network-alias $TEST_CONTAINER"
+if [[ -n "${MVN_DOCKER_ARGS:-}" ]]; then
+  container_mvn_args+=" ${MVN_DOCKER_ARGS}"
+fi
+MVN_DOCKER_ARGS="$container_mvn_args" "$MVN" -B -q -Pload test \
+  -Dgrid.url="http://$CONTAINER:4444/wd/hub" \
   -Dload.fakeNodes=10 \
-  -Dload.fakeNodes.host=host.docker.internal \
+  -Dload.fakeNodes.host="$TEST_CONTAINER" \
   -Dload.sessions=200 \
   -Dload.concurrency=20 \
   ${test_options[@]+"${test_options[@]}"} \
