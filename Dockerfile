@@ -1,4 +1,5 @@
-FROM maven:3.9.16-eclipse-temurin-11 AS builder
+# Docker Official Images on ECR Public avoid Docker Hub's anonymous pull quota in CI.
+FROM public.ecr.aws/docker/library/maven:3.9.16-eclipse-temurin-11 AS builder
 
 WORKDIR /src
 # dependencies are cached in their own layer while the sources change
@@ -9,7 +10,7 @@ COPY src ./src
 RUN mvn -B -ntp -DskipTests package
 
 
-FROM eclipse-temurin:11.0.32.1_1-jre-resolute@sha256:31ef746477f9ed27c0170585e81874f25f64be591b8c2f0bba18700d0086cbfb
+FROM public.ecr.aws/docker/library/eclipse-temurin:11.0.32.1_1-jre-resolute@sha256:31ef746477f9ed27c0170585e81874f25f64be591b8c2f0bba18700d0086cbfb
 LABEL authors=Zebrunner
 
 # Apply published Ubuntu security fixes while keeping the same JRE 11.

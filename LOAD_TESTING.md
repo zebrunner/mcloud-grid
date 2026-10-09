@@ -7,6 +7,10 @@ p50/p95/p99/max latency of session creation, commands and deletion, sessions per
 The run fails when the error rate or the p95 of session creation exceeds the configured thresholds.
 
 Load tests are excluded from the regular build and run only with the `load` profile.
+CI runs this profile only against a disposable local Docker hub with fake Appium nodes;
+it does not contact real grids or require their credentials. `LoadClientTest` runs in the
+regular suite against a local HTTP stub to check authentication and reporting.
+Real-device load tests are manual runs using an explicit `grid.url` as shown below.
 
 ## Against a real grid with real devices
 
@@ -20,10 +24,12 @@ Sessions start real Appium sessions on devices, so keep `load.concurrency` at or
 matching devices unless you want to test queueing (`GRID_NEW_SESSION_WAIT_TIMEOUT`).
 Capabilities can also be read from a file: `-Dload.caps=@caps.json`, but **create `caps.json` first**
 in the directory where you run Maven (or specify an absolute path). A missing file causes the load
-test constructor to fail during TestNG discovery, before any session is created.
+test setup to fail before any session is created.
 
 To send **preemptive HTTP Basic Auth on every WebDriver request** (including the final DELETE), set
 the credentials in environment variables. Use HTTPS for a remote grid; Basic Auth does not encrypt credentials.
+`tests/mvn.sh` forwards `LOAD_GRID_USERNAME` and `LOAD_GRID_PASSWORD` into the Maven container by default.
+If you override `MVN_PASSTHROUGH_ENV_VARS`, include both names in that space-separated list.
 Do not put credentials in `grid.url` or `-D` arguments: URLs and process arguments can appear in logs and process listings.
 
 ```bash

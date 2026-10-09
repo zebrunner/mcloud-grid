@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-MVN_IMAGE=${MVN_IMAGE:-maven:3.9.16-eclipse-temurin-11}
+MVN_IMAGE=${MVN_IMAGE:-public.ecr.aws/docker/library/maven:3.9.16-eclipse-temurin-11}
 MAVEN_CACHE_DIR=${MAVEN_CACHE_DIR:-${HOME}/.m2}
 
 mkdir -p "$MAVEN_CACHE_DIR"
