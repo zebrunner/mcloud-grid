@@ -65,22 +65,22 @@ mvn -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 -Dload.fa
 
 ## Options
 
-| Property | Default | Meaning |
-|---|---|---|
-| `grid.url` | — (test is skipped) | Grid endpoint, e.g. `http://host:4444/wd/hub` |
-| `load.sessions` | 20 | Total sessions |
-| `load.concurrency` | 5 | Sessions in parallel |
-| `load.caps` | `{"platformName":"Android"}` | Requested capabilities, JSON or `@file.json` |
-| `load.commands` | 3 | Light commands per session |
-| `load.commandDurationMs` | 0 (off) | Send commands for this long per session instead of using `load.commands` |
-| `load.commandIntervalMs` | 1000 | Delay between commands in duration mode (must be positive) |
-| `load.sessionHoldMs` | 0 | Keep each session open before deleting it |
-| `load.newSessionTimeoutSec` | 600 | Client timeout for `POST /session` (includes queue time) |
-| `load.maxErrorRate` | 0 | Allowed failed sessions ratio, 0..1 |
-| `load.maxP95CreateMs` | 0 (off) | Upper bound for p95 of session creation |
-| `load.fakeNodes` | 0 | Fake nodes to register (0 = real devices) |
-| `load.fakeNodes.host` | `localhost` | Host the hub uses to reach fake nodes (`host.docker.internal` for Docker Desktop) |
-| `load.fakeNodes.platform` | `ANDROID` | `ANDROID` or `IOS` |
-| `load.fakeNodes.sessionDelayMs` | 0 | Simulated Appium session startup time |
-| `load.reportDir` | `target/load-report` | Report directory |
-| `LOAD_GRID_USERNAME`, `LOAD_GRID_PASSWORD` | unset | Optional Basic Auth credentials, passed via environment (both required) |
+| Property                                   | Default                      | Meaning                                                                           |
+|--------------------------------------------|------------------------------|-----------------------------------------------------------------------------------|
+| `grid.url`                                 | — (test is skipped)          | Grid endpoint, e.g. `http://host:4444/wd/hub`                                     |
+| `load.sessions`                            | 20                           | Total sessions                                                                    |
+| `load.concurrency`                         | 5                            | Sessions in parallel                                                              |
+| `load.caps`                                | `{"platformName":"Android"}` | Requested capabilities, JSON or `@file.json`                                      |
+| `load.commands`                            | 3                            | Light commands per session                                                        |
+| `load.commandDurationMs`                   | 0 (off)                      | Send commands for this long per session instead of using `load.commands`          |
+| `load.commandIntervalMs`                   | 1000                         | Delay between commands in duration mode (must be positive)                        |
+| `load.sessionHoldMs`                       | 0                            | Keep each session open before deleting it                                         |
+| `load.newSessionTimeoutSec`                | 600                          | Client timeout for `POST /session` (includes queue time)                          |
+| `load.maxErrorRate`                        | 0                            | Allowed failed sessions ratio, 0..1                                               |
+| `load.maxP95CreateMs`                      | 0 (off)                      | Upper bound for p95 of session creation                                           |
+| `load.fakeNodes`                           | 0                            | Fake nodes to register (0 = real devices)                                         |
+| `load.fakeNodes.host`                      | `localhost`                  | Host the hub uses to reach fake nodes (`host.docker.internal` for Docker Desktop) |
+| `load.fakeNodes.platform`                  | `ANDROID`                    | `ANDROID` or `IOS`                                                                |
+| `load.fakeNodes.sessionDelayMs`            | 0                            | Simulated Appium session startup time                                             |
+| `load.reportDir`                           | `target/load-report`         | Report directory                                                                  |
+| `LOAD_GRID_USERNAME`, `LOAD_GRID_PASSWORD` | unset                        | Optional Basic Auth credentials, passed via environment (both required)           |
