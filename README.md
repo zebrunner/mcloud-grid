@@ -136,6 +136,12 @@ Selenium's own records have no device ID unless Selenium supplies it. Exceptions
 `SE_OPTS=-debug` turns on Selenium's debug logs without changing the grid log level.
 The generated config remains available at `/opt/selenium/config.json`, but is not dumped to logs.
 
+For interactive viewing of history and live logs with [lnav](https://lnav.org/):
+
+```bash
+docker logs --follow --timestamps mcloud-grid 2>&1 | lnav 
+```
+
 ## Development
 
 Requirements: JDK 11 or newer, maven, docker, python 3 (for the linters), hadolint on macOS (`brew install hadolint`).
