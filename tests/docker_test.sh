@@ -18,8 +18,8 @@ cleanup() {
 }
 
 section "image"
-if ! build_output="$(docker build --quiet --tag "$IMAGE" . 2>&1)"; then
-  fail "image builds" "docker build failed" "$build_output"
+if ! docker build --progress=plain --tag "$IMAGE" . > "$WORK/docker-build.log" 2>&1; then
+  fail "image builds" "docker build failed" "$(tail -100 "$WORK/docker-build.log")"
   finish
 fi
 pass "image builds"
