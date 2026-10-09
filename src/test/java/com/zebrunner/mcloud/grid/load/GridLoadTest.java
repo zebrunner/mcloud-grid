@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,19 +31,32 @@ public class GridLoadTest {
     private static final Pattern SESSION_ID = Pattern.compile("\"sessionId\"\\s*:\\s*\"([^\"]+)\"");
     private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(120);
 
-    private final LoadConfig config = LoadConfig.fromSystemProperties();
+    private LoadConfig config;
     private final List<FakeAppiumNode> fakeNodes = new ArrayList<>();
     private FakeStf fakeStf;
     private HttpClient http;
+    private ExecutorService httpExecutor;
+
+    public GridLoadTest() {
+        // TestNG discovers the class before setup; load user configuration in setUp for actionable errors.
+    }
+
+    GridLoadTest(LoadConfig config) {
+        this.config = config;
+    }
 
     @BeforeClass(alwaysRun = true)
     public void setUp() throws Exception {
+        if (config == null) {
+            config = LoadConfig.fromSystemProperties();
+        }
         if (config.gridUrl.isEmpty()) {
             throw new SkipException("Set -Dgrid.url=http://host:4444/wd/hub to run load tests");
         }
+        httpExecutor = Executors.newFixedThreadPool(Math.max(4, config.concurrency));
         http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
-                .executor(Executors.newFixedThreadPool(Math.max(4, config.concurrency)))
+                .executor(httpExecutor)
                 .build();
         System.out.println("[load] " + config);
         if (config.fakeStfPort > 0) {
@@ -55,7 +69,7 @@ public class GridLoadTest {
             if (fakeStf != null) {
                 fakeStf.addDevice(node.udid());
             }
-            node.register(config.hubRoot());
+            node.register(config.hubRoot(), config.authorization);
         }
         if (!fakeNodes.isEmpty()) {
             // the hub adds a node asynchronously after registration
@@ -69,6 +83,9 @@ public class GridLoadTest {
         fakeNodes.forEach(FakeAppiumNode::close);
         if (fakeStf != null) {
             fakeStf.close();
+        }
+        if (httpExecutor != null) {
+            httpExecutor.shutdownNow();
         }
     }
 
@@ -115,13 +132,22 @@ public class GridLoadTest {
             }
             sessionId = matcher.group(1);
 
-            for (int i = 0; i < config.commandsPerSession; i++) {
+            long deadline = System.nanoTime() + config.commandDuration.toNanos();
+            int commandCount = 0;
+            while (config.commandDuration.isZero() ? commandCount < config.commandsPerSession : System.nanoTime() < deadline) {
                 long c0 = System.nanoTime();
                 HttpResponse<String> response = send("GET", "/session/" + sessionId + "/timeouts", null, COMMAND_TIMEOUT);
                 commandMs.add((System.nanoTime() - c0) / 1_000_000);
+                commandCount++;
                 if (response.statusCode() != 200) {
                     return new LoadReport.SessionResult(false, "command: HTTP " + response.statusCode() + " " + errorOf(response.body()),
                             createMs, commandMs, deleteQuietly(sessionId));
+                }
+                if (!config.commandDuration.isZero()) {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining > 0) {
+                        TimeUnit.NANOSECONDS.sleep(Math.min(config.commandInterval.toNanos(), remaining));
+                    }
                 }
             }
             if (!config.sessionHold.isZero()) {
@@ -135,6 +161,9 @@ public class GridLoadTest {
             }
             return new LoadReport.SessionResult(true, null, createMs, commandMs, deleteMs);
         } catch (InterruptedException e) {
+            if (sessionId != null) {
+                deleteQuietly(sessionId);
+            }
             Thread.currentThread().interrupt();
             return new LoadReport.SessionResult(false, "interrupted", createMs, commandMs, -1);
         } catch (Exception e) {
@@ -161,11 +190,18 @@ public class GridLoadTest {
     }
 
     private HttpResponse<String> send(String method, String path, String body, Duration timeout) throws Exception {
-        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(config.gridUrl + path))
+        return http.send(request(config.gridUrl + path, method, body, timeout, config.authorization), HttpResponse.BodyHandlers.ofString());
+    }
+
+    static HttpRequest request(String url, String method, String body, Duration timeout, String authorization) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(timeout)
                 .header("Content-Type", "application/json; charset=utf-8");
+        if (authorization != null) {
+            request.header("Authorization", authorization);
+        }
         request.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
-        return http.send(request.build(), HttpResponse.BodyHandlers.ofString());
+        return request.build();
     }
 
     private static String errorOf(String body) {

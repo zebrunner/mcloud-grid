@@ -6,9 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -63,12 +61,12 @@ final class FakeAppiumNode implements AutoCloseable {
      * Registers in the hub and, as Selenium and Appium nodes do, every 5 seconds registers again if the hub does not know the node
      * (e.g. after a restart of the hub). Registering a known node again would terminate its sessions (PROXY_REREGISTRATION).
      */
-    void register(String hubRoot) throws IOException, InterruptedException {
-        registerOnce(hubRoot);
+    void register(String hubRoot, String authorization) throws IOException, InterruptedException {
+        registerOnce(hubRoot, authorization);
         reRegistration.scheduleWithFixedDelay(() -> {
             try {
-                if (!isRegistered(hubRoot)) {
-                    registerOnce(hubRoot);
+                if (!isRegistered(hubRoot, authorization)) {
+                    registerOnce(hubRoot, authorization);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -78,16 +76,14 @@ final class FakeAppiumNode implements AutoCloseable {
         }, 5, 5, TimeUnit.SECONDS);
     }
 
-    private boolean isRegistered(String hubRoot) throws IOException, InterruptedException {
-        HttpResponse<String> response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
-                        URI.create(hubRoot + "/grid/api/proxy?id=" + java.net.URLEncoder.encode(advertisedUrl, StandardCharsets.UTF_8)))
-                .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build(), HttpResponse.BodyHandlers.ofString());
+    private boolean isRegistered(String hubRoot, String authorization) throws IOException, InterruptedException {
+        String url = hubRoot + "/grid/api/proxy?id=" + java.net.URLEncoder.encode(advertisedUrl, StandardCharsets.UTF_8);
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                GridLoadTest.request(url, "GET", null, Duration.ofSeconds(10), authorization), HttpResponse.BodyHandlers.ofString());
         return response.statusCode() == 200 && response.body().contains("\"success\": true");
     }
 
-    private void registerOnce(String hubRoot) throws IOException, InterruptedException {
+    private void registerOnce(String hubRoot, String authorization) throws IOException, InterruptedException {
         String caps = "{\"platformName\":\"" + platform + "\",\"appium:platformVersion\":\"" + ("IOS".equals(platform) ? "17.2" : "13")
                 + "\",\"appium:udid\":\"" + udid + "\",\"appium:deviceName\":\"" + udid + "\",\"zebrunner:deviceType\":\"phone\""
                 + ",\"maxInstances\":1,\"seleniumProtocol\":\"WebDriver\"}";
@@ -96,10 +92,9 @@ final class FakeAppiumNode implements AutoCloseable {
                 + "\"proxy\":\"com.zebrunner.mcloud.grid.MobileRemoteProxy\",\"maxSession\":1,\"register\":true,\"registerCycle\":5000,"
                 + "\"nodePolling\":2000,\"unregisterIfStillDownAfter\":5000,\"downPollingLimit\":1,"
                 + "\"capabilities\":[" + caps + "]}}";
-        HttpResponse<String> response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(hubRoot + "/grid/register"))
-                .timeout(Duration.ofSeconds(30))
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                GridLoadTest.request(hubRoot + "/grid/register", "POST", body, Duration.ofSeconds(30), authorization),
+                HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IOException("Node " + udid + " registration failed: " + response.statusCode() + " " + response.body());
         }

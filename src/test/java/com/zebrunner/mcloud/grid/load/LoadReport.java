@@ -1,11 +1,15 @@
 package com.zebrunner.mcloud.grid.load;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -83,24 +87,37 @@ final class LoadReport {
         return sorted.get(Math.max(0, Math.min(index, sorted.size() - 1)));
     }
 
-    private static String stats(List<Long> values) {
-        return String.format("{\"count\":%d,\"p50\":%d,\"p95\":%d,\"p99\":%d,\"max\":%d}", values.size(),
-                percentile(values, 50), percentile(values, 95), percentile(values, 99), percentile(values, 100));
+    private static Map<String, Long> stats(List<Long> values) {
+        Map<String, Long> stats = new LinkedHashMap<>();
+        stats.put("count", (long) values.size());
+        stats.put("p50", percentile(values, 50));
+        stats.put("p95", percentile(values, 95));
+        stats.put("p99", percentile(values, 99));
+        stats.put("max", percentile(values, 100));
+        return stats;
     }
 
     String toJson(LoadConfig config) {
-        String errors = errors().entrySet().stream()
-                .map(e -> "\"" + e.getKey().replace("\\", "\\\\").replace("\"", "\\\"") + "\":" + e.getValue())
-                .collect(Collectors.joining(",", "{", "}"));
         double throughput = wallClockMs == 0 ? 0 : total() * 1000.0 / wallClockMs;
-        return "{\n  \"gridUrl\":\"" + config.gridUrl + "\",\n  \"sessions\":" + total() + ",\n  \"concurrency\":" + config.concurrency
-                + ",\n  \"fakeNodes\":" + config.fakeNodes + ",\n  \"failed\":" + failed()
-                + ",\n  \"errorRate\":" + String.format("%.4f", errorRate()) + ",\n  \"wallClockMs\":" + wallClockMs
-                + ",\n  \"sessionsPerSecond\":" + String.format("%.2f", throughput)
-                + ",\n  \"createSessionMs\":" + stats(createLatencies()) + ",\n  \"commandMs\":" + stats(commandLatencies())
-                + ",\n  \"deleteSessionMs\":" + stats(deleteLatencies()) + ",\n  \"errors\":" + errors
-                + ",\n  \"stfRequests\":" + stfRequests.entrySet().stream().map(e -> "\"" + e.getKey() + "\":" + e.getValue())
-                        .collect(Collectors.joining(",", "{", "}")) + "\n}\n";
+        Map<String, Object> report = new LinkedHashMap<>();
+        report.put("gridUrl", config.gridUrl);
+        report.put("sessions", total());
+        report.put("concurrency", config.concurrency);
+        report.put("fakeNodes", config.fakeNodes);
+        report.put("failed", failed());
+        report.put("errorRate", errorRate());
+        report.put("wallClockMs", wallClockMs);
+        report.put("sessionsPerSecond", throughput);
+        report.put("createSessionMs", stats(createLatencies()));
+        report.put("commandMs", stats(commandLatencies()));
+        report.put("deleteSessionMs", stats(deleteLatencies()));
+        report.put("errors", errors());
+        report.put("stfRequests", stfRequests);
+        try {
+            return new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(report) + "\n";
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Cannot serialize load report", e);
+        }
     }
 
     Path write(LoadConfig config) throws IOException {
