@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- STF DTOs are plain mutable data holders deserialized from JSON -->
+    <Match>
+        <Package name="com.zebrunner.mcloud.grid.models.stf"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <!-- Grid proxies/validators reject invalid input by throwing from constructors by design; no finalizers are involved -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <!-- Proxy identity (equals/hashCode by node id) is implemented in Selenium's BaseRemoteProxy -->
+    <Match>
+        <Class name="com.zebrunner.mcloud.grid.MobileRemoteProxy"/>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+    </Match>
+    <!-- Tests intentionally use fixtures and mocks in ways SpotBugs dislikes -->
+    <Match>
+        <Class name="~.*Test(\$.*)?"/>
+    </Match>
+</FindBugsFilter>

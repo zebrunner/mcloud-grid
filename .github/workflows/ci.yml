@@ -1,0 +1,128 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [develop, main, master]
+  pull_request:
+    branches: [develop, main, master]
+  workflow_dispatch:
+# a new push to a pull request cancels its outdated run, runs of the branches themselves are kept
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+      - name: Install linters
+        run: pip install -r tests/requirements-lint.txt
+      - name: Lint Java, scripts, Dockerfile, workflows and docs
+        run: tests/lint.sh
+        env:
+          JUNIT_DIR: ${{ runner.temp }}/junit
+      - name: Lint report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@b7b80d7ac5b1da46d6aaff9fb57ad50d8453bcb3 # v6.6.0
+        with:
+          report_paths: ${{ runner.temp }}/junit/*.xml
+          check_name: lint report
+          # annotations and the job summary only: no check run, so a read-only token is enough
+          annotate_only: true
+          detailed_summary: true
+          require_tests: true
+      - name: Upload lint JUnit XML
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-lint
+          path: ${{ runner.temp }}/junit/
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+      - name: Unit and STF integration tests
+        run: mvn -B verify
+      - name: Tests report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@b7b80d7ac5b1da46d6aaff9fb57ad50d8453bcb3 # v6.6.0
+        with:
+          report_paths: target/surefire-reports/**/TEST-*.xml
+          check_name: tests report
+          annotate_only: true
+          detailed_summary: true
+          require_tests: true
+      - name: Upload tests JUnit XML and coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: tests
+          path: |
+            target/surefire-reports/**/TEST-*.xml
+            target/site/jacoco/
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: maven
+      - name: Docker image checks
+        run: tests/docker_test.sh
+        env:
+          JUNIT_DIR: ${{ runner.temp }}/junit
+      - name: Load test of the image with fake Appium nodes
+        run: tests/load_local.sh -Dload.fakeNodes=10 -Dload.sessions=200 -Dload.concurrency=20 -Dload.maxErrorRate=0
+      # one report per path: the action pairs report_paths with check_name items
+      - name: Docker image report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@b7b80d7ac5b1da46d6aaff9fb57ad50d8453bcb3 # v6.6.0
+        with:
+          report_paths: ${{ runner.temp }}/junit/*.xml
+          check_name: docker image report
+          annotate_only: true
+          detailed_summary: true
+          require_tests: true
+      - name: Load test report
+        if: ${{ !cancelled() }}
+        uses: mikepenz/action-junit-report@b7b80d7ac5b1da46d6aaff9fb57ad50d8453bcb3 # v6.6.0
+        with:
+          report_paths: target/surefire-reports/**/TEST-*.xml
+          check_name: load test report
+          annotate_only: true
+          detailed_summary: true
+          require_tests: true
+      - name: Upload docker JUnit XML and load report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker
+          path: |
+            ${{ runner.temp }}/junit/
+            target/surefire-reports/**/TEST-*.xml
+            target/load-report/

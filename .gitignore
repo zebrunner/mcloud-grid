@@ -13,4 +13,6 @@ bin
 *.iml
 test-output
 *.log
-/reports
+/reports.DS_Store
+**/.DS_Store
+.venv

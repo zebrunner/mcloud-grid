@@ -4,6 +4,7 @@ import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 
 import javax.annotation.Nonnull;
 import java.lang.invoke.MethodHandles;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -11,6 +12,7 @@ public class PlatformVersionValidator implements Validator {
     private static final Logger LOGGER = Logger.getLogger(MethodHandles.lookup().lookupClass().getName());
     //todo reuse MobileCapabilityType interface
     private static final String PLATFORM_VERSION_CAPABILITY = "platformVersion";
+    private static final String VERSION_PATTERN = "(\\d+\\.){0,}(\\d+)$";
 
     @Override
     public Boolean apply(Map<String, Object> nodeCapabilities, Map<String, Object> requestedCapabilities) {
@@ -28,6 +30,11 @@ public class PlatformVersionValidator implements Validator {
 
         if (actualValue == null) {
             LOGGER.warning("No 'platformVersion' capability specified for node.");
+            return false;
+        }
+
+        if (!actualValue.matches(VERSION_PATTERN)) {
+            LOGGER.warning("Node 'platformVersion' capability is not a numeric version: " + actualValue);
             return false;
         }
 
@@ -65,15 +72,15 @@ public class PlatformVersionValidator implements Validator {
         return false;
     }
 
-    private class PlatformVersion implements Comparable<PlatformVersion> {
+    private static final class PlatformVersion implements Comparable<PlatformVersion> {
         private int[] version;
 
-        public PlatformVersion(String v) {
-            if (v != null && v.matches("(\\d+\\.){0,}(\\d+)$")) {
+        PlatformVersion(String v) {
+            if (v != null && v.matches(VERSION_PATTERN)) {
                 String[] digits = v.split("\\.");
                 this.version = new int[digits.length];
                 for (int i = 0; i < digits.length; i++) {
-                    this.version[i] = Integer.valueOf(digits[i]);
+                    this.version[i] = Integer.parseInt(digits[i]);
                 }
             }
         }
@@ -86,27 +93,47 @@ public class PlatformVersionValidator implements Validator {
             this.version = version;
         }
 
+        /**
+         * Compares versions component by component; missing components are zeros, so 7 == 7.0 == 7.0.0.
+         */
         @Override
         public int compareTo(@Nonnull PlatformVersion pv) {
-            int result = 0;
-            if (pv.getVersion() != null && this.version != null) {
-                int minL = Math.min(this.version.length, pv.getVersion().length);
-                int maxL = Math.max(this.version.length, pv.getVersion().length);
-
-                for (int i = 0; i < minL; i++) {
-                    result = this.version[i] - pv.getVersion()[i];
-                    if (result != 0) {
-                        break;
-                    }
-                }
-
-                if (result == 0 && this.version.length == minL && minL != maxL) {
-                    result = -1;
-                } else if (result == 0 && this.version.length == maxL && minL != maxL) {
-                    result = 1;
+            if (pv.getVersion() == null || this.version == null) {
+                return 0;
+            }
+            int length = Math.max(this.version.length, pv.getVersion().length);
+            for (int i = 0; i < length; i++) {
+                int result = Integer.compare(component(this.version, i), component(pv.getVersion(), i));
+                if (result != 0) {
+                    return result;
                 }
             }
-            return result;
+            return 0;
+        }
+
+        private static int component(int[] version, int index) {
+            return index < version.length ? version[index] : 0;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof PlatformVersion && Arrays.equals(normalized(), ((PlatformVersion) o).normalized());
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(normalized());
+        }
+
+        private int[] normalized() {
+            if (version == null) {
+                return null;
+            }
+            int length = version.length;
+            while (length > 1 && version[length - 1] == 0) {
+                length--;
+            }
+            return Arrays.copyOf(version, length);
         }
     }
 }

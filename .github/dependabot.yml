@@ -1,0 +1,50 @@
+---
+# Weekly update pull requests into develop; the CI checks every bump
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      # test and lint tools do not reach the image, one pull request for all of them
+      test-tools:
+        patterns:
+          - "org.testng:*"
+          - "com.github.tomakehurst:*"
+          - "org.jacoco:*"
+          - "com.puppycrawl.tools:*"
+          - "com.github.spotbugs:*"
+          - "org.apache.maven.plugins:*"
+    ignore:
+      # the hub is a Selenium 3 grid, the migration to Selenium 4 is a separate task (#79)
+      - dependency-name: "org.seleniumhq.selenium:*"
+        update-types: ["version-update:semver-major"]
+      # wiremock 3 changes the artifact and APIs
+      - dependency-name: "com.github.tomakehurst:wiremock-jre8-standalone"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    ignore:
+      # the hub runs on Java 11
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "maven"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /tests
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      linters:
+        patterns: ["*"]

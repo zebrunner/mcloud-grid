@@ -15,6 +15,7 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid;
 
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -35,13 +36,19 @@ public enum Platform {
      * Retrieves platform type from capabilities.
      *
      * @param cap - desired capabilities
-     * @return platform
+     * @return platform, {@link #ANY} if it is missing or unknown
      */
     public static Platform fromCapabilities(Map<String, Object> cap) {
-        Platform platform = Platform.ANY;
-        if (cap != null && cap.containsKey("platformName") && cap.get("platformName") != null) {
-            platform = Platform.valueOf(cap.get("platformName").toString().toUpperCase());
+        if (cap == null || cap.get("platformName") == null) {
+            return Platform.ANY;
         }
-        return platform;
+        String name = cap.get("platformName").toString().trim().toUpperCase(Locale.ROOT);
+        for (Platform platform : values()) {
+            if (platform.name().equals(name)) {
+                return platform;
+            }
+        }
+        // platforms without dedicated handling (Tizen, webOS, ...)
+        return Platform.ANY;
     }
 }

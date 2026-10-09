@@ -1,0 +1,25 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.java]
+indent_style = space
+indent_size = 4
+
+# pom.xml keeps its tabs
+[pom.xml]
+indent_style = tab
+
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# shell scripts, also the style of shfmt
+[{*.sh,generate_config}]
+indent_style = space
+indent_size = 2
+shell_variant = bash
+space_redirects = true

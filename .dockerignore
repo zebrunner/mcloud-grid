@@ -1,0 +1,11 @@
+# only pom.xml, src and the scripts are needed by the image build
+.git
+.github
+.idea
+target
+tests
+config
+scripts
+*.md
+*.iml
+.DS_Store

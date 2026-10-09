@@ -15,139 +15,127 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.util;
 
-import java.util.Map;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zebrunner.mcloud.grid.integration.client.Path;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpHeaders;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
+
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-
-import org.apache.commons.lang3.StringUtils;
-
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import com.sun.jersey.core.util.MultivaluedMapImpl;
-import com.zebrunner.mcloud.grid.integration.client.Path;
-import org.apache.commons.lang3.concurrent.ConcurrentException;
-import org.apache.commons.lang3.concurrent.LazyInitializer;
-import org.apache.commons.lang3.exception.ExceptionUtils;
-
-public class HttpClient {
+/**
+ * JSON HTTP client of the STF API.
+ */
+public final class HttpClient {
     private static final Logger LOGGER = Logger.getLogger(HttpClient.class.getName());
 
-    private static final LazyInitializer<Client> CLIENT = new LazyInitializer<>() {
-        @Override
-        protected Client initialize() throws ConcurrentException {
-            Client client = Client.create(new DefaultClientConfig(GensonProvider.class));
-            client.setConnectTimeout(3000);
-            client.setReadTimeout(3000);
-            return client;
-        }
-    };
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    private static final CloseableHttpClient CLIENT = HttpClients.custom()
+            .setDefaultRequestConfig(RequestConfig.custom()
+                    .setConnectTimeout(3000)
+                    .setConnectionRequestTimeout(3000)
+                    .setSocketTimeout(3000)
+                    .build())
+            .setConnectionManager(connectionManager())
+            .evictIdleConnections(30, TimeUnit.SECONDS)
+            // no retries: a slow STF must not block new session requests longer than the timeouts above
+            .disableAutomaticRetries()
+            .build();
+
+    private static PoolingHttpClientConnectionManager connectionManager() {
+        PoolingHttpClientConnectionManager manager = new PoolingHttpClientConnectionManager();
+        // STF calls are made for every device of the grid
+        manager.setDefaultMaxPerRoute(50);
+        manager.setMaxTotal(100);
+        // keep-alive connections closed by STF or a proxy in front of it are detected before every reuse (~1ms)
+        manager.setValidateAfterInactivity(1);
+        return manager;
+    }
+
+    private HttpClient() {
+        //hide
+    }
 
     public static Executor uri(Path path, String serviceUrl, Object... parameters) {
-        String url = path.build(serviceUrl, parameters);
-        return uri(url, null);
+        return new Executor(path.build(serviceUrl, parameters));
     }
 
-    public static Executor uri(Path path, Map<String, String> queryParameters, String serviceUrl, Object... parameters) {
-        String url = path.build(serviceUrl, parameters);
-        return uri(url, queryParameters);
-    }
+    public static final class Executor {
+        private final String url;
+        private String authorization;
 
-    private static Executor uri(String url, Map<String, String> queryParameters) {
-        try {
-            WebResource webResource = CLIENT.get()
-                    .resource(url);
-            if (queryParameters != null) {
-                MultivaluedMap<String, String> requestParameters = new MultivaluedMapImpl();
-                queryParameters.forEach(requestParameters::add);
-                webResource = webResource.queryParams(requestParameters);
-            }
-            return new Executor(webResource);
-        } catch (ConcurrentException e) {
-            return ExceptionUtils.rethrow(e);
-        }
-    }
-
-    public static class Executor {
-
-        private final WebResource.Builder builder;
-        private String errorMessage;
-
-        public Executor(WebResource webResource) {
-            builder = webResource.type(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON);
-        }
-
-        public <R> Response<R> get(Class<R> responseClass) {
-            return execute(responseClass, builder -> builder.get(ClientResponse.class));
-        }
-
-        public <R> Response<R> post(Class<R> responseClass, Object requestEntity) {
-            return execute(responseClass, builder -> builder.post(ClientResponse.class, requestEntity));
-        }
-
-        public <R> Response<R> put(Class<R> responseClass, Object requestEntity) {
-            return execute(responseClass, builder -> builder.put(ClientResponse.class, requestEntity));
-        }
-
-        public <R> Response<R> delete(Class<R> responseClass) {
-            return execute(responseClass, builder -> builder.delete(ClientResponse.class));
-        }
-
-        public Executor type(String mediaType) {
-            builder.type(mediaType);
-            return this;
-        }
-
-        public Executor accept(String mediaType) {
-            builder.accept(mediaType);
-            return this;
+        private Executor(String url) {
+            this.url = url;
         }
 
         public Executor withAuthorization(String authToken) {
-            return withAuthorization(authToken, null);
-        }
-
-        public Executor withAuthorization(String authToken, String project) {
-            initHeaders(builder, authToken, project);
+            this.authorization = authToken;
             return this;
         }
 
-        private static void initHeaders(WebResource.Builder builder, String authToken, String project) {
-            if (!StringUtils.isEmpty(authToken)) {
-                builder.header("Authorization", authToken);
-            }
-            if (!StringUtils.isEmpty(project)) {
-                builder.header("Project", project);
-            }
+        public <R> Response<R> get(Class<R> responseClass) {
+            return execute(responseClass, HttpGet::new, null);
         }
 
-        private <R> Response<R> execute(Class<R> responseClass, Function<WebResource.Builder, ClientResponse> methodBuilder) {
+        public <R> Response<R> post(Class<R> responseClass, Object requestEntity) {
+            return execute(responseClass, HttpPost::new, requestEntity);
+        }
+
+        public <R> Response<R> put(Class<R> responseClass, Object requestEntity) {
+            return execute(responseClass, HttpPut::new, requestEntity);
+        }
+
+        public <R> Response<R> delete(Class<R> responseClass) {
+            return execute(responseClass, HttpDelete::new, null);
+        }
+
+        private <R> Response<R> execute(Class<R> responseClass, Function<String, HttpRequestBase> method, Object requestEntity) {
             Response<R> rs = new Response<>();
             try {
-                ClientResponse response = methodBuilder.apply(builder);
-                int status = response.getStatus();
-                rs.setStatus(status);
-                if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200) {
-                    rs.setObject(response.getEntity(responseClass));
+                HttpRequestBase request = method.apply(url);
+                request.setHeader(HttpHeaders.ACCEPT, ContentType.APPLICATION_JSON.getMimeType());
+                if (StringUtils.isNotEmpty(authorization)) {
+                    request.setHeader(HttpHeaders.AUTHORIZATION, authorization);
+                }
+                if (request instanceof HttpEntityEnclosingRequestBase) {
+                    String body = requestEntity == null ? "" : MAPPER.writeValueAsString(requestEntity);
+                    ((HttpEntityEnclosingRequestBase) request).setEntity(new StringEntity(body, ContentType.APPLICATION_JSON));
+                }
+                try (CloseableHttpResponse response = CLIENT.execute(request)) {
+                    int status = response.getStatusLine().getStatusCode();
+                    rs.setStatus(status);
+                    String body = response.getEntity() == null ? null : EntityUtils.toString(response.getEntity());
+                    if (responseClass != null && !responseClass.isAssignableFrom(Void.class) && status == 200 && StringUtils.isNotBlank(body)) {
+                        rs.setObject(MAPPER.readValue(body, responseClass));
+                    }
                 }
             } catch (Exception e) {
-                String message = errorMessage == null ? e.getMessage() : e.getMessage() + ". " + errorMessage;
-                LOGGER.log(Level.SEVERE, message, e);
+                // status 0 tells the caller the request failed; the stack trace is useful only for debugging
+                LOGGER.warning(() -> String.format("STF request %s %s failed: %s: %s", method.apply(url).getMethod(), url,
+                        e.getClass().getSimpleName(), e.getMessage()));
+                LOGGER.log(Level.FINE, "STF request failure", e);
             }
             return rs;
         }
-
-        public Executor onFailure(String message) {
-            this.errorMessage = message;
-            return this;
-        }
-
     }
 
     public static class Response<T> {
