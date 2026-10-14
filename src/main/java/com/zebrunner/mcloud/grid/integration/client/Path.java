@@ -45,5 +45,5 @@ public enum Path {
     public String build(String serviceUrl, Object... parameters) {
         return serviceUrl + String.format(relativePath, parameters);
     }
-    
+
 }

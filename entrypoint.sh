@@ -18,6 +18,7 @@
 ROOT=/opt/selenium
 CONF=$ROOT/config.json
 
+# log <message>: a JSON log line like the ones of the hub (JsonLogFormatter)
 log() {
   printf '{"timestamp":"%s","level":"INFO","logger":"entrypoint","component":"mcloud-grid","category":"grid","message":"%s"}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1"
@@ -27,10 +28,11 @@ log() {
 
 log "Starting Selenium hub"
 
-function shutdown {
+# shutdown: stops the hub on SIGTERM and SIGINT
+shutdown() {
   log "Shutting down hub"
-  kill -s SIGTERM $NODE_PID
-  wait $NODE_PID
+  kill -s SIGTERM "$hubPid"
+  wait "$hubPid"
   log "shutdown complete"
 }
 
@@ -43,6 +45,6 @@ java ${JAVA_HEAP_OPTS:--Xms1G -Xmx4G} ${JAVA_OPTS} -Djava.net.preferIPv4Stack=tr
   -role hub \
   -hubConfig "$CONF" \
   ${SE_OPTS} &
-NODE_PID=$!
+hubPid=$!
 
-wait $NODE_PID
+wait "$hubPid"
