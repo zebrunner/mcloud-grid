@@ -10,7 +10,7 @@ COPY src ./src
 RUN mvn -B -ntp -DskipTests package
 
 
-FROM public.ecr.aws/docker/library/eclipse-temurin:11.0.32.1_1-jre-resolute@sha256:31ef746477f9ed27c0170585e81874f25f64be591b8c2f0bba18700d0086cbfb
+FROM public.ecr.aws/docker/library/eclipse-temurin:21.0.12.1_1-jre-resolute@sha256:e9a838377dc3719c0a0e7d1ac2e13d6f49c5cacd643f9a22024845736bb00ad9
 
 # Apply published Ubuntu security fixes while keeping the same JRE 11.
 RUN apt-get update && \
