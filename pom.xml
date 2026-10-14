@@ -22,8 +22,8 @@
 		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
 		<checkstyle.version>10.12.7</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
-		<plexus-utils3.version>3.6.1</plexus-utils3.version>
-		<plexus-utils4.version>4.0.3</plexus-utils4.version>
+		<plexus-utils3.version>4.1.0</plexus-utils3.version>
+		<plexus-utils4.version>4.1.0</plexus-utils4.version>
 		<commons-beanutils.version>1.11.0</commons-beanutils.version>
 		<aircompressor.version>2.0.3</aircompressor.version>
 		<snappy.version>0.5</snappy.version>
