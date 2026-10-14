@@ -1,18 +1,20 @@
-.project
+# IDE
+.idea/
+*.iml
+# the lint tools of `make lint`
+.venv/
+# macOS
+.DS_Store
+# the project: Maven, Eclipse and the reports of the tests
 target
-bin
+.project
 .classpath
-/test-output
 /.settings
 **/.settings
+bin
 /com
-/application.log
-/sql.log
-*.checkstyle
-.idea
-*.iml
+/test-output
 test-output
+/reports
 *.log
-/reports.DS_Store
-**/.DS_Store
-.venv
+*.checkstyle

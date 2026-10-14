@@ -1,4 +1,4 @@
-# Project checks; `make check` runs the linters, the unit/integration tests, the docker image checks and a short load test
+# Project checks; `make check` runs the linters, the unit/integration tests, the docker image checks and a short load test (CONVENTIONS.md)
 SHELL := /bin/bash
 VENV := .venv
 MVN ?= tests/mvn.sh
@@ -9,11 +9,12 @@ export MVN
 .PHONY: help check lint test docker load
 
 help: ## this list
-	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
 
-check: lint test docker load ## everything below, as CI runs it
+check: ## everything below, as CI runs it; every step runs, the failed ones fail the target
+	@status=0; for target in lint test docker load; do $(MAKE) --no-print-directory $$target || status=1; done; exit $$status
 
-lint: $(VENV)/.installed ## the linters (tests/lint.sh): yaml, workflows, Dockerfile, markdown, shell, checkstyle, spotbugs
+lint: $(VENV)/.installed ## the linters and the text file checks (tests/lint.sh), checkstyle, spotbugs
 	tests/lint.sh
 
 test: ## unit and STF integration tests with the coverage report in target/site/jacoco

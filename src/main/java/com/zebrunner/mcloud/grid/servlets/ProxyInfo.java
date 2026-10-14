@@ -40,7 +40,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 
 /**
  * Servlet that retrieves information about connected nodes.
- * 
+ *
  * @author Alex Khursevich (alex@qaprosoft.com)
  */
 public class ProxyInfo extends RegistryBasedServlet {

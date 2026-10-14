@@ -31,7 +31,7 @@ jobs:
           cache: maven
       - name: Install linters
         run: pip install -r tests/requirements-lint.txt
-      - name: Lint Java, scripts, Dockerfile, workflows and docs
+      - name: Lint the project files (tests/lint.sh)
         run: tests/lint.sh
         env:
           # setup-java provides Java; the runner already has Maven, so no image pull is needed.
