@@ -4,7 +4,27 @@ root = true
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
+trim_trailing_whitespace = true
 
+[Makefile]
+indent_style = tab
+
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+[*.{js,mjs}]
+indent_style = space
+indent_size = 2
+
+# shell scripts, also the style of shfmt
+[*.sh]
+indent_style = space
+indent_size = 2
+shell_variant = bash
+space_redirects = true
+
+# Java, also the rules of config/checkstyle/checkstyle.xml
 [*.java]
 indent_style = space
 indent_size = 4
@@ -13,12 +33,8 @@ indent_size = 4
 [pom.xml]
 indent_style = tab
 
-[*.{yml,yaml}]
-indent_style = space
-indent_size = 2
-
-# shell scripts, also the style of shfmt
-[{*.sh,generate_config}]
+# shell scripts without the .sh extension
+[generate_config]
 indent_style = space
 indent_size = 2
 shell_variant = bash

@@ -2,6 +2,7 @@
 .git
 .github
 .idea
+.venv
 target
 tests
 config
@@ -9,3 +10,4 @@ scripts
 *.md
 *.iml
 .DS_Store
+**/.DS_Store
