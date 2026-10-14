@@ -1,5 +1,5 @@
 # Docker Official Images on ECR Public avoid Docker Hub's anonymous pull quota in CI.
-FROM public.ecr.aws/docker/library/maven:3.9.16-eclipse-temurin-11 AS builder
+FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-26 AS builder
 
 WORKDIR /src
 # dependencies are cached in their own layer while the sources change
