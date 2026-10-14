@@ -22,8 +22,9 @@
 		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
 		<checkstyle.version>10.12.7</checkstyle.version>
 		<spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
-		<plexus-utils3.version>3.6.1</plexus-utils3.version>
-		<plexus-utils4.version>4.0.3</plexus-utils4.version>
+		<plexus-utils.version>4.1.0</plexus-utils.version>
+		<!-- plexus-utils 4 moved the XML classes out; 3.x is the Maven 3 line -->
+		<plexus-xml.version>3.1.0</plexus-xml.version>
 		<commons-beanutils.version>1.11.0</commons-beanutils.version>
 		<aircompressor.version>2.0.3</aircompressor.version>
 		<snappy.version>0.5</snappy.version>
@@ -186,7 +187,7 @@
 					<dependency>
 						<groupId>org.codehaus.plexus</groupId>
 						<artifactId>plexus-utils</artifactId>
-						<version>${plexus-utils4.version}</version>
+						<version>${plexus-utils.version}</version>
 					</dependency>
 				</dependencies>
 			</plugin>
@@ -198,7 +199,12 @@
 					<dependency>
 						<groupId>org.codehaus.plexus</groupId>
 						<artifactId>plexus-utils</artifactId>
-						<version>${plexus-utils3.version}</version>
+						<version>${plexus-utils.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-xml</artifactId>
+						<version>${plexus-xml.version}</version>
 					</dependency>
 				</dependencies>
 			</plugin>
@@ -290,7 +296,12 @@
 					<dependency>
 						<groupId>org.codehaus.plexus</groupId>
 						<artifactId>plexus-utils</artifactId>
-						<version>${plexus-utils3.version}</version>
+						<version>${plexus-utils.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-xml</artifactId>
+						<version>${plexus-xml.version}</version>
 					</dependency>
 				</dependencies>
 				<executions>
@@ -379,7 +390,12 @@
 					<dependency>
 						<groupId>org.codehaus.plexus</groupId>
 						<artifactId>plexus-utils</artifactId>
-						<version>${plexus-utils3.version}</version>
+						<version>${plexus-utils.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>org.codehaus.plexus</groupId>
+						<artifactId>plexus-xml</artifactId>
+						<version>${plexus-xml.version}</version>
 					</dependency>
 				</dependencies>
 				<executions>
@@ -427,7 +443,7 @@
 					<dependency>
 						<groupId>org.codehaus.plexus</groupId>
 						<artifactId>plexus-utils</artifactId>
-						<version>${plexus-utils4.version}</version>
+						<version>${plexus-utils.version}</version>
 					</dependency>
 					<dependency>
 						<groupId>io.airlift</groupId>
@@ -452,7 +468,7 @@
 					<dependency>
 						<groupId>org.codehaus.plexus</groupId>
 						<artifactId>plexus-utils</artifactId>
-						<version>${plexus-utils4.version}</version>
+						<version>${plexus-utils.version}</version>
 					</dependency>
 					<dependency>
 						<groupId>io.airlift</groupId>
@@ -489,7 +505,7 @@
 							<dependency>
 								<groupId>org.codehaus.plexus</groupId>
 								<artifactId>plexus-utils</artifactId>
-								<version>${plexus-utils4.version}</version>
+								<version>${plexus-utils.version}</version>
 							</dependency>
 							<dependency>
 								<groupId>org.apache.commons</groupId>
