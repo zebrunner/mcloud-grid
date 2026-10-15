@@ -46,12 +46,3 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
-  # the linters of tests/requirements-lint.txt
-  - package-ecosystem: pip
-    directory: /tests
-    target-branch: develop
-    schedule:
-      interval: weekly
-    groups:
-      linters:
-        patterns: ["*"]
