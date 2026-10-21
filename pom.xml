@@ -21,7 +21,7 @@
 		<jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
 		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
 		<checkstyle.version>10.12.7</checkstyle.version>
-		<spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
+		<spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
 		<plexus-utils.version>4.1.0</plexus-utils.version>
 		<!-- plexus-utils 4 moved the XML classes out; 3.x is the Maven 3 line -->
 		<plexus-xml.version>3.1.0</plexus-xml.version>
