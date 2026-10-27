@@ -41,6 +41,7 @@ import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.internal.utils.HtmlRenderer;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import org.openqa.selenium.remote.CapabilityType;
+import org.openqa.selenium.remote.http.HttpClient;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -170,7 +171,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             switch (platform) {
             case ANDROID:
                 appiumCheck = (remoteURL, sessionUUID) -> {
-                    Response<String> response = HttpClientApache.create()
+                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create())
                             .withUri(Path.APPIUM_STATUS_ADB, remoteURL.toString())
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
@@ -184,7 +185,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 break;
             case IOS:
                 appiumCheck = (remoteURL, sessionUUID) -> {
-                    Response<String> response = HttpClientApache.create()
+                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create())
                             .withUri(Path.APPIUM_STATUS_WDA, remoteURL.toString())
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
@@ -305,6 +306,24 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                     .put(CapabilityType.PLATFORM_NAME, "tvOS");
         }
         limitNewCommandTimeout(session.getRequestedCapabilities(), internalKey);
+        // the hub keeps the personal STF token of the session (STF_TOKEN of the session), Appium would log it
+        for (String name : new String[] {"zebrunner:" + STF_TOKEN, "appium:" + STF_TOKEN, STF_TOKEN}) {
+            session.getRequestedCapabilities().remove(name);
+        }
+    }
+
+    /**
+     * The requests of the hub to the node (the commands of the sessions, the status polling) carry the token of the node.
+     */
+    @Override
+    public HttpClient getHttpClient(URL url, int connectionTimeout, int readTimeout) {
+        return NODE_REGISTRATION_TOKEN.authenticate(super.getHttpClient(url, connectionTimeout, readTimeout));
+    }
+
+    @Override
+    @Deprecated
+    public HttpClient getHttpClient(URL url) {
+        return NODE_REGISTRATION_TOKEN.authenticate(super.getHttpClient(url));
     }
 
     /**

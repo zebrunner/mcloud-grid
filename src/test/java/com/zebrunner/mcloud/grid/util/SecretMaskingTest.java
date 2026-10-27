@@ -51,6 +51,21 @@ public class SecretMaskingTest {
     }
 
     @Test
+    public void tokensAreMaskedInLogMessages() {
+        Assert.assertEquals(SecretMasking.maskLogMessage("{\"custom\":{\"registrationToken\":\"s3cret\",\"a\":1}}"),
+                "{\"custom\":{\"registrationToken\":\"*****\",\"a\":1}}");
+        Assert.assertEquals(SecretMasking.maskLogMessage("custom={registrationToken=s3cret, a=1}"), "custom={registrationToken=*****, a=1}");
+        Assert.assertEquals(SecretMasking.maskLogMessage("Got a request to create a new session: Capabilities {platformName: Android, "
+                + "zebrunner:STF_TOKEN: personal-token}"), "Got a request to create a new session: Capabilities {platformName: Android, "
+                + "zebrunner:STF_TOKEN: *****}");
+        Assert.assertEquals(SecretMasking.maskLogMessage("{\"zebrunner:STF_TOKEN\": \"personal-token\"}"), "{\"zebrunner:STF_TOKEN\": \"*****\"}");
+        Assert.assertEquals(SecretMasking.maskLogMessage("STF integration: disabled (STF_URL and STF_TOKEN are not set)"),
+                "STF integration: disabled (STF_URL and STF_TOKEN are not set)");
+        Assert.assertEquals(SecretMasking.maskLogMessage("no token here"), "no token here");
+        Assert.assertNull(SecretMasking.maskLogMessage(null));
+    }
+
+    @Test
     public void textWithoutUrlsIsKept() {
         Assert.assertEquals(SecretMasking.maskUrl("a?token=b"), "a?token=b");
         Assert.assertEquals(SecretMasking.maskUrl("http://hub:4444/wd/hub"), "http://hub:4444/wd/hub");

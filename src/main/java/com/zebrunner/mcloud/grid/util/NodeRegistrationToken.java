@@ -3,27 +3,29 @@ package com.zebrunner.mcloud.grid.util;
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
+import org.openqa.selenium.remote.http.HttpClient;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
- * The shared secret a node registers with (NODE_REGISTRATION_TOKEN of the hub and of the node): the node sends it in
- * 'custom' of its configuration, see the node config of zebrunner/appium.
+ * The secret shared by the hub and its nodes (NODE_REGISTRATION_TOKEN of both): a node registers with it in 'custom' of
+ * its configuration, the hub sends it to the node with every request in {@link #HEADER} (zebrunner/appium answers
+ * nothing else but the container itself).
  */
 public final class NodeRegistrationToken {
     public static final String CUSTOM_KEY = "registrationToken";
-    // the token in a log message: the JSON of a registration request (Selenium logs it with -debug) or a map
-    private static final Pattern IN_TEXT = Pattern.compile("(" + CUSTOM_KEY + "\"?\\s*[:=]\\s*\"?)[^\",}\\s]+");
+    public static final String HEADER = "X-MCloud-Node-Token";
 
+    private final String token;
     private final byte[] digest;
 
     private NodeRegistrationToken(String token) {
-        this.digest = StringUtils.isEmpty(token) ? null : sha256(token);
+        this.token = StringUtils.isEmpty(token) ? null : token;
+        this.digest = this.token == null ? null : sha256(token);
     }
 
     /**
@@ -60,13 +62,23 @@ public final class NodeRegistrationToken {
     }
 
     /**
-     * @return the text with the value of every registration token masked
+     * @return the client that sends the token to the node with every request, the client itself without a token
      */
-    public static String mask(String text) {
-        if (text == null || !text.contains(CUSTOM_KEY)) {
-            return text;
+    public HttpClient authenticate(HttpClient client) {
+        if (!isEnabled()) {
+            return client;
         }
-        return IN_TEXT.matcher(text).replaceAll("$1" + SecretMasking.MASK);
+        return request -> {
+            request.setHeader(HEADER, token);
+            return client.execute(request);
+        };
+    }
+
+    /**
+     * @return the client of the requests of the hub itself to the node (the Appium status checks) with the token
+     */
+    public HttpClientApache authenticate(HttpClientApache client) {
+        return isEnabled() ? client.withHeader(HEADER, token) : client;
     }
 
     private static byte[] sha256(String value) {

@@ -20,7 +20,7 @@ public final class JsonLogFormatter extends Formatter {
 
     @Override
     public String format(LogRecord record) {
-        String message = NodeRegistrationToken.mask(formatMessage(record));
+        String message = SecretMasking.maskLogMessage(formatMessage(record));
         if (message == null) {
             message = "";
         }
