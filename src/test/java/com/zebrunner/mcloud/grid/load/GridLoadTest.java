@@ -101,12 +101,22 @@ public class GridLoadTest {
             for (Future<LoadReport.SessionResult> future : futures) {
                 results.add(future.get());
             }
-            LoadReport report = new LoadReport(results, (System.nanoTime() - start) / 1_000_000,
-                    fakeStf == null ? Map.of() : fakeStf.requests());
+            long wallClockMs = (System.nanoTime() - start) / 1_000_000;
+            if (fakeStf != null) {
+                // the hub returns the device of an ended session in the background
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+                while (fakeStf.reservedDevices() > 0 && System.nanoTime() < until) {
+                    Thread.sleep(100);
+                }
+            }
+            LoadReport report = new LoadReport(results, wallClockMs, fakeStf == null ? Map.of() : fakeStf.requests());
             Path file = report.write(config);
             System.out.println("[load] report: " + file.toAbsolutePath());
             System.out.println(report.toJson(config));
 
+            if (fakeStf != null) {
+                Assert.assertEquals(fakeStf.reservedDevices(), 0L, "the devices still reserved in STF after the sessions ended");
+            }
             Assert.assertTrue(report.errorRate() <= config.maxErrorRate,
                     String.format("Error rate %.2f%% exceeds %.2f%%: %s", report.errorRate() * 100, config.maxErrorRate * 100, report.errors()));
             if (config.maxP95CreateMs > 0) {

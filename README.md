@@ -36,8 +36,8 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`.
 | Env var | Default | Meaning |
 | --- | --- | --- |
 | `GRID_NEW_SESSION_WAIT_TIMEOUT` | `600000` | How long a new session request waits in the queue, ms |
-| `GRID_TIMEOUT` | `150` | Client inactivity timeout of a session, s |
-| `GRID_BROWSER_TIMEOUT` | `0` | Timeout of a command on the node, s (0 = none) |
+| `GRID_TIMEOUT` | `150` | Client inactivity timeout of a session, s; it replaces the one of the nodes (`0` keeps the one of the nodes) |
+| `GRID_BROWSER_TIMEOUT` | `900` | Timeout of a command on the node, s (0 = none); it replaces the one of the nodes (zebrunner/appium sends `0`): a hung command fails after it and the device is released, instead of staying busy until the restart of the hub |
 | `GRID_CLEAN_UP_CYCLE` | `5000` | How often the hub checks timed out sessions, ms |
 | `GRID_THROW_ON_CAPABILITY_NOT_PRESENT` | `true` | Reject requests no registered device can serve; see [Queueing](#queueing) |
 | `GRID_JETTY_MAX_THREADS` | `-1` | Jetty threads of the hub (-1 = default) |
@@ -99,6 +99,12 @@ The same token authenticates the hub to the nodes: every request of the hub to a
 The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is in no log of Appium; the hub masks it (and the registration token) in its own logs, e.g. the session requests Selenium logs with `-debug`.
 
 `/lifecycle-manager` of Selenium, which shuts the hub down for anyone, is turned off in the hub config (`withoutServlets`).
+
+### Matching
+
+The hub matches the queued requests to the devices in the order of the queue: it claims a free matching device for a request, then prepares it (the Appium status check of `CHECK_APPIUM_STATUS`, the reservation in STF) without the lock of the registry, the devices of several requests in parallel. A slow STF or node delays only its request, not the queueing, the end of the sessions and the registration of the nodes. A device that fails a request (not ready, not reserved in STF) is skipped by this request for 10 s, the request gets the next device at once. A device prepared for a request that is gone meanwhile (timed out) or on a node lost meanwhile is returned in STF.
+
+When the hub loses a node (it is down for `unregisterIfStillDownAfter` of the node, or registers again) its sessions end and their devices are returned in STF. An invalid `zebrunner:STF_TIMEOUT` (not a whole number of seconds) is logged and the default timeout is used.
 
 ### Queueing
 

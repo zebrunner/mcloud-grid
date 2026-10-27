@@ -6,6 +6,7 @@ import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
+import org.openqa.grid.internal.SessionTerminationReason;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.selenium.remote.http.HttpMethod;
 import org.openqa.selenium.remote.http.HttpRequest;
@@ -22,6 +23,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.delete;
 import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
@@ -254,6 +256,35 @@ public class MobileRemoteProxyStfTest {
     public void nodeNotPresentInStfIsRejected() {
         Assert.expectThrows(GridException.class,
                 () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps("not-in-stf")));
+    }
+
+    public void abandonedSessionReturnsDeviceToStf() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        TestSession session = proxy.getNewSession(request("Android"));
+
+        proxy.abandon(session);
+
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
+    }
+
+    public void sessionOfALostNodeReturnsDeviceToStfOnce() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        TestSession session = proxy.getNewSession(request("Android"));
+
+        proxy.releaseLostSession(session, SessionTerminationReason.PROXY_REREGISTRATION);
+        proxy.afterSession(session);
+
+        stf.server().verify(1, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
+    }
+
+    public void deviceWithAnInvalidStfTimeoutIsReserved() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        Map<String, Object> requested = request("Android");
+        requested.put("zebrunner:STF_TIMEOUT", "1h");
+
+        Assert.assertNotNull(proxy.getNewSession(requested));
+
+        stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices")).withRequestBody(containing("\"timeout\":3600000")));
     }
 
     public void afterSessionReturnsDeviceToStf() {

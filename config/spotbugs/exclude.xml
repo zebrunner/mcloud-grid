@@ -14,6 +14,12 @@
         <Class name="com.zebrunner.mcloud.grid.MobileRemoteProxy"/>
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
     </Match>
+    <!-- GridRegistry.getAllProxies returns the ProxySet of the registry: the servlets of Selenium iterate it -->
+    <Match>
+        <Class name="com.zebrunner.mcloud.grid.MobileGridRegistry"/>
+        <Method name="getAllProxies"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
     <!-- Tests intentionally use fixtures and mocks in ways SpotBugs dislikes -->
     <Match>
         <Class name="~.*Test(\$.*)?"/>

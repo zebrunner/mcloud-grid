@@ -27,6 +27,7 @@ import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient;
 import org.apache.commons.lang3.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -44,7 +45,7 @@ public final class STFClient {
     private static final String STF_URL = System.getenv("STF_URL");
     public static final String DEFAULT_STF_TOKEN = System.getenv("STF_TOKEN");
     // Max time is seconds for reserving devices in STF
-    private static final String DEFAULT_STF_TIMEOUT = System.getenv("STF_TIMEOUT");
+    private static final String DEFAULT_STF_TIMEOUT = validStfTimeout(System.getenv("STF_TIMEOUT"));
     private static final int FALLBACK_STF_TIMEOUT = 3600;
     private static final boolean IS_STF_ENABLED = (!StringUtils.isEmpty(STF_URL) && !StringUtils.isEmpty(DEFAULT_STF_TOKEN));
 
@@ -417,13 +418,47 @@ public final class STFClient {
     }
 
     /**
-     * STF reservation timeout in seconds: 'STF_TIMEOUT' capability, then STF_TIMEOUT env var, then 1 hour.
+     * @return STF_TIMEOUT of the env if it is a positive number of seconds, otherwise null (1 hour) with an error in the log
+     */
+    private static String validStfTimeout(String value) {
+        if (StringUtils.isBlank(value) || parseSeconds(value).isPresent()) {
+            return value;
+        }
+        LOGGER.severe(() -> String.format("[CONFIGURATION] STF_TIMEOUT '%s' is not a positive number of seconds, %s seconds are used.",
+                value, FALLBACK_STF_TIMEOUT));
+        return null;
+    }
+
+    /**
+     * STF reservation timeout in seconds: 'STF_TIMEOUT' capability, then STF_TIMEOUT env var, then 1 hour. A value that is
+     * not a positive whole number of seconds (e.g. "1h", 3600.5) is skipped with a warning: it must not fail the session.
      */
     static int stfTimeoutSeconds(Map<String, Object> requestedCapabilities, String defaultTimeout) {
-        return CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TIMEOUT")
-                .map(String::valueOf)
-                .map(Integer::parseInt)
-                .orElseGet(() -> StringUtils.isBlank(defaultTimeout) ? FALLBACK_STF_TIMEOUT : Integer.parseInt(defaultTimeout));
+        Object requested = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TIMEOUT").orElse(null);
+        Optional<Integer> seconds = parseSeconds(requested);
+        if (requested != null && seconds.isEmpty()) {
+            LOGGER.warning(() -> String.format("The capability 'zebrunner:STF_TIMEOUT' %s is not a positive number of seconds, "
+                    + "the default reservation timeout is used.", requested));
+        }
+        return seconds.or(() -> parseSeconds(StringUtils.trimToNull(defaultTimeout))).orElse(FALLBACK_STF_TIMEOUT);
+    }
+
+    /**
+     * @return the positive whole number of seconds of a number (3600, 3600.0) or a text ("3600"), empty otherwise
+     */
+    static Optional<Integer> parseSeconds(Object value) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        try {
+            BigDecimal number = new BigDecimal(String.valueOf(value).trim());
+            if (number.signum() <= 0 || number.stripTrailingZeros().scale() > 0 || number.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0) {
+                return Optional.empty();
+            }
+            return Optional.of(number.intValueExact());
+        } catch (NumberFormatException | ArithmeticException e) {
+            return Optional.empty();
+        }
     }
 
     /**

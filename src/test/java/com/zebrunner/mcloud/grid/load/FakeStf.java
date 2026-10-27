@@ -44,6 +44,13 @@ final class FakeStf implements AutoCloseable {
     }
 
     /**
+     * @return number of the devices reserved now
+     */
+    long reservedDevices() {
+        return devices.values().stream().filter(owner -> !owner.isEmpty()).count();
+    }
+
+    /**
      * @return number of requests by "METHOD endpoint", serials replaced by {serial}
      */
     Map<String, Long> requests() {
