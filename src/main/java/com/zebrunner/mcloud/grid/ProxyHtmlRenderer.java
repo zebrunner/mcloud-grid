@@ -6,6 +6,7 @@ import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.internal.utils.HtmlRenderer;
 import org.openqa.grid.web.servlet.console.DefaultProxyHtmlRenderer;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -38,12 +39,12 @@ public class ProxyHtmlRenderer implements HtmlRenderer {
         builder.append(HEADER_PATCH_SCRIPT);
         builder.append("<div class='proxy'>");
         builder.append("<p class='proxyname'>");
-        builder.append(proxy.getClass().getSimpleName());
-        builder.append(getHtmlNodeVersion());
+        builder.append(escape(proxy.getClass().getSimpleName()));
+        builder.append(escape(getHtmlNodeVersion()));
         builder.append("</p>");
         builder.append("<p class='proxyid'>id : ");
-        builder.append(proxy.getId());
-        builder.append(", OS : ").append(DefaultProxyHtmlRenderer.getPlatform(proxy)).append("</p>");
+        builder.append(escape(proxy.getId()));
+        builder.append(", OS : ").append(escape(platform(proxy))).append("</p>");
         builder.append(nodeTabs());
         builder.append("<div class='content'>");
         builder.append(tabInfo());
@@ -63,6 +64,17 @@ public class ProxyHtmlRenderer implements HtmlRenderer {
             return " (version : " + version + ")";
         } catch (Exception e) {
             return " unknown version," + e.getMessage();
+        }
+    }
+
+    /**
+     * The 'platform' of the node: Selenium fails on a value that is not one of its platforms, the card is rendered anyway.
+     */
+    private static String platform(RemoteProxy proxy) {
+        try {
+            return DefaultProxyHtmlRenderer.getPlatform(proxy);
+        } catch (RuntimeException e) {
+            return "Unknown";
         }
     }
 
@@ -102,11 +114,19 @@ public class ProxyHtmlRenderer implements HtmlRenderer {
         return builder.toString();
     }
 
+    /**
+     * The configuration the node registered with: the values come from the node, so they are escaped.
+     */
     private String tabConfig() {
         RemoteProxy proxy = proxy();
-        return "<div type='config' class='content_detail'>"
-                + proxy.getConfig().toString("<p>%1$s: %2$s</p>")
-                + "</div>";
+        StringBuilder builder = new StringBuilder("<div type='config' class='content_detail'>");
+        proxy.getConfig().toJson().forEach((name, value) -> {
+            if (value instanceof Map && ((Map<?, ?>) value).isEmpty() || value instanceof Collection && ((Collection<?>) value).isEmpty()) {
+                return;
+            }
+            builder.append("<p>").append(escape(name)).append(": ").append(escape(String.valueOf(value))).append("</p>");
+        });
+        return builder.append("</div>").toString();
     }
 
     private RemoteProxy proxy() {
@@ -140,7 +160,7 @@ public class ProxyHtmlRenderer implements HtmlRenderer {
         return value.replaceAll("([a-z])([A-Z])", "$1 $2");
     }
 
-    private static String escape(String value) {
+    static String escape(String value) {
         return String.valueOf(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 .replace("\"", "&quot;").replace("'", "&#39;");
     }

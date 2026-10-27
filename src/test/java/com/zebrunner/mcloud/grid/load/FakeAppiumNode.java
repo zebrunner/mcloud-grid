@@ -30,6 +30,7 @@ final class FakeAppiumNode implements AutoCloseable {
     private final String platform;
     private final long sessionDelayMs;
     private final String advertisedUrl;
+    private final String registrationToken;
     private final Set<String> sessions = ConcurrentHashMap.newKeySet();
     private final AtomicInteger createdSessions = new AtomicInteger();
     private final ScheduledExecutorService reRegistration = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -38,8 +39,9 @@ final class FakeAppiumNode implements AutoCloseable {
         return thread;
     });
 
-    FakeAppiumNode(String udid, String platform, String advertisedHost, long sessionDelayMs) throws IOException {
+    FakeAppiumNode(String udid, String platform, String advertisedHost, long sessionDelayMs, String registrationToken) throws IOException {
         this.udid = udid;
+        this.registrationToken = registrationToken;
         this.platform = platform;
         this.sessionDelayMs = sessionDelayMs;
         this.server = HttpServer.create(new InetSocketAddress(0), 0);
@@ -91,6 +93,8 @@ final class FakeAppiumNode implements AutoCloseable {
                 + "\"id\":\"" + advertisedUrl + "\",\"remoteHost\":\"" + advertisedUrl + "\",\"url\":\"" + advertisedUrl + "\","
                 + "\"proxy\":\"com.zebrunner.mcloud.grid.MobileRemoteProxy\",\"maxSession\":1,\"register\":true,\"registerCycle\":5000,"
                 + "\"nodePolling\":2000,\"unregisterIfStillDownAfter\":5000,\"downPollingLimit\":1,"
+                + (registrationToken == null ? "" : "\"custom\":{\"registrationToken\":\""
+                        + registrationToken.replace("\\", "\\\\").replace("\"", "\\\"") + "\"},")
                 + "\"capabilities\":[" + caps + "]}}";
         HttpResponse<String> response = HttpClient.newHttpClient().send(
                 GridLoadTest.request(hubRoot + "/grid/register", "POST", body, Duration.ofSeconds(30), authorization),

@@ -4,6 +4,7 @@
 #   e.g. tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
 # FAKE_STF_PORT=<port> enables STF in the hub with an in-process fake STF on that port (latency: -Dload.fakeStf.latencyMs=...),
 # HUB_ENV="NAME=value ..." passes more env vars to the hub container.
+# The hub requires a random NODE_REGISTRATION_TOKEN, the fake nodes register with it (LOAD_NODE_REGISTRATION_TOKEN).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -16,7 +17,11 @@ TEST_CONTAINER=${TEST_CONTAINER:-${CONTAINER}-tests}
 PORT=${PORT:-4444}
 FAKE_STF_PORT=${FAKE_STF_PORT:-}
 
-hub_env=()
+# the token reaches the containers through the environment, not their command lines
+NODE_REGISTRATION_TOKEN="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
+export NODE_REGISTRATION_TOKEN
+export LOAD_NODE_REGISTRATION_TOKEN="$NODE_REGISTRATION_TOKEN"
+hub_env=(--env NODE_REGISTRATION_TOKEN)
 for variable in ${HUB_ENV:-}; do
   hub_env+=(--env "$variable")
 done

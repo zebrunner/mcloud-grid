@@ -2,6 +2,7 @@ package com.zebrunner.mcloud.grid.servlets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
+import com.zebrunner.mcloud.grid.util.SecretMasking;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.web.servlet.RegistryBasedServlet;
@@ -64,6 +65,7 @@ public class AllSessionsServlet extends RegistryBasedServlet {
         for (String name : DEVICE_CAPABILITIES) {
             CapabilityUtils.getAppiumCapability(device, name).ifPresent(value -> merged.put(name, value));
         }
-        return merged;
+        // the servlet answers anyone who reaches the hub: no STF token, remote ADB address or other secret
+        return SecretMasking.mask(merged);
     }
 }

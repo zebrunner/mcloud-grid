@@ -8,9 +8,9 @@ MAVEN_CACHE_DIR=${MAVEN_CACHE_DIR:-${HOME}/.m2}
 
 mkdir -p "$MAVEN_CACHE_DIR"
 
-# Default passthrough list keeps auth credentials available to load tests running inside Docker.
+# Default passthrough list keeps auth credentials and the node registration token available to load tests running inside Docker.
 # Users can still override it with a custom space-delimited list of env names.
-: "${MVN_PASSTHROUGH_ENV_VARS:=LOAD_GRID_USERNAME LOAD_GRID_PASSWORD}"
+: "${MVN_PASSTHROUGH_ENV_VARS:=LOAD_GRID_USERNAME LOAD_GRID_PASSWORD LOAD_NODE_REGISTRATION_TOKEN}"
 
 docker_args=(
   --rm

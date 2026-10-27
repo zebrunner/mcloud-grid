@@ -1,5 +1,6 @@
 package com.zebrunner.mcloud.grid;
 
+import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.internal.DefaultGridRegistry;
 import org.openqa.grid.internal.GridRegistry;
@@ -17,6 +18,8 @@ import java.util.Map;
  * Builds real (not mocked) Selenium Grid objects for proxy tests.
  */
 public final class GridFixtures {
+    // NODE_REGISTRATION_TOKEN of the 'stf-tests' execution; the hub without a token accepts it too
+    public static final String REGISTRATION_TOKEN = "test-registration-token";
 
     private GridFixtures() {
         //hide
@@ -55,6 +58,7 @@ public final class GridFixtures {
         config.id = nodeUrl;
         config.remoteHost = nodeUrl;
         config.proxy = MobileRemoteProxy.class.getName();
+        config.custom = new HashMap<>(Map.of(NodeRegistrationToken.CUSTOM_KEY, REGISTRATION_TOKEN));
         MutableCapabilities caps = new MutableCapabilities(capabilities);
         caps.setCapability(RegistrationRequest.MAX_INSTANCES, 1);
         List<MutableCapabilities> list = new ArrayList<>();

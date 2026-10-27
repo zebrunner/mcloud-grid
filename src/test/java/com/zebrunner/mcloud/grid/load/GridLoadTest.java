@@ -64,7 +64,7 @@ public class GridLoadTest {
         }
         for (int i = 0; i < config.fakeNodes; i++) {
             FakeAppiumNode node = new FakeAppiumNode("fake-" + i + "-" + System.nanoTime(), config.fakeNodesPlatform, config.fakeNodesHost,
-                    config.fakeNodeSessionDelayMs);
+                    config.fakeNodeSessionDelayMs, config.nodeRegistrationToken);
             fakeNodes.add(node);
             if (fakeStf != null) {
                 fakeStf.addDevice(node.udid());

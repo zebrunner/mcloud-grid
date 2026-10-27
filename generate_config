@@ -15,11 +15,15 @@ cat << _EOF
   "timeout": $GRID_TIMEOUT,
   "debug": $GRID_DEBUG,
   "proxy": "$GRID_PROXY",
+  "registry": "com.zebrunner.mcloud.grid.MobileGridRegistry",
   "servlets": [
     "com.zebrunner.mcloud.grid.servlets.AllSessionsServlet",
     "com.zebrunner.mcloud.grid.servlets.DevicesServlet",
     "com.zebrunner.mcloud.grid.servlets.MetricsServlet",
     "com.zebrunner.mcloud.grid.servlets.TerminateSessionServlet"
+  ],
+  "withoutServlets": [
+    "org.openqa.grid.web.servlet.LifecycleServlet"
   ]
 }
 _EOF

@@ -49,6 +49,8 @@ final class LoadConfig {
     final String reportDir;
     /** Preemptive Authorization header for every WebDriver request; never print this value. */
     final String authorization;
+    /** NODE_REGISTRATION_TOKEN of the hub the fake nodes register with (LOAD_NODE_REGISTRATION_TOKEN), null = none; never print this value. */
+    final String nodeRegistrationToken;
 
     private LoadConfig() {
         this(System.getenv("LOAD_GRID_USERNAME"), System.getenv("LOAD_GRID_PASSWORD"));
@@ -73,6 +75,8 @@ final class LoadConfig {
         fakeStfPort = Integer.getInteger("load.fakeStf.port", 0);
         fakeStfLatencyMs = Long.getLong("load.fakeStf.latencyMs", 0L);
         reportDir = System.getProperty("load.reportDir", "target/load-report");
+        String token = System.getenv("LOAD_NODE_REGISTRATION_TOKEN");
+        nodeRegistrationToken = token == null || token.isEmpty() ? null : token;
         authorization = basicAuthorization(username, password);
         if (sessions <= 0 || concurrency <= 0 || commandsPerSession < 0 || commandDuration.isNegative()
                 || commandInterval.isZero() || commandInterval.isNegative() || sessionHold.isNegative() || newSessionTimeout.isZero()
