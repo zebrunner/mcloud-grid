@@ -29,6 +29,7 @@ import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.openqa.grid.common.RegistrationRequest;
@@ -95,6 +96,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return true;
         }
     };
+
+    // zebrunner/appium gives WebDriverAgent 3 s and a second attempt, adb 5 s: the hub waits longer for the status
+    // check, otherwise a slow WDA ignores the device here while Appium answers it is ready
+    private static final Duration APPIUM_STATUS_TIMEOUT = EnvUtils.getDurationInSeconds("APPIUM_STATUS_TIMEOUT", Duration.ofSeconds(10));
+    private static final RequestConfig APPIUM_STATUS_REQUEST = RequestConfig.custom()
+            .setConnectionRequestTimeout(1000)
+            .setConnectTimeout(2000)
+            .setSocketTimeout((int) APPIUM_STATUS_TIMEOUT.toMillis())
+            .build();
 
     // adb/wda timeout
     private static final Duration UNHEALTHY_MOBILE_TIMEOUT = EnvUtils.getDurationInSeconds("UNHEALTHY_MOBILE_TIMEOUT", Duration.ofMinutes(1));
@@ -172,7 +182,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             switch (platform) {
             case ANDROID:
                 appiumCheck = (remoteURL, sessionUUID) -> {
-                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create())
+                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create().withRequestConfig(APPIUM_STATUS_REQUEST))
                             .withUri(Path.APPIUM_STATUS_ADB, remoteURL.toString())
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
@@ -186,7 +196,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 break;
             case IOS:
                 appiumCheck = (remoteURL, sessionUUID) -> {
-                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create())
+                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create().withRequestConfig(APPIUM_STATUS_REQUEST))
                             .withUri(Path.APPIUM_STATUS_WDA, remoteURL.toString())
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {

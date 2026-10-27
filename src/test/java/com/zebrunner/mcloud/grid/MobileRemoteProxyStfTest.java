@@ -348,6 +348,15 @@ public class MobileRemoteProxyStfTest {
         Assert.assertNotNull(session.getRequestedCapabilities().get("zebrunner:slotCapabilities"));
     }
 
+    public void slowAppiumStatusCheckIsAwaited() {
+        // zebrunner/appium may take more than 3 s (WebDriverAgent gets 3 s and a second attempt)
+        stf.server().stubFor(get("/wd/hub/status-wda").willReturn(aResponse().withStatus(200).withFixedDelay(4000)));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+
+        Assert.assertNotNull(proxy.getNewSession(request("iOS")));
+        Assert.assertFalse(IgnoredDevices.get(IOS_UDID).isPresent());
+    }
+
     public void appiumStatusCheckSendsTheNodeToken() {
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
 

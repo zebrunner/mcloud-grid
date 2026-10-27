@@ -63,6 +63,7 @@ STF integration is enabled when both `STF_URL` and `STF_TOKEN` are set.
 | `STF_TOKEN` | | Access token of the STF user that reserves devices for automation; when the user is an STF admin, a device that does not answer the reservation is also marked unhealthy in STF |
 | `STF_TIMEOUT` | `3600` | Reservation timeout of a device in STF, s |
 | `CHECK_APPIUM_STATUS` | `false` | Check `/status-adb` (Android) or `/status-wda` (iOS) of the node before a session |
+| `APPIUM_STATUS_TIMEOUT` | `10` | How long the hub waits for the Appium status check, s; zebrunner/appium gives WebDriverAgent 3 s and a second attempt, adb 5 s |
 | `UNHEALTHY_MOBILE_TIMEOUT` | `60` | A device failing the Appium status check is skipped for, s |
 | `INACTIVITY_RELEASE_TIMEOUT` | `60` | A device whose session timed out before it started is skipped for, s |
 | `STF_DEVICE_INVALID_RESPONSE_IGNORE_TIMEOUT` | `600` | A device with an invalid STF status or failed reservation is skipped for, s |
