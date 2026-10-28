@@ -7,14 +7,19 @@ import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
+import org.openqa.selenium.remote.http.HttpMethod;
+import org.openqa.selenium.remote.http.HttpRequest;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.delete;
@@ -296,6 +301,45 @@ public class MobileRemoteProxyStfTest {
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID + "/remoteConnect"))
                 .withHeader("Authorization", equalTo("Bearer personal-token")));
         stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID)));
+    }
+
+    public void personalStfTokenIsNotForwardedToTheNode() {
+        stf.user("personal-token", "john");
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        Map<String, Object> requested = request("iOS");
+        requested.put("zebrunner:STF_TOKEN", "personal-token");
+        TestSession session = proxy.getNewSession(requested);
+
+        proxy.beforeSession(session);
+
+        Assert.assertFalse(session.getRequestedCapabilities().containsKey("zebrunner:STF_TOKEN"), session.getRequestedCapabilities().toString());
+        Assert.assertEquals(session.get("STF_TOKEN"), "personal-token");
+        Assert.assertNotNull(session.getRequestedCapabilities().get("zebrunner:slotCapabilities"));
+    }
+
+    public void appiumStatusCheckSendsTheNodeToken() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+
+        Assert.assertNotNull(proxy.getNewSession(request("Android")));
+
+        stf.server().verify(getRequestedFor(urlEqualTo("/wd/hub/status-adb"))
+                .withHeader(NodeRegistrationToken.HEADER, equalTo(GridFixtures.REGISTRATION_TOKEN)));
+    }
+
+    public void requestsOfTheHubToTheNodeSendTheNodeToken() throws Exception {
+        stf.server().stubFor(get("/wd/hub/status").willReturn(okJson("{\"value\":{\"ready\":true}}")));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+
+        // the client of the commands of the sessions and of the status polling
+        proxy.getHttpClient(new URL(nodeUrl), 1000, 1000).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/status"));
+        proxy.getProxyStatus();
+
+        // the polling of the nodes of the other tests may add requests
+        List<String> tokens = stf.server().findAll(getRequestedFor(urlEqualTo("/wd/hub/status"))).stream()
+                .map(request -> request.getHeader(NodeRegistrationToken.HEADER))
+                .collect(Collectors.toList());
+        Assert.assertTrue(tokens.size() >= 2, tokens.toString());
+        Assert.assertTrue(tokens.stream().allMatch(GridFixtures.REGISTRATION_TOKEN::equals), tokens.toString());
     }
 
     public void deviceReservedWithPersonalTokenIsNotReturned() {

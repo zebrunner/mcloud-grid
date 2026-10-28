@@ -48,7 +48,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`.
 | `SE_OPTS` | | Extra hub options, e.g. `-debug`; `-servlets` replaces the [servlets](#endpoints) of the hub config |
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
-| `NODE_REGISTRATION_TOKEN` | | The secret a node registers with, see [Node registration](#node-registration); not set = any node (with a warning in the log) |
+| `NODE_REGISTRATION_TOKEN` | | The secret a node registers with and the hub sends to the nodes, see [Node registration](#node-registration); not set = any node (with a warning in the log) |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
 | `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
@@ -78,7 +78,7 @@ STF integration is enabled when both `STF_URL` and `STF_TOKEN` are set.
 | `appium:platformVersion` | Exact (`13`), range (`11-13`), minimum (`12+`) or list (`12,14`); `7` matches `7.0` |
 | `appium:deviceName`, `appium:udid` | One value or a comma separated list |
 | `zebrunner:deviceType` | `phone`, `tablet`, `tv`, `tvOS`, ...; `tvOS` devices get `platformName=tvOS` |
-| `zebrunner:STF_TOKEN` | Personal STF token: the device is reserved as that user and is not returned after the session |
+| `zebrunner:STF_TOKEN` | Personal STF token: the device is reserved as that user and is not returned after the session; the hub does not pass it to Appium |
 | `zebrunner:STF_TIMEOUT` | Reservation timeout in STF for this session, s |
 | `zebrunner:enableAdb` | Android: wait for the remote ADB connection of STF before the session |
 
@@ -86,13 +86,17 @@ The node capabilities of the reserved device are passed to the session as `zebru
 
 ### Node registration
 
-A node registers with the hub through `/grid/register`, which answers anyone who reaches the hub, and gets the sessions of its device with their capabilities (e.g. `zebrunner:STF_TOKEN`). So the hub registers a node only when:
+A node registers with the hub through `/grid/register`, which answers anyone who reaches the hub, and gets the sessions of its device with their commands and capabilities. So the hub registers a node only when:
 
 - its proxy is `MobileRemoteProxy` (the registry of the hub config, `MobileGridRegistry`, rejects the others): a node with another class would skip the checks below;
 - it sends `NODE_REGISTRATION_TOKEN` of the hub in `custom` of its configuration (`"custom": {"registrationToken": "<token>"}`), which [zebrunner/appium](https://github.com/zebrunner/appium) does with its own `NODE_REGISTRATION_TOKEN`; the hub takes the token out of the configuration it keeps, so the console, `/grid/api/proxy` and the logs do not show it;
 - its address is in `NODE_ALLOWED_NETWORKS` and reachable (`CHECK_NODE_REACHABILITY`), and its device is in STF.
 
 A node that registers again at the same address (e.g. after the hub restarted) is checked for the token only; a node with the id of a registered one at another address is checked as a new node. A rejected node is logged with the reason once in 10 minutes. Without `NODE_REGISTRATION_TOKEN` the hub logs a warning on start: any host that reaches it can register a node. Generate the token with e.g. `openssl rand -hex 24` and set it for the hub and for every node (`NODE_REGISTRATION_TOKEN` of mcloud-agent); a node without it is not registered until it has the token.
+
+The same token authenticates the hub to the nodes: every request of the hub to a node (the commands of the sessions, the status polling, the Appium status checks) carries it in the header `X-MCloud-Node-Token`, and zebrunner/appium with `NODE_REGISTRATION_TOKEN` answers only such requests and the ones of its own container. So the Appium of a device is used through the hub only, which reserves the device in STF.
+
+The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is in no log of Appium; the hub masks it (and the registration token) in its own logs, e.g. the session requests Selenium logs with `-debug`.
 
 `/lifecycle-manager` of Selenium, which shuts the hub down for anyone, is turned off in the hub config (`withoutServlets`).
 

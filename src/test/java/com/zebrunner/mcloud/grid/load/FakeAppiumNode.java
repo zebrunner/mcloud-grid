@@ -109,7 +109,10 @@ final class FakeAppiumNode implements AutoCloseable {
         String path = exchange.getRequestURI().getPath().replaceFirst("^/wd/hub", "");
         exchange.getRequestBody().readAllBytes();
         try {
-            if (path.equals("/status") || path.equals("/status-adb") || path.equals("/status-wda")) {
+            // as zebrunner/appium with NODE_REGISTRATION_TOKEN: the requests of the hub carry the token
+            if (registrationToken != null && !registrationToken.equals(exchange.getRequestHeaders().getFirst("X-MCloud-Node-Token"))) {
+                respond(exchange, 401, "{\"value\":{\"error\":\"unknown error\",\"message\":\"no node token\"}}");
+            } else if (path.equals("/status") || path.equals("/status-adb") || path.equals("/status-wda")) {
                 respond(exchange, 200, "{\"status\":0,\"value\":{\"ready\":true,\"message\":\"fake node\"}}");
             } else if ("POST".equals(method) && path.equals("/session")) {
                 sleep(sessionDelayMs);

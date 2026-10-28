@@ -1,9 +1,15 @@
 package com.zebrunner.mcloud.grid.util;
 
 import org.openqa.grid.common.RegistrationRequest;
+import org.openqa.selenium.remote.http.HttpClient;
+import org.openqa.selenium.remote.http.HttpMethod;
+import org.openqa.selenium.remote.http.HttpRequest;
+import org.openqa.selenium.remote.http.HttpResponse;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,12 +67,18 @@ public class NodeRegistrationTokenTest {
     }
 
     @Test
-    public void tokenIsMaskedInLogMessages() {
-        Assert.assertEquals(NodeRegistrationToken.mask("{\"custom\":{\"registrationToken\":\"s3cret\",\"a\":1}}"),
-                "{\"custom\":{\"registrationToken\":\"*****\",\"a\":1}}");
-        Assert.assertEquals(NodeRegistrationToken.mask("custom={registrationToken=s3cret, a=1}"), "custom={registrationToken=*****, a=1}");
-        Assert.assertEquals(NodeRegistrationToken.mask("no token here"), "no token here");
-        Assert.assertNull(NodeRegistrationToken.mask(null));
+    public void clientOfTheHubSendsTheTokenToTheNode() throws Exception {
+        List<String> sent = new ArrayList<>();
+        HttpClient client = request -> {
+            sent.add(request.getHeader(NodeRegistrationToken.HEADER));
+            return new HttpResponse();
+        };
+
+        NodeRegistrationToken.of("s3cret").authenticate(client).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/status"));
+        NodeRegistrationToken.of("").authenticate(client).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/status"));
+
+        Assert.assertEquals(sent, Arrays.asList("s3cret", null));
+        Assert.assertSame(NodeRegistrationToken.of("").authenticate(client), client);
     }
 
     @Test

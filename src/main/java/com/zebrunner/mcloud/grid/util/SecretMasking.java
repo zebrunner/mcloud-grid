@@ -23,6 +23,9 @@ public final class SecretMasking {
     private static final Pattern URL_USER_INFO = Pattern.compile("(?i)\\b([a-z][a-z0-9+.-]*://)[^/?#@\\s]+@");
     // a query parameter with the name of a secret, e.g. ?token=... or &X-Amz-Signature=...
     private static final Pattern URL_SECRET_PARAMETER = Pattern.compile("([?&][^=&#\\s]+=)([^&#\\s]*)");
+    // the registration token of a node and the STF token of a session in a log message: JSON (the registration request
+    // Selenium logs with -debug), a map or the capabilities of a session request (Capabilities {zebrunner:STF_TOKEN: ...})
+    private static final Pattern LOG_SECRET = Pattern.compile("((?:" + NodeRegistrationToken.CUSTOM_KEY + "|STF_TOKEN)\"?\\s*[:=]\\s*\"?)[^\",}\\s]+");
 
     private SecretMasking() {
         //hide
@@ -68,6 +71,16 @@ public final class SecretMasking {
             return maskUrl((String) value);
         }
         return value;
+    }
+
+    /**
+     * @return the log message with the registration tokens and the STF tokens masked
+     */
+    public static String maskLogMessage(String message) {
+        if (message == null || !message.contains(NodeRegistrationToken.CUSTOM_KEY) && !message.contains("STF_TOKEN")) {
+            return message;
+        }
+        return LOG_SECRET.matcher(message).replaceAll("$1" + MASK);
     }
 
     /**

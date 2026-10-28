@@ -17,6 +17,8 @@ package com.zebrunner.mcloud.grid.util;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,6 +51,7 @@ public final class HttpClientApache {
     private RequestConfig requestConfig = DEFAULT_REQUEST_CFG;
 
     private String url;
+    private final Map<String, String> headers = new LinkedHashMap<>();
 
     private HttpClientApache() {
     }
@@ -59,6 +62,11 @@ public final class HttpClientApache {
 
     public HttpClientApache withRequestConfig(RequestConfig requestConfig) {
         this.requestConfig = requestConfig;
+        return this;
+    }
+
+    public HttpClientApache withHeader(String name, String value) {
+        headers.put(name, value);
         return this;
     }
 
@@ -129,6 +137,7 @@ public final class HttpClientApache {
     }
 
     private Response<String> execute(HttpUriRequest req) {
+        headers.forEach(req::setHeader);
         Response<String> result = new Response<String>();
         try (CloseableHttpClient httpClient = HttpClientBuilder.create()
                 .setDefaultRequestConfig(requestConfig)
