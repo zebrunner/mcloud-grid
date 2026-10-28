@@ -178,6 +178,17 @@ public class STFClientTest {
         Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS"), "1800"), 1800);
         Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS"), null), 3600);
         Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS"), ""), 3600);
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS", "zebrunner:STF_TIMEOUT", 600.0), "1800"), 600);
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS", "zebrunner:STF_TIMEOUT", " 90 "), "1800"), 90);
+    }
+
+    public void invalidStfTimeoutIsNotAFailure() {
+        // a value that is not a positive whole number of seconds failed the session after the slot was taken
+        for (Object invalid : new Object[] {"1h", 3600.5, "3600.5", -5, 0, "", "99999999999", true}) {
+            Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS", "zebrunner:STF_TIMEOUT", invalid), "1800"), 1800, String.valueOf(invalid));
+        }
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS", "zebrunner:STF_TIMEOUT", "1h"), "2h"), 3600);
+        Assert.assertEquals(STFClient.stfTimeoutSeconds(caps("iOS"), "-1"), 3600);
     }
 
     public void unknownDeviceIsNotReserved() {

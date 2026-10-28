@@ -38,6 +38,15 @@ Local hub in Docker (builds the image from this repo; `make load` runs a short v
 tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
 ```
 
+With a fake STF in the test process (`FAKE_STF_PORT`, published by the Maven container) and a latency of every STF response, e.g. a slow STF: the hub reserves the fake devices in it, and after the sessions the test waits up to 30 s for the hub to return them and fails if a device stays reserved:
+
+```bash
+FAKE_STF_PORT=18090 MVN_DOCKER_ARGS="-p 18090:18090" tests/load_local.sh \
+  -Dload.fakeNodes=10 -Dload.sessions=100 -Dload.concurrency=10 -Dload.fakeStf.latencyMs=300
+```
+
+With 300 ms per STF response the hub prepares the devices of the requests in parallel (see [Matching](README.md#matching)): about 6 sessions/s, session creation p50 1.6 s; the hub that reserved the devices under the lock of its registry made 1 session/s, p50 9.1 s.
+
 Remote hub (STF must be disabled on it, fake devices are not in STF; with `NODE_REGISTRATION_TOKEN` on the hub, export it as `LOAD_NODE_REGISTRATION_TOKEN`, which `tests/mvn.sh` forwards like the credentials):
 
 ```bash

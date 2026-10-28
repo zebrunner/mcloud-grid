@@ -53,6 +53,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.zebrunner.mcloud.grid.validator.DeviceTypeValidator.ZEBRUNNER_DEVICE_TYPE_CAPABILITY;
@@ -232,9 +233,30 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         LOGGER.finest(() -> String.format("[%s][%s] after command: %s", udid, session.getInternalKey(), request.getRequestURI()));
     }
 
+    /**
+     * A session of the device prepared at once (claim and prepare), the slot is released when the device is not ready.
+     * MobileGridRegistry calls claim under its lock and prepare without it.
+     */
     @Override
     public TestSession getNewSession(Map<String, Object> requestedCapability) {
+        TestSession session = claim(requestedCapability);
+        if (session == null) {
+            return null;
+        }
+        if (prepare(session)) {
+            return session;
+        }
+        session.getSlot().doFinishRelease();
+        return null;
+    }
 
+    /**
+     * The free slot of the device for the request, without any request to the node or STF: the registry calls it
+     * under its lock. The device is checked and reserved in STF by {@link #prepare(TestSession)}.
+     *
+     * @return the session of the claimed slot, null if the device does not match, is busy, down or ignored
+     */
+    public TestSession claim(Map<String, Object> requestedCapability) {
         if (isDown()) {
             LOGGER.fine(() -> String.format("[%s] Node %s is down, the device is skipped.", udid, getRemoteHost()));
             return null;
@@ -259,26 +281,38 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             TestSession session = testslot.getNewSession(requestedCapability);
             if (session == null) {
                 LOGGER.fine(() -> String.format("[%s] Test slot did not create a session (it is busy or does not match).", udid));
-                return null;
             }
+            return session;
+        }
+        return null;
+    }
 
-            String internalKey = session.getInternalKey();
-
+    /**
+     * Checks the device of the claimed session (the Appium status) and reserves it in STF; the registry calls it
+     * without its lock. The caller releases the slot when the device is not prepared.
+     *
+     * @return true if the session may start on the device
+     */
+    public boolean prepare(TestSession session) {
+        TestSlot testslot = session.getSlot();
+        String internalKey = session.getInternalKey();
+        Map<String, Object> requestedCapability = session.getRequestedCapabilities();
+        boolean reserved = false;
+        try {
             // additional check if device is ready for session with custom Appium's status verification
             if (!appiumCheck.apply(testslot.getRemoteURL(), internalKey)) {
                 IgnoredDevices.ignore(udid, UNHEALTHY_MOBILE_TIMEOUT, "Appium status check failed");
                 LOGGER.warning(() -> String.format("[%s][%s] Device '%s' is not ready for a session, it is ignored for %s seconds.",
                         udid, internalKey, deviceName, UNHEALTHY_MOBILE_TIMEOUT.toSeconds()));
-                testslot.doFinishRelease();
-                return null;
+                return false;
             }
 
             if (STFClient.isSTFEnabled()) {
                 STFDevice device = STFClient.reserveSTFDevice(udid, requestedCapability, internalKey);
                 if (device == null) {
-                    testslot.doFinishRelease();
-                    return null;
+                    return false;
                 }
+                reserved = true;
                 String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapability, "STF_TOKEN")
                         .map(String::valueOf)
                         .orElse(STFClient.DEFAULT_STF_TOKEN);
@@ -291,9 +325,32 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
             LOGGER.info(() -> String.format("[%s][%s] Device '%s' (%s %s) is selected for the session, starting the Appium session.",
                     udid, internalKey, deviceName, platform, CapabilityUtils.getAppiumCapability(testslot.getCapabilities(), "platformVersion").orElse("")));
-            return session;
+            return true;
+        } catch (RuntimeException e) {
+            LOGGER.log(Level.WARNING, String.format("[%s][%s] The device could not be prepared for the session.", udid, internalKey), e);
+            if (reserved) {
+                disconnectSTFDevice(session);
+            }
+            return false;
         }
-        return null;
+    }
+
+    /**
+     * The prepared session did not start: its request is gone (timed out) or the node is lost; the device is returned in STF.
+     */
+    public void abandon(TestSession session) {
+        LOGGER.info(() -> String.format("[%s][%s] The prepared session is not started (the request is gone or the node is lost), "
+                + "the device is returned.", udid, session.getInternalKey()));
+        disconnectSTFDevice(session);
+    }
+
+    /**
+     * The hub released the session of a lost (or registered again) node without the events of the session.
+     */
+    public void releaseLostSession(TestSession session, SessionTerminationReason reason) {
+        LOGGER.warning(() -> String.format("[%s][%s] Session %s is released (%s): the node %s is lost or registered again, the device is returned.",
+                udid, session.getInternalKey(), describeExternalSession(session), reason, getRemoteHost()));
+        disconnectSTFDevice(session);
     }
 
     @Override
