@@ -32,13 +32,13 @@ The example runs 2 session lifecycles, one at a time; *each* session sends `GET 
 
 The test can register in-process fake Appium nodes (`MobileRemoteProxy`, answering `/status`, `/status-adb`, `/status-wda` and session endpoints), so the hub logic and its throughput can be stressed without devices. The hub must be able to reach this machine at `load.fakeNodes.host`.
 
-Local hub in Docker (builds the image from this repo; `make load` runs a short version):
+Local hub in Docker (builds the image from this repo; `make load` runs a short version; the hub requires a random `NODE_REGISTRATION_TOKEN`, which the fake nodes register with):
 
 ```bash
 tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
 ```
 
-Remote hub (STF must be disabled on it, fake devices are not in STF):
+Remote hub (STF must be disabled on it, fake devices are not in STF; with `NODE_REGISTRATION_TOKEN` on the hub, export it as `LOAD_NODE_REGISTRATION_TOKEN`, which `tests/mvn.sh` forwards like the credentials):
 
 ```bash
 tests/mvn.sh -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 -Dload.fakeNodes.host=<ip reachable from the hub>
@@ -65,3 +65,4 @@ tests/mvn.sh -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 
 | `load.fakeNodes.sessionDelayMs` | 0 | Simulated Appium session startup time |
 | `load.reportDir` | `target/load-report` | Report directory |
 | `LOAD_GRID_USERNAME`, `LOAD_GRID_PASSWORD` | unset | Optional Basic Auth credentials, passed via environment (both required) |
+| `LOAD_NODE_REGISTRATION_TOKEN` | unset | `NODE_REGISTRATION_TOKEN` of the hub the fake nodes register with, passed via environment |

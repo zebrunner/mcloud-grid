@@ -42,12 +42,13 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`.
 | `GRID_THROW_ON_CAPABILITY_NOT_PRESENT` | `true` | Reject requests no registered device can serve; see [Queueing](#queueing) |
 | `GRID_JETTY_MAX_THREADS` | `-1` | Jetty threads of the hub (-1 = default) |
 | `GRID_DEBUG` | `false` | Debug logging of the hub |
-| `GRID_PROXY`, `GRID_CAPABILITY_MATCHER` | mobile proxy and matcher | Classes of the node proxy and capability matcher |
+| `GRID_PROXY`, `GRID_CAPABILITY_MATCHER` | mobile proxy and matcher | Classes of the node proxy and capability matcher; a node names the class of its proxy itself, the hub registers only `MobileRemoteProxy` (and its subclasses), see [Node registration](#node-registration) |
 | `JAVA_HEAP_OPTS` | `-Xms1G -Xmx4G` | JVM heap of the hub |
 | `JAVA_OPTS` | | Other JVM options |
 | `SE_OPTS` | | Extra hub options, e.g. `-debug`; `-servlets` replaces the [servlets](#endpoints) of the hub config |
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
+| `NODE_REGISTRATION_TOKEN` | | The secret a node registers with, see [Node registration](#node-registration); not set = any node (with a warning in the log) |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
 | `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
@@ -83,6 +84,18 @@ STF integration is enabled when both `STF_URL` and `STF_TOKEN` are set.
 
 The node capabilities of the reserved device are passed to the session as `zebrunner:slotCapabilities`.
 
+### Node registration
+
+A node registers with the hub through `/grid/register`, which answers anyone who reaches the hub, and gets the sessions of its device with their capabilities (e.g. `zebrunner:STF_TOKEN`). So the hub registers a node only when:
+
+- its proxy is `MobileRemoteProxy` (the registry of the hub config, `MobileGridRegistry`, rejects the others): a node with another class would skip the checks below;
+- it sends `NODE_REGISTRATION_TOKEN` of the hub in `custom` of its configuration (`"custom": {"registrationToken": "<token>"}`), which [zebrunner/appium](https://github.com/zebrunner/appium) does with its own `NODE_REGISTRATION_TOKEN`; the hub takes the token out of the configuration it keeps, so the console, `/grid/api/proxy` and the logs do not show it;
+- its address is in `NODE_ALLOWED_NETWORKS` and reachable (`CHECK_NODE_REACHABILITY`), and its device is in STF.
+
+A node that registers again at the same address (e.g. after the hub restarted) is checked for the token only; a node with the id of a registered one at another address is checked as a new node. A rejected node is logged with the reason once in 10 minutes. Without `NODE_REGISTRATION_TOKEN` the hub logs a warning on start: any host that reaches it can register a node. Generate the token with e.g. `openssl rand -hex 24` and set it for the hub and for every node (`NODE_REGISTRATION_TOKEN` of mcloud-agent); a node without it is not registered until it has the token.
+
+`/lifecycle-manager` of Selenium, which shuts the hub down for anyone, is turned off in the hub config (`withoutServlets`).
+
 ### Queueing
 
 With `GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true` a request for a device that is not registered fails at once (`cannot find : Capabilities {...}`, or `Empty pool of VM for setup` when no device is registered at all). With `false` it waits in the queue for up to `GRID_NEW_SESSION_WAIT_TIMEOUT` and gets a device that registers meanwhile (a restarted device, a new emulator), otherwise it fails with `Request timed out waiting for a node to become available`.
@@ -91,9 +104,9 @@ With `GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true` a request for a device that is 
 
 | Endpoint | Content |
 | --- | --- |
-| `/grid/console` | Selenium grid console, with the UDID of every device |
+| `/grid/console` | Selenium grid console, with the UDID of every device; the values of the nodes and of the queued requests are escaped, the secrets of the queued requests are masked |
 | `/grid/admin/DevicesServlet` | Devices as JSON: platform, type, node, status `free`/`busy`/`ignored`/`down`, why and until when a device is ignored, its session (Appium session id, start, inactivity, last command) |
-| `/grid/admin/AllSessionsServlet` | Active sessions as JSON with the requested capabilities and the device |
+| `/grid/admin/AllSessionsServlet` | Active sessions as JSON with the requested capabilities and the device; secrets are masked as `*****`: `zebrunner:STF_TOKEN`, `remoteURL` of `zebrunner:slotCapabilities` (the remote ADB address), capabilities named like a token, password, secret, key or credential, and the user info and such query parameters of URLs (e.g. `appium:app`) |
 | `/grid/admin/MetricsServlet` | Prometheus metrics: `mcloud_grid_devices{platform,status}`, `mcloud_grid_sessions`, `mcloud_grid_new_session_requests` (the queue) |
 | `POST /grid/admin/TerminateSessionServlet?udid=<udid>` or `?sessionId=<id>` | Terminates the session of a device and releases it in STF, see below |
 | `/wd/hub/status` | Hub status, also the healthcheck of the image |
@@ -116,7 +129,7 @@ The servlets are registered in the hub config by `generate_config`. `com.zebrunn
 {"timestamp":"2026-10-09T12:00:00Z","level":"INFO","logger":"com.zebrunner.mcloud.grid.MobileRemoteProxy","component":"mcloud-grid","category":"device","udid":"emulator-5554","sessionId":"0f85...","message":"Device 'Pixel 7' (ANDROID 14) is selected for the session, starting the Appium session."}
 ```
 
-Use `docker logs mcloud-grid 2>&1 | jq -c 'select(.udid == "emulator-5554")'` to see one device, `select(.category == "grid")` for hub-wide events or `select(.component == "selenium")` for Selenium itself. Selenium's own records have no device ID unless Selenium supplies it. Exceptions are escaped into one JSON field. `MCLOUD_LOG_LEVEL=FINE` adds grid details (skipped devices, STF device data, remoteConnect steps); `SE_OPTS=-debug` turns on Selenium's debug logs without changing the grid log level. The generated config remains available at `/opt/selenium/config.json`, but is not dumped to logs.
+Use `docker logs mcloud-grid 2>&1 | jq -c 'select(.udid == "emulator-5554")'` to see one device, `select(.category == "grid")` for hub-wide events or `select(.component == "selenium")` for Selenium itself. Selenium's own records have no device ID unless Selenium supplies it. Exceptions are escaped into one JSON field. `MCLOUD_LOG_LEVEL=FINE` adds grid details (skipped devices, STF device data, remoteConnect steps); `SE_OPTS=-debug` turns on Selenium's debug logs without changing the grid log level; the registration requests of the nodes it logs have the registration token masked. The generated config remains available at `/opt/selenium/config.json`, but is not dumped to logs.
 
 For interactive viewing of history and live logs with [lnav](https://lnav.org/):
 

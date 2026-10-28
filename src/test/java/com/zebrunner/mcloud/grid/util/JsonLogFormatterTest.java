@@ -15,6 +15,19 @@ public class JsonLogFormatterTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    public void registrationTokenIsMasked() throws IOException {
+        LogRecord record = new LogRecord(Level.FINE, "getting the following registration request  : "
+                + "{\"configuration\":{\"custom\":{\"registrationToken\":\"s3cret\"},\"url\":\"http://10.0.0.5:4723/wd/hub\"}}");
+        record.setLoggerName("org.openqa.grid.web.servlet.RegistrationServlet");
+
+        String message = mapper.readTree(formatter.format(record)).get("message").asText();
+
+        Assert.assertFalse(message.contains("s3cret"), message);
+        Assert.assertTrue(message.contains("\"registrationToken\":\"*****\""), message);
+        Assert.assertTrue(message.contains("http://10.0.0.5:4723/wd/hub"), message);
+    }
+
+    @Test
     public void extractsDeviceContextAndEscapesMessage() throws IOException {
         LogRecord record = new LogRecord(Level.INFO, "[emulator-5554][session-1] Device \"Pixel\"\nstarted");
         record.setLoggerName("com.zebrunner.mcloud.grid.MobileRemoteProxy");

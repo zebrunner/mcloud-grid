@@ -2,6 +2,8 @@ package com.zebrunner.mcloud.grid;
 
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.integration.client.StfStub;
+import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
+import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.TestSession;
@@ -191,6 +193,57 @@ public class MobileRemoteProxyStfTest {
         GridException e = Assert.expectThrows(GridException.class,
                 () -> GridFixtures.proxy(registry, "http://192.0.2.10:4723", GridFixtures.androidNodeCaps(ANDROID_UDID)));
         Assert.assertTrue(e.getMessage().contains("is not in NODE_ALLOWED_NETWORKS (127.0.0.0/8, ::1)"), e.getMessage());
+    }
+
+    public void nodeWithIdOfKnownNodeAtAnotherAddressIsChecked() {
+        registry.add(GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID)));
+        RegistrationRequest request = GridFixtures.registrationRequest("http://192.0.2.10:4723", GridFixtures.androidNodeCaps(ANDROID_UDID));
+        request.getConfiguration().id = nodeUrl;
+
+        GridException e = Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
+        Assert.assertTrue(e.getMessage().contains("is not in NODE_ALLOWED_NETWORKS"), e.getMessage());
+    }
+
+    public void knownNodeWithAnotherDeviceIsCheckedInStf() {
+        registry.add(GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID)));
+
+        Assert.expectThrows(GridException.class,
+                () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps("not-in-stf")));
+    }
+
+    public void nodeWithoutRegistrationTokenIsRejected() {
+        // NODE_REGISTRATION_TOKEN=test-registration-token in the 'stf-tests' execution
+        RegistrationRequest request = GridFixtures.registrationRequest(nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        request.getConfiguration().custom.clear();
+
+        GridException e = Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
+        Assert.assertTrue(e.getMessage().contains("has no or another NODE_REGISTRATION_TOKEN than the hub"), e.getMessage());
+        stf.server().verify(0, getRequestedFor(urlMatching("/api/v1/devices.*")));
+    }
+
+    public void nodeWithAnotherRegistrationTokenIsRejected() {
+        RegistrationRequest request = GridFixtures.registrationRequest(nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        request.getConfiguration().custom.put(NodeRegistrationToken.CUSTOM_KEY, "another-token");
+
+        Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
+    }
+
+    public void knownNodeWithoutRegistrationTokenIsRejected() {
+        MobileRemoteProxy registered = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        registry.add(registered);
+        RegistrationRequest request = GridFixtures.registrationRequest(nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        request.getConfiguration().custom.clear();
+
+        Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
+        Assert.assertSame(registry.getProxyById(nodeUrl), registered);
+    }
+
+    public void registrationTokenIsNotKept() {
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+
+        Assert.assertFalse(proxy.getOriginalRegistrationRequest().getConfiguration().custom.containsKey(NodeRegistrationToken.CUSTOM_KEY));
+        Assert.assertFalse(proxy.getConfig().custom.containsKey(NodeRegistrationToken.CUSTOM_KEY));
+        Assert.assertFalse(proxy.getOriginalRegistrationRequest().toJson().toString().contains(GridFixtures.REGISTRATION_TOKEN));
     }
 
     public void nodeNotPresentInStfIsRejected() {

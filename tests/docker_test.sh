@@ -10,6 +10,7 @@ cd "$REPO" || exit 1
 
 IMAGE="${IMAGE:-mcloud-grid:test}"
 CONTAINER="mcloud-grid-test-$$"
+TOKEN="docker-test-token-$$"
 
 # called by the EXIT trap of lib.sh
 # shellcheck disable=SC2329
@@ -29,6 +30,8 @@ check "config.json is not baked into the image" "absent" \
 
 section "container"
 docker run --detach --name "$CONTAINER" \
+  --env NODE_REGISTRATION_TOKEN="$TOKEN" \
+  --env CHECK_NODE_REACHABILITY=false \
   --env GRID_TIMEOUT=77 \
   --env GRID_NEW_SESSION_WAIT_TIMEOUT=12345 \
   --env JAVA_HEAP_OPTS="-Xms64m -Xmx512m" \
@@ -49,6 +52,8 @@ check_contains "config.json takes GRID_TIMEOUT" '"timeout": 77,' "$config"
 check_contains "config.json takes GRID_NEW_SESSION_WAIT_TIMEOUT" '"newSessionWaitTimeout": 12345,' "$config"
 check_contains "config.json uses the mobile proxy" '"proxy": "com.zebrunner.mcloud.grid.MobileRemoteProxy"' "$config"
 check_contains "config.json uses the mobile capability matcher" '"capabilityMatcher": "com.zebrunner.mcloud.grid.MobileCapabilityMatcher"' "$config"
+check_contains "config.json uses the mobile registry" '"registry": "com.zebrunner.mcloud.grid.MobileGridRegistry"' "$config"
+check_contains "config.json turns the lifecycle servlet off" '"org.openqa.grid.web.servlet.LifecycleServlet"' "$config"
 
 for servlet in DevicesServlet AllSessionsServlet; do
   check "${servlet} is registered" '{"value":[]}' \
@@ -61,6 +66,54 @@ check "TerminateSessionServlet is registered (needs STF)" "501" \
     'http://localhost:4444/grid/admin/TerminateSessionServlet?udid=x')"
 check "grid console responds" "200" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
+
+section "node registration"
+# register <host> <proxy class> <token>: the registration request of a node as the node config of zebrunner/appium,
+# prints the HTTP status
+register() {
+  local custom='{}'
+  if [[ -n "$3" ]]; then
+    custom="{\"registrationToken\": \"$3\"}"
+  fi
+  docker exec -i "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' -X POST --data-binary @- http://localhost:4444/grid/register << _EOF
+{"capabilities": [{"maxInstances": 1, "platformName": "ANDROID", "udid": "udid-$1", "deviceName": "Pixel"}],
+ "configuration": {"proxy": "$2", "url": "http://$1:4723/wd/hub", "host": "$1", "port": 4723, "id": "http://$1:4723",
+   "maxSession": 1, "register": true, "custom": $custom}}
+_EOF
+}
+# registered <host>: the answer of the hub about the node, which a node asks for every few seconds
+registered() {
+  docker exec "$CONTAINER" curl -s "http://localhost:4444/grid/api/proxy?id=http://$1:4723"
+}
+# wait_registered <host>: the hub adds a node in the background
+wait_registered() {
+  local answer=""
+  for _ in $(seq 1 20); do
+    answer="$(registered "$1")"
+    [[ "$answer" == *'"success": true'* ]] && break
+    sleep 0.5
+  done
+  echo "$answer"
+}
+mobile=com.zebrunner.mcloud.grid.MobileRemoteProxy
+check "a node without the registration token is rejected" "500" "$(register 192.0.2.1 "$mobile" "")"
+check "a node with another registration token is rejected" "500" "$(register 192.0.2.2 "$mobile" wrong-token)"
+check "a node with the registration token is accepted" "200" "$(register 192.0.2.3 "$mobile" "$TOKEN")"
+answer="$(wait_registered 192.0.2.3)"
+check_contains "the node with the registration token is registered" '"success": true' "$answer"
+check_not_contains "the hub does not show the registration token of a node" "$TOKEN" "$answer"
+check_not_contains "the console does not show the registration token of a node" "$TOKEN" \
+  "$(docker exec "$CONTAINER" curl -s http://localhost:4444/grid/console)"
+check "the hub answers a node of another proxy class (Selenium adds it in the background)" "200" \
+  "$(register 192.0.2.4 org.openqa.grid.selenium.proxy.DefaultRemoteProxy "$TOKEN")"
+sleep 2
+for host in 192.0.2.1 192.0.2.2 192.0.2.4; do
+  check_contains "the rejected node ${host} is not registered" '"success": false' "$(registered "$host")"
+done
+docker exec "$CONTAINER" curl -s -o /dev/null 'http://localhost:4444/lifecycle-manager?action=shutdown'
+sleep 2
+check "/lifecycle-manager does not shut the hub down" "200" \
+  "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/wd/hub/status)"
 
 cmdline="$(docker exec "$CONTAINER" sh -c 'tr "\0" " " < /proc/$(pgrep java)/cmdline')"
 check_contains "JAVA_HEAP_OPTS reach the JVM" "-Xms64m -Xmx512m" "$cmdline"
@@ -77,6 +130,11 @@ else
   fail "docker stop shuts the hub down gracefully" "took ${elapsed}s" "SIGTERM was not handled, docker stop waited ${elapsed}s"
 fi
 check_contains "shutdown is logged" "shutdown complete" "$(docker logs "$CONTAINER" 2>&1 | tail -5)"
+logs="$(docker logs "$CONTAINER" 2>&1)"
+check_contains "a node of another proxy class is logged" "registers with the proxy org.openqa.grid.selenium.proxy.DefaultRemoteProxy" "$logs"
+check_contains "a node without the registration token is logged" "Node http://192.0.2.1:4723 has no or another NODE_REGISTRATION_TOKEN" "$logs"
+check_contains "the registration requests are in the debug log" "getting the following registration request" "$logs"
+check_not_contains "the registration token is not in the log (debug included)" "$TOKEN" "$logs"
 
 docker logs "$CONTAINER" > "$WORK/docker.log" 2>&1
 check "all Docker log lines are JSON (including Selenium debug and entrypoint)" "ok" \
