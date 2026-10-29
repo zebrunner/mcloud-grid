@@ -51,6 +51,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`.
 | `GRID_PROXY`, `GRID_CAPABILITY_MATCHER` | mobile proxy and matcher | Classes of the node proxy and capability matcher; a node names the class of its proxy itself, the hub registers only `MobileRemoteProxy` (and its subclasses), see [Node registration](#node-registration) |
 | `JAVA_HEAP_OPTS` | `-Xms1G -Xmx4G` | JVM heap of the hub |
 | `JAVA_OPTS` | | Other JVM options |
+| `JAVA_HOME`, `PATH`, `LANG` | `/opt/java/openjdk`, its `bin` first, `C.UTF-8` | The Java runtime of the image (Temurin 11, the modules of the hub only) and the UTF-8 locale |
 | `SE_OPTS` | | Extra hub options, e.g. `-debug`; `-servlets` replaces the [servlets](#endpoints) of the hub config |
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |

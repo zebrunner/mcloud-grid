@@ -9,15 +9,31 @@ COPY src ./src
 # tests and linters run in CI and `make check`, the image build only packages
 RUN mvn -B -ntp -DskipTests package
 
+# The Java runtime of the hub: the modules of the jar (jdeps) and the ones it loads by reflection or as services (TLS
+# with EC keys and the zip file system, JMX, sun.misc.Unsafe, the JNDI of Jetty, the HTTP client), not the whole JRE
+RUN jdeps --ignore-missing-deps --multi-release 11 --print-module-deps \
+      target/mcloud-grid-jar-with-dependencies.jar > /tmp/modules && \
+    jlink --add-modules "$(cat /tmp/modules),jdk.crypto.ec,jdk.zipfs,java.management,jdk.management,jdk.unsupported,java.naming,java.net.http,jdk.localedata" \
+      --strip-debug --no-man-pages --no-header-files --compress=2 --output /opt/jre && \
+    /opt/jre/bin/java -version
 
-FROM public.ecr.aws/docker/library/eclipse-temurin:11.0.32.1_1-jre-resolute@sha256:31ef746477f9ed27c0170585e81874f25f64be591b8c2f0bba18700d0086cbfb
 
-# Apply published Ubuntu security fixes while keeping the same JRE 11.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends --only-upgrade \
-        libfreetype6=2.14.2+dfsg-1ubuntu0.2 \
-        libpng16-16t64=1.6.57-1ubuntu0.1 && \
+# The Ubuntu of the eclipse-temurin images with the Java runtime of the builder (Temurin 11, its own time zones and CA
+# certificates): curl of the healthcheck, pgrep; the UTF-8 locale of Ubuntu; the security fixes of Ubuntu
+FROM public.ecr.aws/docker/library/ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
+
+ENV JAVA_HOME=/opt/java/openjdk \
+    LANG=C.UTF-8
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+RUN export DEBIAN_FRONTEND=noninteractive && \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        curl=8.18.0-1ubuntu2.8 ca-certificates=20260816ubuntu0.26.04.1 procps=2:4.0.4-9ubuntu1 && \
     rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/jre /opt/java/openjdk
 
 EXPOSE 4444
 
@@ -46,12 +62,11 @@ ENV \
     # JVM heap of the hub; other JVM options can be added with JAVA_OPTS
     JAVA_HEAP_OPTS="-Xms1G -Xmx4G"
 
-COPY --from=builder /src/target/mcloud-grid-jar-with-dependencies.jar /opt/selenium/
-COPY generate_config entrypoint.sh /opt/bin/
-COPY logger.properties /opt/selenium/
-
 # the hub writes its config.json on start, so /opt/selenium belongs to the unprivileged 'ubuntu' user of the base image
-RUN chown -R 1000:1000 /opt/selenium
+# (COPY --chown: a chown -R of its own layer would copy the jar again)
+COPY --from=builder --chown=1000:1000 /src/target/mcloud-grid-jar-with-dependencies.jar /opt/selenium/
+COPY generate_config entrypoint.sh /opt/bin/
+COPY --chown=1000:1000 logger.properties /opt/selenium/
 USER 1000:1000
 
 ARG VERSION=dev
