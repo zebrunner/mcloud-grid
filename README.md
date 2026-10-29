@@ -13,8 +13,14 @@ Feel free to support the development with a [**donation**](https://www.paypal.co
 ## Build
 
 ```bash
-docker build . -t zebrunner/mcloud-grid:latest
+make build VERSION=3.1   # public.ecr.aws/zebrunner/mcloud-grid:3.1 in the local docker
+make push VERSION=3.1    # built by docker buildx and pushed: docker login public.ecr.aws first
 ```
+
+`make build` builds the image for the platform of this machine, `make push` builds `linux/amd64` and `linux/arm64` (`PLATFORMS`) with `docker buildx` and pushes them as one multi-platform image. `IMAGE_REPO` sets another repository (e.g. `IMAGE_REPO=registry.example.com/mcloud-grid`), `VERSION` is the tag and the
+`org.opencontainers.image.version` label (`dev` by default, required by `push`). `make push` uses the buildx builder
+`mcloud` (docker-container driver), which it creates once; another platform than the one of the machine needs QEMU
+(`docker run --privileged --rm tonistiigi/binfmt --install all`).
 
 The image build compiles and packages the hub; tests and linters run separately (see [Development](#development)).
 

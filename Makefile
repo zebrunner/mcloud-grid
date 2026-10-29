@@ -5,8 +5,14 @@ MVN ?= tests/mvn.sh
 export PATH := $(CURDIR)/$(VENV)/bin:$(PATH)
 export MVN
 
+# The image (CONVENTIONS.md#makefile): `make build VERSION=<tag>`, `make push VERSION=<tag>` (docker login first);
+# IMAGE_REPO overrides the repository, PLATFORMS the platforms of the push
+IMAGE_REPO ?= public.ecr.aws/zebrunner/mcloud-grid
+VERSION ?= dev
+PLATFORMS ?= linux/amd64,linux/arm64
+
 .DEFAULT_GOAL := help
-.PHONY: help check lint test docker load
+.PHONY: help check lint test docker load build push
 
 help: ## this list
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/'
@@ -25,6 +31,15 @@ docker: ## the docker image checks (tests/docker_test.sh)
 
 load: ## a short load test of the image with fake Appium nodes (tests/load_local.sh), see LOAD_TESTING.md
 	tests/load_local.sh -Dload.fakeNodes=10 -Dload.sessions=200 -Dload.concurrency=20 -Dload.maxErrorRate=0
+
+build: ## the image IMAGE_REPO:VERSION for the platform of this machine: make build VERSION=<tag>
+	docker build --progress=plain --provenance=false --build-arg VERSION=$(VERSION) --tag $(IMAGE_REPO):$(VERSION) .
+
+push: ## the image IMAGE_REPO:VERSION for PLATFORMS, built by docker buildx and pushed: make push VERSION=<tag>
+	@[[ "$(VERSION)" != dev ]] || { echo "make push VERSION=<tag>: the tag of the image is required"; exit 1; }
+	@docker buildx inspect mcloud > /dev/null 2>&1 || docker buildx create --name mcloud --driver docker-container --driver-opt network=host > /dev/null
+	docker buildx build --builder mcloud --progress=plain --provenance=false --platform $(PLATFORMS) \
+	  --build-arg VERSION=$(VERSION) --tag $(IMAGE_REPO):$(VERSION) --push .
 
 # The tools of tests/requirements-lint.txt in .venv; the hadolint-py wheel for macOS is broken, brew provides it there
 $(VENV)/.installed: tests/requirements-lint.txt
