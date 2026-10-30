@@ -20,7 +20,9 @@
 // timeouts of the hub, the devices of lost nodes are returned in STF, the queued requests are safe for the console.
 package com.zebrunner.mcloud.grid;
 
+import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
+import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.grid.internal.ActiveTestSessions;
 import org.openqa.grid.internal.BaseGridRegistry;
 import org.openqa.grid.internal.ExternalSessionKey;
@@ -109,12 +111,21 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         matcher.setUncaughtExceptionHandler((thread, e) -> LOGGER.log(Level.SEVERE, "Matcher thread stopped", e));
     }
 
+    /**
+     * Hub starts its registry before its server: the hub does not start without NODE_REGISTRATION_TOKEN.
+     */
     @Override
     public void start() {
+        checkRegistrationToken(System.getenv(NodeRegistrationToken.ENV));
         matcher.start();
-        if (!MobileRemoteProxy.isRegistrationTokenEnabled()) {
-            LOGGER.warning("[CONFIGURATION] NODE_REGISTRATION_TOKEN is not set: any host that reaches the hub can register a node "
-                    + "and get the sessions of its device.");
+    }
+
+    static void checkRegistrationToken(String token) {
+        try {
+            NodeRegistrationToken.of(token);
+        } catch (GridConfigurationException e) {
+            LOGGER.severe("[CONFIGURATION] " + e.getMessage() + " The hub does not start.");
+            throw e;
         }
     }
 

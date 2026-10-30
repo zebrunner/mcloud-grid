@@ -49,7 +49,7 @@ final class LoadConfig {
     final String reportDir;
     /** Preemptive Authorization header for every WebDriver request; never print this value. */
     final String authorization;
-    /** NODE_REGISTRATION_TOKEN of the hub the fake nodes register with (LOAD_NODE_REGISTRATION_TOKEN), null = none; never print this value. */
+    /** NODE_REGISTRATION_TOKEN of the hub the fake nodes register with (LOAD_NODE_REGISTRATION_TOKEN), required for them; never print this value. */
     final String nodeRegistrationToken;
 
     private LoadConfig() {
@@ -82,6 +82,9 @@ final class LoadConfig {
                 || commandInterval.isZero() || commandInterval.isNegative() || sessionHold.isNegative() || newSessionTimeout.isZero()
                 || newSessionTimeout.isNegative()) {
             throw new IllegalArgumentException("Sessions, concurrency, timeouts and command interval must be positive; command count and duration cannot be negative");
+        }
+        if (fakeNodes > 0 && nodeRegistrationToken == null) {
+            throw new IllegalArgumentException("Fake nodes need LOAD_NODE_REGISTRATION_TOKEN: NODE_REGISTRATION_TOKEN of the hub");
         }
     }
 

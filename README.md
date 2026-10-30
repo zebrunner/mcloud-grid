@@ -29,11 +29,11 @@ The image build compiles and packages the hub; tests and linters run separately 
 ```bash
 docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
   -e GRID_TIMEOUT=60 -e GRID_BROWSER_TIMEOUT=60 \
-  -e STF_URL=http://stf.example.com -e STF_TOKEN=<token> \
+  -e STF_URL=http://stf.example.com -e STF_TOKEN=<token> -e NODE_REGISTRATION_TOKEN=<node token> \
   --name mcloud-grid zebrunner/mcloud-grid:latest
 ```
 
-The hub runs as an unprivileged user and stops gracefully on `docker stop`.
+The hub runs as an unprivileged user and stops gracefully on `docker stop`. It does not start without `NODE_REGISTRATION_TOKEN`, see [Node registration](#node-registration).
 
 ## Configuration
 
@@ -55,7 +55,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`.
 | `SE_OPTS` | | Extra hub options, e.g. `-debug`; `-servlets` replaces the [servlets](#endpoints) of the hub config |
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
-| `NODE_REGISTRATION_TOKEN` | | The secret a node registers with and the hub sends to the nodes, see [Node registration](#node-registration); not set = any node (with a warning in the log) |
+| `NODE_REGISTRATION_TOKEN` | | Required: the secret a node registers with and the hub sends to the nodes, see [Node registration](#node-registration); the hub does not start without it |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
 | `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
@@ -100,9 +100,9 @@ A node registers with the hub through `/grid/register`, which answers anyone who
 - it sends `NODE_REGISTRATION_TOKEN` of the hub in `custom` of its configuration (`"custom": {"registrationToken": "<token>"}`), which [zebrunner/appium](https://github.com/zebrunner/appium) does with its own `NODE_REGISTRATION_TOKEN`; the hub takes the token out of the configuration it keeps, so the console, `/grid/api/proxy` and the logs do not show it;
 - its address is in `NODE_ALLOWED_NETWORKS` and reachable (`CHECK_NODE_REACHABILITY`), and its device is in STF.
 
-A node that registers again at the same address (e.g. after the hub restarted) is checked for the token only; a node with the id of a registered one at another address is checked as a new node. A rejected node is logged with the reason once in 10 minutes. Without `NODE_REGISTRATION_TOKEN` the hub logs a warning on start: any host that reaches it can register a node. Generate the token with e.g. `openssl rand -hex 24` and set it for the hub and for every node (`NODE_REGISTRATION_TOKEN` of mcloud-agent); a node without it is not registered until it has the token.
+A node that registers again at the same address (e.g. after the hub restarted) is checked for the token only; a node with the id of a registered one at another address is checked as a new node. A rejected node is logged with the reason once in 10 minutes. Without `NODE_REGISTRATION_TOKEN` the hub does not start: it logs `NODE_REGISTRATION_TOKEN is not set` (then the JVM prints the stack trace of the exception) and exits with `1`. Generate the token with e.g. `openssl rand -hex 24` and set it for the hub and for every node (`NODE_REGISTRATION_TOKEN` of mcloud-agent); a node without it is not registered until it has the token.
 
-The same token authenticates the hub to the nodes: every request of the hub to a node (the commands of the sessions, the status polling, the Appium status checks) carries it in the header `X-MCloud-Node-Token`, and zebrunner/appium with `NODE_REGISTRATION_TOKEN` answers only such requests and the ones of its own container. So the Appium of a device is used through the hub only, which reserves the device in STF.
+The same token authenticates the hub to the nodes: every request of the hub to a node (the commands of the sessions, the status polling, the Appium status checks) carries it in the header `X-MCloud-Node-Token`, and zebrunner/appium answers only such requests and the ones of its own container. So the Appium of a device is used through the hub only, which reserves the device in STF.
 
 The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is in no log of Appium; the hub masks it (and the registration token) in its own logs, e.g. the session requests Selenium logs with `-debug`.
 
@@ -163,7 +163,7 @@ Requirements: docker, python 3 (for the linters), hadolint on macOS (`brew insta
 make check   # everything CI runs
 make lint    # yaml, GitHub workflows, Dockerfile, markdown, shell scripts, the text files, checkstyle, spotbugs
 make test    # unit and STF integration tests, coverage in target/site/jacoco
-make docker  # docker image checks: user, config generation, options, endpoints, graceful shutdown
+make docker  # docker image checks: user, config generation, options, endpoints, node registration, no start without the token, graceful shutdown
 make load    # short load test of the image with fake Appium nodes
 ```
 

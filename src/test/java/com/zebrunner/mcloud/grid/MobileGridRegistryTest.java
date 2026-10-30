@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid;
 
 import org.openqa.grid.common.RegistrationRequest;
+import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.grid.internal.ExternalSessionKey;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.RemoteProxy;
@@ -173,6 +174,17 @@ public class MobileGridRegistryTest {
     @Test
     public void hubUsesTheRegistry() {
         Assert.assertTrue(registry instanceof MobileGridRegistry, registry.getClass().getName());
+    }
+
+    @Test
+    public void hubDoesNotStartWithoutRegistrationToken() {
+        // the registry of setUp is started with NODE_REGISTRATION_TOKEN of the test executions (pom.xml)
+        MobileGridRegistry.checkRegistrationToken(GridFixtures.REGISTRATION_TOKEN);
+        for (String token : new String[] {null, "", " "}) {
+            GridConfigurationException e = Assert.expectThrows(GridConfigurationException.class,
+                    () -> MobileGridRegistry.checkRegistrationToken(token));
+            Assert.assertTrue(e.getMessage().startsWith("NODE_REGISTRATION_TOKEN is not set"), e.getMessage());
+        }
     }
 
     @Test

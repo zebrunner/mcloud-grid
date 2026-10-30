@@ -47,7 +47,7 @@ FAKE_STF_PORT=18090 MVN_DOCKER_ARGS="-p 18090:18090" tests/load_local.sh \
 
 With 300 ms per STF response the hub prepares the devices of the requests in parallel (see [Matching](README.md#matching)): about 6 sessions/s, session creation p50 1.6 s; the hub that reserved the devices under the lock of its registry made 1 session/s, p50 9.1 s.
 
-Remote hub (STF must be disabled on it, fake devices are not in STF; with `NODE_REGISTRATION_TOKEN` on the hub, export it as `LOAD_NODE_REGISTRATION_TOKEN`, which `tests/mvn.sh` forwards like the credentials):
+Remote hub (STF must be disabled on it, fake devices are not in STF; export `NODE_REGISTRATION_TOKEN` of the hub as `LOAD_NODE_REGISTRATION_TOKEN`, which `tests/mvn.sh` forwards like the credentials):
 
 ```bash
 tests/mvn.sh -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 -Dload.fakeNodes.host=<ip reachable from the hub>
@@ -74,4 +74,4 @@ tests/mvn.sh -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 
 | `load.fakeNodes.sessionDelayMs` | 0 | Simulated Appium session startup time |
 | `load.reportDir` | `target/load-report` | Report directory |
 | `LOAD_GRID_USERNAME`, `LOAD_GRID_PASSWORD` | unset | Optional Basic Auth credentials, passed via environment (both required) |
-| `LOAD_NODE_REGISTRATION_TOKEN` | unset | `NODE_REGISTRATION_TOKEN` of the hub the fake nodes register with, passed via environment |
+| `LOAD_NODE_REGISTRATION_TOKEN` | unset | `NODE_REGISTRATION_TOKEN` of the hub the fake nodes register with, passed via environment; required with `load.fakeNodes` |
