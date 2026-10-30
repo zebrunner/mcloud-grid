@@ -18,7 +18,7 @@ import java.util.Map;
  * Builds real (not mocked) Selenium Grid objects for proxy tests.
  */
 public final class GridFixtures {
-    // NODE_REGISTRATION_TOKEN of the 'stf-tests' execution; the hub without a token accepts it too
+    // NODE_REGISTRATION_TOKEN of the test executions (pom.xml)
     public static final String REGISTRATION_TOKEN = "test-registration-token";
 
     private GridFixtures() {

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Checks of the docker image: build, unprivileged user, config generation from env vars,
-# options passed to the JVM and the hub, hub status and graceful shutdown.
+# Checks of the docker image: build, unprivileged user, no start without NODE_REGISTRATION_TOKEN, config generation from
+# env vars, options passed to the JVM and the hub, hub status, node registration and graceful shutdown.
 # IMAGE overrides the tag of the built image.
 source "$(dirname "$0")/lib.sh"
 require_cmd docker
@@ -10,12 +10,13 @@ cd "$REPO" || exit 1
 
 IMAGE="${IMAGE:-mcloud-grid:test}"
 CONTAINER="mcloud-grid-test-$$"
+NO_TOKEN_CONTAINER="${CONTAINER}-no-token"
 TOKEN="docker-test-token-$$"
 
 # called by the EXIT trap of lib.sh
 # shellcheck disable=SC2329
 cleanup() {
-  docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
+  docker rm -f "$CONTAINER" "$NO_TOKEN_CONTAINER" > /dev/null 2>&1 || true
 }
 
 section "image"
@@ -27,6 +28,20 @@ pass "image builds"
 check "hub runs as an unprivileged user" "1000" "$(docker run --rm --entrypoint id "$IMAGE" -u)"
 check "config.json is not baked into the image" "absent" \
   "$(docker run --rm --entrypoint sh "$IMAGE" -c 'test -e /opt/selenium/config.json && echo present || echo absent')"
+
+section "registration token"
+# the registry fails the start of the hub without NODE_REGISTRATION_TOKEN
+docker run --detach --name "$NO_TOKEN_CONTAINER" --env JAVA_HEAP_OPTS="-Xms64m -Xmx512m" "$IMAGE" > /dev/null
+for _ in $(seq 1 60); do
+  [[ "$(docker inspect --format '{{.State.Running}}' "$NO_TOKEN_CONTAINER")" == "false" ]] && break
+  sleep 1
+done
+check "the hub exits without NODE_REGISTRATION_TOKEN" "false 1" \
+  "$(docker inspect --format '{{.State.Running}} {{.State.ExitCode}}' "$NO_TOKEN_CONTAINER")"
+logs="$(docker logs "$NO_TOKEN_CONTAINER" 2>&1)"
+check_contains "the missing NODE_REGISTRATION_TOKEN is logged" \
+  '"level":"SEVERE","logger":"com.zebrunner.mcloud.grid.MobileGridRegistry"' "$(grep 'NODE_REGISTRATION_TOKEN is not set' <<< "$logs")"
+check_not_contains "the hub is not up without NODE_REGISTRATION_TOKEN" "Selenium Grid hub is up and running" "$logs"
 
 section "container"
 docker run --detach --name "$CONTAINER" \

@@ -254,6 +254,8 @@
 					<environmentVariables>
 						<!-- proxies of unit tests point to nodes that do not exist; the check is covered in the 'stf' execution -->
 						<CHECK_NODE_REACHABILITY>false</CHECK_NODE_REACHABILITY>
+						<!-- the hub does not start without it; GridFixtures.REGISTRATION_TOKEN -->
+						<NODE_REGISTRATION_TOKEN>test-registration-token</NODE_REGISTRATION_TOKEN>
 					</environmentVariables>
 					<systemPropertyVariables>
 						<java.util.logging.config.file>${project.basedir}/src/test/resources/logging.properties</java.util.logging.config.file>

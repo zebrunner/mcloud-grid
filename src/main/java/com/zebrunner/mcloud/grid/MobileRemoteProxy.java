@@ -84,12 +84,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         protected Boolean initialize() throws ConcurrentException {
             LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
             LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
-                            + "node reachability check: %s; node registration token: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
+                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
                             + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
                     STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
                     CHECK_APPIUM_STATUS ? "on" : "off",
                     CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
-                    NODE_REGISTRATION_TOKEN.isEnabled() ? "required" : "not required (NODE_REGISTRATION_TOKEN is not set)",
                     NODE_ALLOWED_NETWORKS,
                     MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
                     UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
@@ -120,8 +119,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // nodes may register only from these networks, empty = from anywhere
     private static final AllowedNetworks NODE_ALLOWED_NETWORKS = AllowedNetworks.fromEnv("NODE_ALLOWED_NETWORKS", System.getenv("NODE_ALLOWED_NETWORKS"));
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
-    // the secret a node registers with, empty = any node
-    private static final NodeRegistrationToken NODE_REGISTRATION_TOKEN = NodeRegistrationToken.of(System.getenv("NODE_REGISTRATION_TOKEN"));
+    // the secret a node registers with, MobileGridRegistry does not start the hub without it
+    private static final NodeRegistrationToken NODE_REGISTRATION_TOKEN = NodeRegistrationToken.of(System.getenv(NodeRegistrationToken.ENV));
 
     private static final Duration INACTIVITY_RELEASE_TIMEOUT = EnvUtils.getDurationInSeconds("INACTIVITY_RELEASE_TIMEOUT", Duration.ofMinutes(1));
 
@@ -493,10 +492,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             throw new GridException(message);
         }
         return request;
-    }
-
-    static boolean isRegistrationTokenEnabled() {
-        return NODE_REGISTRATION_TOKEN.isEnabled();
     }
 
     /**

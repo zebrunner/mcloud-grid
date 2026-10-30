@@ -93,8 +93,7 @@ final class FakeAppiumNode implements AutoCloseable {
                 + "\"id\":\"" + advertisedUrl + "\",\"remoteHost\":\"" + advertisedUrl + "\",\"url\":\"" + advertisedUrl + "\","
                 + "\"proxy\":\"com.zebrunner.mcloud.grid.MobileRemoteProxy\",\"maxSession\":1,\"register\":true,\"registerCycle\":5000,"
                 + "\"nodePolling\":2000,\"unregisterIfStillDownAfter\":5000,\"downPollingLimit\":1,"
-                + (registrationToken == null ? "" : "\"custom\":{\"registrationToken\":\""
-                        + registrationToken.replace("\\", "\\\\").replace("\"", "\\\"") + "\"},")
+                + "\"custom\":{\"registrationToken\":\"" + registrationToken.replace("\\", "\\\\").replace("\"", "\\\"") + "\"},"
                 + "\"capabilities\":[" + caps + "]}}";
         HttpResponse<String> response = HttpClient.newHttpClient().send(
                 GridLoadTest.request(hubRoot + "/grid/register", "POST", body, Duration.ofSeconds(30), authorization),
@@ -109,8 +108,8 @@ final class FakeAppiumNode implements AutoCloseable {
         String path = exchange.getRequestURI().getPath().replaceFirst("^/wd/hub", "");
         exchange.getRequestBody().readAllBytes();
         try {
-            // as zebrunner/appium with NODE_REGISTRATION_TOKEN: the requests of the hub carry the token
-            if (registrationToken != null && !registrationToken.equals(exchange.getRequestHeaders().getFirst("X-MCloud-Node-Token"))) {
+            // as zebrunner/appium: the requests of the hub carry the token
+            if (!registrationToken.equals(exchange.getRequestHeaders().getFirst("X-MCloud-Node-Token"))) {
                 respond(exchange, 401, "{\"value\":{\"error\":\"unknown error\",\"message\":\"no node token\"}}");
             } else if (path.equals("/status") || path.equals("/status-adb") || path.equals("/status-wda")) {
                 respond(exchange, 200, "{\"status\":0,\"value\":{\"ready\":true,\"message\":\"fake node\"}}");
