@@ -1,0 +1,8 @@
+# The image of the hub on top of 2.6-beta12: openjdk:11 of Dockerfile is gone from Docker Hub, so the runtime of
+# 2.6-beta12 is reused and only the jars, the scripts and the config are replaced.
+# mvn -U clean compile assembly:single package && docker build -f Dockerfile.hotfix -t public.ecr.aws/zebrunner/mcloud-grid:2.6-beta13 .
+FROM public.ecr.aws/zebrunner/mcloud-grid:2.6-beta12
+ENV GRID_REGISTRY com.zebrunner.mcloud.grid.MobileGridRegistry
+COPY generate_config entry_point.sh /opt/bin/
+COPY target/mcloud-grid-jar-with-dependencies.jar target/mcloud-grid-1.0.jar logger.properties /opt/selenium/
+RUN /opt/bin/generate_config > /opt/selenium/config.json
