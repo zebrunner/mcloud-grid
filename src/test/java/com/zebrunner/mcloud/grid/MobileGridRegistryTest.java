@@ -76,9 +76,19 @@ public class MobileGridRegistryTest {
         volatile boolean ready = true;
         volatile RuntimeException failure;
         volatile RuntimeException claimFailure;
+        volatile RuntimeException afterSessionFailure;
 
         TestProxy(RegistrationRequest request, GridRegistry registry) {
             super(request, registry);
+        }
+
+        @Override
+        public void afterSession(TestSession session) {
+            events.add("afterSession");
+            if (afterSessionFailure != null) {
+                throw afterSessionFailure;
+            }
+            super.afterSession(session);
         }
 
         @Override
@@ -362,6 +372,37 @@ public class MobileGridRegistryTest {
         registry.terminate(session, SessionTerminationReason.CLIENT_STOPPED_SESSION);
 
         await("the end of the session", () -> registry.getActiveSessions().isEmpty() && proxy.getTotalUsed() == 0);
+        Assert.assertSame(boundSession(request("Android")).getSlot().getProxy(), proxy);
+    }
+
+    @Test
+    public void lateTerminationDoesNotEndTheNextSessionOfTheDevice() throws Exception {
+        TestProxy proxy = node(NODE_URL, "emulator-5554");
+        TestSession first = boundSession(request("Android"));
+        registry.terminate(first, SessionTerminationReason.CLIENT_STOPPED_SESSION);
+        await("the end of the first session", () -> proxy.getTotalUsed() == 0);
+        TestSession second = boundSession(request("Android"));
+
+        // e.g. a command of the client after the end of the first session
+        registry.terminate(first, SessionTerminationReason.CLIENT_STOPPED_SESSION);
+        Thread.sleep(300);
+
+        Assert.assertSame(second.getSlot().getSession(), second);
+        Assert.assertEquals(proxy.events.stream().filter("afterSession"::equals).count(), 1);
+        registry.terminate(second, SessionTerminationReason.CLIENT_STOPPED_SESSION);
+        await("the end of the second session", () -> registry.getActiveSessions().isEmpty() && proxy.getTotalUsed() == 0);
+    }
+
+    @Test
+    public void failedAfterSessionFreesTheDevice() throws Exception {
+        TestProxy proxy = node(NODE_URL, "emulator-5554");
+        proxy.afterSessionFailure = new IllegalStateException("afterSession failed");
+        TestSession session = boundSession(request("Android"));
+
+        registry.terminate(session, SessionTerminationReason.TIMEOUT);
+
+        await("the end of the session", () -> registry.getActiveSessions().isEmpty() && proxy.getTotalUsed() == 0);
+        proxy.afterSessionFailure = null;
         Assert.assertSame(boundSession(request("Android")).getSlot().getProxy(), proxy);
     }
 
