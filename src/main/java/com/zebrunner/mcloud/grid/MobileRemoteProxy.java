@@ -315,7 +315,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         String sessionId = getExternalSessionId(session);
         LOGGER.warning(() -> String.format("[%s] Session on [%s]  will be closed. Ext.id: [%s]", udid, deviceName, sessionId));
         if (STFClient.isSTFEnabled()) {
-            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), udid);
+            STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), udid);
         }
         if (isMitmSupported) {
             if (MitmProxyClient.isProxyInitialized(udid)) {
@@ -351,7 +351,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 //            }
         }
         if (STFClient.isSTFEnabled()) {
-            STFClient.disconnectSTFDevice(udid, platform, (boolean) session.get(IS_MANUALLY_RESERVED), udid);
+            STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), udid);
         }
     }
 

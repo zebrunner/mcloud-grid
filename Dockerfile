@@ -25,6 +25,8 @@ ENV GRID_DEBUG false
 ENV GRID_PROXY com.zebrunner.mcloud.grid.MobileRemoteProxy
 # Capability matcher
 ENV GRID_CAPABILITY_MATCHER com.zebrunner.mcloud.grid.MobileCapabilityMatcher
+# Registry: a late termination of a session does not release the next session of the device
+ENV GRID_REGISTRY com.zebrunner.mcloud.grid.MobileGridRegistry
 
 RUN mkdir /opt/selenium
 
