@@ -73,6 +73,8 @@ import java.util.logging.Logger;
  * its checks (NODE_REGISTRATION_TOKEN, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
  * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) replace the ones of the nodes.</li>
  * <li>The device of a session of a lost node is returned in STF.</li>
+ * <li>The end of a session releases only the slot that still holds it (a late termination does not end the next session
+ * of the device), and a failed afterSession does not leave the device busy.</li>
  * </ul>
  */
 public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry {
@@ -265,12 +267,30 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     @Override
     public void terminate(TestSession session, SessionTerminationReason reason) {
         // the release (afterSession: STF) may take long, the caller does not wait
-        new Thread(() -> release(session.getSlot(), reason)).start();
+        new Thread(() -> release(session, reason)).start();
     }
 
-    private void release(TestSlot testSlot, SessionTerminationReason reason) {
-        if (!testSlot.startReleaseProcess() || !testSlot.performAfterSessionEvent()) {
-            return;
+    /**
+     * Only the slot that still holds the session is released: a late termination (a command of the client after the
+     * end of its session, the cleanup thread) released the next session of the device, and a failed afterSession left
+     * the slot "being released", the device busy until the restart of the hub.
+     */
+    private void release(TestSession session, SessionTerminationReason reason) {
+        TestSlot testSlot = session.getSlot();
+        lock.lock();
+        try {
+            if (testSlot.getSession() != session) {
+                LOGGER.fine(() -> String.format("Session %s (%s) has already ended, the slot is not released.", session, reason));
+                return;
+            }
+            if (!testSlot.startReleaseProcess()) {
+                return;
+            }
+        } finally {
+            lock.unlock();
+        }
+        if (!testSlot.performAfterSessionEvent()) {
+            LOGGER.warning(() -> String.format("afterSession failed for session %s, the slot is released anyway.", session));
         }
         String internalKey = testSlot.getInternalKey();
         lock.lock();
