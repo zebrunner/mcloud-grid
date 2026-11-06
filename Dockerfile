@@ -30,7 +30,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-        curl=8.18.0-1ubuntu2.8 ca-certificates=20260816ubuntu0.26.04.1 procps=2:4.0.4-9ubuntu1 && \
+        curl=8.18.0-1ubuntu2.8 ca-certificates=20260816ubuntu0.26.04.2 procps=2:4.0.4-9ubuntu1 && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/jre /opt/java/openjdk
