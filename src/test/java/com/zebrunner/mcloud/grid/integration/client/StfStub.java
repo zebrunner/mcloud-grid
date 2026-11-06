@@ -3,6 +3,7 @@ package com.zebrunner.mcloud.grid.integration.client;
 import com.github.tomakehurst.wiremock.WireMockServer;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
@@ -83,6 +84,7 @@ public final class StfStub {
         private boolean ready = true;
         private String owner;
         private String remoteConnectUrl;
+        private String battery;
 
         private DeviceJson(String serial) {
             this.serial = serial;
@@ -113,6 +115,11 @@ public final class StfStub {
             return this;
         }
 
+        public DeviceJson battery(double level, double scale, String status) {
+            this.battery = String.format(Locale.ROOT, "{\"level\":%s,\"scale\":%s,\"status\":\"%s\"}", level, scale, status);
+            return this;
+        }
+
         @Override
         public String toString() {
             StringBuilder json = new StringBuilder("{\"serial\":\"").append(serial).append('"')
@@ -123,6 +130,9 @@ public final class StfStub {
             }
             if (owner != null) {
                 json.append(",\"owner\":{\"name\":\"").append(owner).append("\",\"email\":\"").append(owner).append("@example.com\"}");
+            }
+            if (battery != null) {
+                json.append(",\"battery\":").append(battery);
             }
             if (remoteConnectUrl != null) {
                 json.append(",\"remoteConnectUrl\":\"").append(remoteConnectUrl).append('"');

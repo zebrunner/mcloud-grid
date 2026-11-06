@@ -32,6 +32,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 /**
  * The registry of the hub config (generate_config): only MobileRemoteProxy nodes, the devices prepared outside of
@@ -419,6 +423,47 @@ public class MobileGridRegistryTest {
         TestProxy proxy = node(NODE_URL, "emulator-5554");
         Assert.assertSame(boundSession(first).getSlot().getProxy(), proxy);
         Assert.assertEquals(registry.getNewSessionRequestCount(), 0);
+    }
+
+    @Test
+    public void requestLeavingTheQueueWithoutADeviceLogsWhy() {
+        List<String> warnings = new CopyOnWriteArrayList<>();
+        Handler capture = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                if (record.getLevel() == Level.WARNING) {
+                    warnings.add(record.getMessage());
+                }
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger logger = Logger.getLogger(MobileGridRegistry.class.getName());
+        Level level = logger.getLevel();
+        // logging.properties of the tests keeps only SEVERE
+        logger.setLevel(Level.WARNING);
+        logger.addHandler(capture);
+        try {
+            IgnoredDevices.ignore("emulator-5554", Duration.ofHours(1), "low battery: 12% (discharging), below 15%");
+            node(NODE_URL, "emulator-5554");
+            RequestHandler handler = request("Android");
+
+            Assert.assertTrue(registry.removeNewSessionRequest(handler));
+
+            String warning = warnings.stream().filter(message -> message.startsWith("No device was found")).findFirst().orElse("");
+            Assert.assertTrue(warning.contains("matching devices: 1, busy: 0, down: 0, ignored: 1"), warning);
+            Assert.assertTrue(warning.contains("emulator-5554"), warning);
+            Assert.assertTrue(warning.contains("low battery: 12% (discharging), below 15%"), warning);
+        } finally {
+            logger.removeHandler(capture);
+            logger.setLevel(level);
+        }
     }
 
     @Test

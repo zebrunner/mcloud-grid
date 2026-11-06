@@ -84,13 +84,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         protected Boolean initialize() throws ConcurrentException {
             LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
             LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
-                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
+                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; low battery check: %s; "
                             + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
                     STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
                     CHECK_APPIUM_STATUS ? "on" : "off",
                     CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
                     NODE_ALLOWED_NETWORKS,
                     MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
+                    STFClient.lowBatteryCheck(),
                     UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
             return true;
         }

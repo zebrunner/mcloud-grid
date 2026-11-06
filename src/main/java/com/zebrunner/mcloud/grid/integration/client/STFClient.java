@@ -17,6 +17,7 @@ package com.zebrunner.mcloud.grid.integration.client;
 
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
+import com.zebrunner.mcloud.grid.models.stf.Battery;
 import com.zebrunner.mcloud.grid.models.stf.DeviceResponse;
 import com.zebrunner.mcloud.grid.models.stf.Devices;
 import com.zebrunner.mcloud.grid.models.stf.RemoteConnectUserDevice;
@@ -55,6 +56,10 @@ public final class STFClient {
     private static final Duration UNHEALTHY_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_UNHEALTHY_IGNORE_TIMEOUT", Duration.ofMinutes(1));
 
     private static final Duration STF_DEVICE_MANUALLY_RESERVED_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_MANUALLY_RESERVED_TIMEOUT", Duration.ofMinutes(3));
+
+    // a device charged below the threshold (%) is skipped by automation for the timeout; 0 disables the check
+    private static final int LOW_BATTERY_THRESHOLD = EnvUtils.getInt("STF_DEVICE_LOW_BATTERY_THRESHOLD", 15);
+    private static final Duration LOW_BATTERY_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_LOW_BATTERY_IGNORE_TIMEOUT", Duration.ofHours(1));
 
     private static final Duration USER_CACHE_TIME = Duration.ofMinutes(5);
     private static final Map<String, CachedUser> USERS = new ConcurrentHashMap<>();
@@ -122,6 +127,19 @@ public final class STFClient {
         }
 
         boolean available = Boolean.TRUE.equals(stfDevice.getPresent()) && Boolean.TRUE.equals(stfDevice.getReady());
+        // only for an available device: STF keeps the last battery of a disconnected one
+        if (available) {
+            Integer battery = batteryPercent(stfDevice.getBattery());
+            if (isLowBattery(battery, LOW_BATTERY_THRESHOLD)) {
+                String status = stfDevice.getBattery().getStatus();
+                IgnoredDevices.ignore(deviceUDID, LOW_BATTERY_TIMEOUT,
+                        String.format("low battery: %s%% (%s), below %s%%", battery, StringUtils.defaultIfBlank(status, "unknown"), LOW_BATTERY_THRESHOLD));
+                LOGGER.warning(() -> String.format("[%s][%s] Battery of the device is %s%% (%s), below %s%% (STF_DEVICE_LOW_BATTERY_THRESHOLD), "
+                                + "it is ignored for %s seconds.", deviceUDID, sessionUUID, battery, StringUtils.defaultIfBlank(status, "unknown"),
+                        LOW_BATTERY_THRESHOLD, LOW_BATTERY_TIMEOUT.toSeconds()));
+                return null;
+            }
+        }
         // true when the device was reserved by this call, so it must be returned if a later step fails
         boolean reservedNow = false;
         if (stfDevice.getOwner() != null) {
@@ -203,6 +221,32 @@ public final class STFClient {
                 () -> String.format("[%s][%s] Device is reserved in STF%s.", deviceUDID, sessionUUID,
                         stfDevice.getRemoteConnectUrl() == null ? "" : ", remote ADB: " + stfDevice.getRemoteConnectUrl()));
         return stfDevice;
+    }
+
+    /**
+     * @return the charge of the battery in percent, null when STF does not know it (e.g. Apple TV); STF sends Android
+     * level of the given scale, iOS level in percent with scale 100
+     */
+    static Integer batteryPercent(Battery battery) {
+        if (battery == null || battery.getLevel() == null) {
+            return null;
+        }
+        double scale = battery.getScale() == null || battery.getScale() <= 0 ? 100 : battery.getScale();
+        return (int) Math.round(battery.getLevel() * 100 / scale);
+    }
+
+    static boolean isLowBattery(Integer percent, int threshold) {
+        return threshold > 0 && percent != null && percent < threshold;
+    }
+
+    /**
+     * @return the low battery check of the configuration, for the log
+     */
+    public static String lowBatteryCheck() {
+        if (!IS_STF_ENABLED || LOW_BATTERY_THRESHOLD <= 0) {
+            return "off";
+        }
+        return String.format("below %s%% the device is ignored for %ss", LOW_BATTERY_THRESHOLD, LOW_BATTERY_TIMEOUT.toSeconds());
     }
 
     private static STFDevice notReady(String deviceUDID, String sessionUUID) {

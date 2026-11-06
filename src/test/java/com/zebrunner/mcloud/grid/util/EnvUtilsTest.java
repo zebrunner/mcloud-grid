@@ -26,6 +26,13 @@ public class EnvUtilsTest {
     }
 
     @Test
+    public void readsInt() {
+        Assert.assertEquals(EnvUtils.getInt("THRESHOLD", 15, Map.of("THRESHOLD", " 20 ")::get), 20);
+        Assert.assertEquals(EnvUtils.getInt("THRESHOLD", 15, Map.<String, String>of()::get), 15);
+        Assert.assertEquals(EnvUtils.getInt("THRESHOLD", 15, Map.of("THRESHOLD", "15%")::get), 15);
+    }
+
+    @Test
     public void invalidValueIsDefault() {
         // used to fail the class initialization of the proxy with NumberFormatException
         Assert.assertEquals(read(Map.of("TIMEOUT", "10m")), DEFAULT);

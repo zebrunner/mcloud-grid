@@ -338,10 +338,46 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         lock.lock();
         try {
             failedClaims.remove(handler);
-            return queue.removeIf(queued -> queued == handler);
+            boolean preparingDevice = preparing.containsKey(handler);
+            boolean removed = queue.removeIf(queued -> queued == handler);
+            if (removed && !preparingDevice) {
+                logNoDevice(handler.getRequest().getDesiredCapabilities());
+            }
+            return removed;
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Under the lock: why the request left the queue without a device (timed out or its client is gone).
+     */
+    private void logNoDevice(Map<String, Object> capabilities) {
+        List<String> ignored = new ArrayList<>();
+        int matching = 0;
+        int busy = 0;
+        int down = 0;
+        for (RemoteProxy proxy : proxies.getSorted()) {
+            if (!proxy.hasCapability(capabilities)) {
+                continue;
+            }
+            matching++;
+            if (proxy.isBusy()) {
+                busy++;
+            } else if (proxy instanceof MobileRemoteProxy && ((MobileRemoteProxy) proxy).isDown()) {
+                down++;
+            } else if (proxy instanceof MobileRemoteProxy) {
+                MobileRemoteProxy mobile = (MobileRemoteProxy) proxy;
+                IgnoredDevices.get(mobile.getUdid()).ifPresent(entry -> ignored.add(String.format("%s '%s' (%s, %ss more)",
+                        mobile.getUdid(), mobile.getDeviceName(), entry.getReason(), entry.secondsLeft())));
+            }
+        }
+        String reason = matching == 0
+                ? "no device matches it"
+                : String.format("matching devices: %s, busy: %s, down: %s, ignored: %s%s", matching, busy, down, ignored.size(),
+                        ignored.isEmpty() ? "" : " - " + String.join("; ", ignored));
+        LOGGER.warning(() -> String.format("No device was found for the session request (timed out or the client is gone), %s. Request: %s",
+                reason, SecretMasking.mask(capabilities)));
     }
 
     @Override

@@ -77,6 +77,11 @@ STF integration is enabled when both `STF_URL` and `STF_TOKEN` are set.
 | `STF_DEVICE_UNAUTHORIZED_IGNORE_TIMEOUT` | `600` | A device unauthorized in STF is skipped for, s |
 | `STF_DEVICE_UNHEALTHY_IGNORE_TIMEOUT` | `60` | An unhealthy or not ready device is skipped for, s |
 | `STF_DEVICE_MANUALLY_RESERVED_TIMEOUT` | `180` | A device reserved in STF by another user is skipped for, s |
+| `STF_DEVICE_LOW_BATTERY_THRESHOLD` | `15` | A present and ready device charged below this level (%) in STF (Android and iOS) is skipped by automation; `0` disables the check |
+| `STF_DEVICE_LOW_BATTERY_IGNORE_TIMEOUT` | `3600` | A device with a low battery is skipped for, s; it is checked again by the next request after that |
+
+A request that leaves the queue without a device (`newSessionWaitTimeout` or a gone client) is logged as a warning with the
+matching devices: busy, down and ignored ones with the reason (e.g. `low battery: 12% (discharging), below 15%`).
 
 ### Capabilities
 
