@@ -3,6 +3,7 @@ package com.zebrunner.mcloud.grid.integration.client;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
+import com.zebrunner.mcloud.grid.models.stf.Battery;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -225,6 +226,74 @@ public class STFClientTest {
 
         Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(1));
+    }
+
+    public void lowBatteryDeviceIsIgnoredForAnHour() {
+        stf.devices(device(UDID).battery(14, 100, "charging"));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        assertIgnoredFor(Duration.ofHours(1));
+        Assert.assertEquals(IgnoredDevices.get(UDID).get().getReason(), "low battery: 14% (charging), below 15%");
+        assertNoReservationRequest();
+    }
+
+    public void lowBatteryUsesScaleOfAndroid() {
+        stf.devices(device(UDID).battery(7, 50, "discharging"));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android"), SESSION));
+        assertIgnoredFor(Duration.ofHours(1));
+        assertNoReservationRequest();
+    }
+
+    public void lowBatteryOfDeviceReservedByAnotherUserIgnoresItForAnHour() {
+        stf.devices(device(UDID).owner("someone-else").battery(5, 100, "discharging"));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        assertIgnoredFor(Duration.ofHours(1));
+    }
+
+    public void deviceChargedToThresholdIsReserved() {
+        stf.devices(device(UDID).battery(15, 100, "discharging"));
+
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertFalse(IgnoredDevices.isIgnored(UDID));
+    }
+
+    public void deviceWithoutBatteryIsReserved() {
+        stf.devices(device(UDID));
+
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+    }
+
+    public void lastBatteryOfAbsentDeviceIsNotChecked() {
+        stf.devices(device(UDID).present(false).battery(3, 100, "discharging"));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        assertIgnoredFor(Duration.ofMinutes(1));
+        Assert.assertEquals(IgnoredDevices.get(UDID).get().getReason(), "device is not present or not ready in STF");
+    }
+
+    public void batteryPercent() {
+        Assert.assertNull(STFClient.batteryPercent(null));
+        Assert.assertNull(STFClient.batteryPercent(battery(null, 100.0)));
+        Assert.assertEquals(STFClient.batteryPercent(battery(41.0, 100.0)), Integer.valueOf(41));
+        Assert.assertEquals(STFClient.batteryPercent(battery(7.0, 50.0)), Integer.valueOf(14));
+        Assert.assertEquals(STFClient.batteryPercent(battery(41.0, null)), Integer.valueOf(41));
+        Assert.assertEquals(STFClient.batteryPercent(battery(41.0, 0.0)), Integer.valueOf(41));
+    }
+
+    public void lowBatteryThreshold() {
+        Assert.assertTrue(STFClient.isLowBattery(14, 15));
+        Assert.assertFalse(STFClient.isLowBattery(15, 15));
+        Assert.assertFalse(STFClient.isLowBattery(null, 15));
+        Assert.assertFalse(STFClient.isLowBattery(0, 0), "0 disables the check");
+    }
+
+    private static Battery battery(Double level, Double scale) {
+        Battery battery = new Battery();
+        battery.setLevel(level);
+        battery.setScale(scale);
+        return battery;
     }
 
     public void deviceReservedByAnotherUserIsIgnored() {

@@ -23,6 +23,27 @@ public final class EnvUtils {
         return getDurationInSeconds(name, defaultValue, System::getenv);
     }
 
+    /**
+     * @return integer from the env var, or the default value when it is not set or is not a number
+     */
+    public static int getInt(String name, int defaultValue) {
+        return getInt(name, defaultValue, System::getenv);
+    }
+
+    static int getInt(String name, int defaultValue, Function<String, String> env) {
+        String value = env.apply(name);
+        if (StringUtils.isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            LOGGER.warning(() -> String.format("[CONFIGURATION] '%s' should be a number, but was '%s'. Default value will be used: %s.",
+                    name, value, defaultValue));
+            return defaultValue;
+        }
+    }
+
     static Duration getDurationInSeconds(String name, Duration defaultValue, Function<String, String> env) {
         String value = env.apply(name);
         if (StringUtils.isBlank(value)) {
