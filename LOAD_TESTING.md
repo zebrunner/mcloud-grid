@@ -30,28 +30,21 @@ The example runs 2 session lifecycles, one at a time; *each* session sends `GET 
 
 ## Against the hub only (fake nodes)
 
-The test can register in-process fake Appium nodes (`MobileRemoteProxy`, answering `/status`, `/status-adb`, `/status-wda` and session endpoints), so the hub logic and its throughput can be stressed without devices. The hub must be able to reach this machine at `load.fakeNodes.host`.
+The test can register in-process fake Appium nodes (`MobileRemoteProxy`, answering `/status`, `/status-adb`, `/status-wda` and session endpoints), so the hub logic and its throughput can be stressed without devices. The fake nodes need the in-process fake STF of the test (`load.fakeStf.port`): it enrolls every fake node with its own node token for `load.fakeNodes.host`, verifies the tokens for the hub (`POST /api/v1/nodes/verify`) and has their devices. `STF_URL` of the hub must point to the fake STF and `STF_TOKEN` must be `fake-stf-token`; the hub must reach the fake nodes at `load.fakeNodes.host`.
 
-Local hub in Docker (builds the image from this repo; `make load` runs a short version; the hub requires a random `NODE_REGISTRATION_TOKEN`, which the fake nodes register with):
+Local hub in Docker (builds the image from this repo; `make load` runs a short version): the hub and the Maven container share a docker network, the hub reaches the fake STF (`FAKE_STF_PORT`, `18090` by default) and the fake nodes in the Maven container by its name:
 
 ```bash
 tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
 ```
 
-With a fake STF in the test process (`FAKE_STF_PORT`, published by the Maven container) and a latency of every STF response, e.g. a slow STF: the hub reserves the fake devices in it, and after the sessions the test waits up to 30 s for the hub to return them and fails if a device stays reserved:
+With a latency of every STF response, e.g. a slow STF: the hub reserves the fake devices in it, and after the sessions the test waits up to 30 s for the hub to return them and fails if a device stays reserved:
 
 ```bash
-FAKE_STF_PORT=18090 MVN_DOCKER_ARGS="-p 18090:18090" tests/load_local.sh \
-  -Dload.fakeNodes=10 -Dload.sessions=100 -Dload.concurrency=10 -Dload.fakeStf.latencyMs=300
+tests/load_local.sh -Dload.fakeNodes=10 -Dload.sessions=100 -Dload.concurrency=10 -Dload.fakeStf.latencyMs=300
 ```
 
 With 300 ms per STF response the hub prepares the devices of the requests in parallel (see [Matching](README.md#matching)): about 6 sessions/s, session creation p50 1.6 s; the hub that reserved the devices under the lock of its registry made 1 session/s, p50 9.1 s.
-
-Remote hub (STF must be disabled on it, fake devices are not in STF; export `NODE_REGISTRATION_TOKEN` of the hub as `LOAD_NODE_REGISTRATION_TOKEN`, which `tests/mvn.sh` forwards like the credentials):
-
-```bash
-tests/mvn.sh -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 -Dload.fakeNodes.host=<ip reachable from the hub>
-```
 
 ## Options
 
@@ -68,10 +61,11 @@ tests/mvn.sh -Pload test -Dgrid.url=http://grid:4444/wd/hub -Dload.fakeNodes=20 
 | `load.newSessionTimeoutSec` | 600 | Client timeout for `POST /session` (includes queue time) |
 | `load.maxErrorRate` | 0 | Allowed failed sessions ratio, 0..1 |
 | `load.maxP95CreateMs` | 0 (off) | Upper bound for p95 of session creation |
-| `load.fakeNodes` | 0 | Fake nodes to register (0 = real devices) |
+| `load.fakeNodes` | 0 | Fake nodes to register (0 = real devices); they need `load.fakeStf.port` |
 | `load.fakeNodes.host` | `localhost` | Host the hub uses to reach fake nodes (`host.docker.internal` for Docker Desktop) |
 | `load.fakeNodes.platform` | `ANDROID` | `ANDROID` or `IOS` |
 | `load.fakeNodes.sessionDelayMs` | 0 | Simulated Appium session startup time |
+| `load.fakeStf.port` | 0 (none) | Port of the fake STF the hub uses (its `STF_URL`), required for the fake nodes |
+| `load.fakeStf.latencyMs` | 0 | Latency of every fake STF response |
 | `load.reportDir` | `target/load-report` | Report directory |
 | `LOAD_GRID_USERNAME`, `LOAD_GRID_PASSWORD` | unset | Optional Basic Auth credentials, passed via environment (both required) |
-| `LOAD_NODE_REGISTRATION_TOKEN` | unset | `NODE_REGISTRATION_TOKEN` of the hub the fake nodes register with, passed via environment; required with `load.fakeNodes` |

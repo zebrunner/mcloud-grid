@@ -63,12 +63,12 @@ public class GridLoadTest {
             fakeStf = new FakeStf(config.fakeStfPort, config.fakeStfLatencyMs);
         }
         for (int i = 0; i < config.fakeNodes; i++) {
+            // every fake node is an enrolled node with its own node token, which the hub verifies with the fake STF
+            String nodeToken = fakeStf.enroll("fake-" + i, config.fakeNodesHost);
             FakeAppiumNode node = new FakeAppiumNode("fake-" + i + "-" + System.nanoTime(), config.fakeNodesPlatform, config.fakeNodesHost,
-                    config.fakeNodeSessionDelayMs, config.nodeRegistrationToken);
+                    config.fakeNodeSessionDelayMs, nodeToken);
             fakeNodes.add(node);
-            if (fakeStf != null) {
-                fakeStf.addDevice(node.udid());
-            }
+            fakeStf.addDevice(node.udid());
             node.register(config.hubRoot(), config.authorization);
         }
         if (!fakeNodes.isEmpty()) {

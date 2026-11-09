@@ -70,4 +70,26 @@ public class SecretMaskingTest {
         Assert.assertEquals(SecretMasking.maskUrl("a?token=b"), "a?token=b");
         Assert.assertEquals(SecretMasking.maskUrl("http://hub:4444/wd/hub"), "http://hub:4444/wd/hub");
     }
+
+    @Test
+    public void nodeTokenKeepsItsLabelOnly() {
+        String token = "mcn1.node-1.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+        Assert.assertEquals(SecretMasking.maskLogMessage("token " + token + " of the node"), "token mcn1.node-1.***** of the node");
+        Assert.assertEquals(SecretMasking.maskLogMessage("{\"custom\":{\"registrationToken\":\"" + token + "\"}}"),
+                "{\"custom\":{\"registrationToken\":\"*****\"}}");
+        Assert.assertEquals(SecretMasking.maskLogMessage("no token"), "no token");
+        Assert.assertNull(SecretMasking.maskLogMessage(null));
+    }
+
+    @Test
+    public void secretHeadersOfTheHttpClientDebugLogsAreMasked() {
+        Assert.assertEquals(SecretMasking.maskLogMessage("http-outgoing-0 >> Authorization: Bearer 0123abcd"),
+                "http-outgoing-0 >> Authorization: Bearer *****");
+        Assert.assertEquals(SecretMasking.maskLogMessage("http-outgoing-0 >> \"Authorization: Bearer 0123abcd[\\r][\\n]\""),
+                "http-outgoing-0 >> \"Authorization: Bearer *****[\\r][\\n]\"");
+        Assert.assertEquals(SecretMasking.maskLogMessage("authorization: Basic dXNlcjpwYXNz"), "authorization: Basic *****");
+        Assert.assertEquals(SecretMasking.maskLogMessage("http-outgoing-1 >> X-MCloud-Node-Token: s3cret"),
+                "http-outgoing-1 >> X-MCloud-Node-Token: *****");
+        Assert.assertEquals(SecretMasking.maskLogMessage("the Authorization header is required"), "the Authorization header is required");
+    }
 }

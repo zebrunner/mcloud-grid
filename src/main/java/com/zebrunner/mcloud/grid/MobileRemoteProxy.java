@@ -17,6 +17,7 @@ package com.zebrunner.mcloud.grid;
 
 import com.zebrunner.mcloud.grid.integration.client.Path;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
+import com.zebrunner.mcloud.grid.integration.client.StfNodes;
 import com.zebrunner.mcloud.grid.models.stf.STFDevice;
 import com.zebrunner.mcloud.grid.util.AllowedNetworks;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
@@ -26,6 +27,7 @@ import com.zebrunner.mcloud.grid.util.HttpClientApache;
 import com.zebrunner.mcloud.grid.util.LogLevels;
 import com.zebrunner.mcloud.grid.util.NodeReachability;
 import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
+import com.zebrunner.mcloud.grid.util.NodeToken;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.ConcurrentException;
 import org.apache.commons.lang3.concurrent.LazyInitializer;
@@ -53,6 +55,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -84,7 +91,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         protected Boolean initialize() throws ConcurrentException {
             LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
             LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
-                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; low battery check: %s; "
+                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
+                            + "low battery check: %s; "
                             + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
                     STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
                     CHECK_APPIUM_STATUS ? "on" : "off",
@@ -120,11 +128,23 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // nodes may register only from these networks, empty = from anywhere
     private static final AllowedNetworks NODE_ALLOWED_NETWORKS = AllowedNetworks.fromEnv("NODE_ALLOWED_NETWORKS", System.getenv("NODE_ALLOWED_NETWORKS"));
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
-    // the secret a node registers with, MobileGridRegistry does not start the hub without it
-    private static final NodeRegistrationToken NODE_REGISTRATION_TOKEN = NodeRegistrationToken.of(System.getenv(NodeRegistrationToken.ENV));
+    // the node tokens verified by STF; MobileGridRegistry does not start the hub without STF_URL and STF_TOKEN
+    private static volatile NodeAuthentication nodeAuthentication = NodeAuthentication.fromEnv();
+    // STF verifies the node token of a registered node again and again: a revoked node is unregistered
+    static final Duration NODE_TOKEN_CHECK_PERIOD = Duration.ofSeconds(60);
+    // a node is kept while STF does not answer for so long since the last verification of its node token
+    static final Duration NODE_TOKEN_CHECK_GRACE = Duration.ofMinutes(10);
+    private static final ScheduledExecutorService NODE_TOKEN_CHECKS = Executors.newScheduledThreadPool(4, new DaemonThreads("Node token check"));
 
     private static final Duration INACTIVITY_RELEASE_TIMEOUT = EnvUtils.getDurationInSeconds("INACTIVITY_RELEASE_TIMEOUT", Duration.ofMinutes(1));
 
+    // the node token of the node, which the hub sends only to it
+    private final NodeRegistrationToken nodeCredential;
+    private final NodeToken nodeToken;
+    private final String nodeHost;
+    private volatile Instant nodeTokenVerifiedAt;
+    private volatile boolean nodeTokenCheckFailed;
+    private ScheduledFuture<?> nodeTokenCheck;
     private final String udid;
     private final String deviceName;
     private final String deviceType;
@@ -133,7 +153,15 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private final HtmlRenderer htmlRenderer;
 
     public MobileRemoteProxy(RegistrationRequest request, GridRegistry registry) {
-        super(acceptRegistrationToken(request), registry);
+        this(acceptRegistration(request), registry);
+    }
+
+    private MobileRemoteProxy(NodeAuthentication.Accepted accepted, GridRegistry registry) {
+        super(accepted.getRequest(), registry);
+        nodeCredential = accepted.getCredential();
+        nodeToken = accepted.getNodeToken();
+        nodeHost = accepted.getHost();
+        nodeTokenVerifiedAt = Instant.now();
         try {
             INITIAL_GRID_CONFIGURATION_LOGS.get();
         } catch (Exception e) {
@@ -146,14 +174,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
         // a node registers again when the hub does not answer it in time: the node the hub already has at the same address
         // was checked when it was added, a node with its id at another address is a new one
+        // NODE_ALLOWED_NETWORKS is checked with the token, see acceptRegistration
         RemoteProxy known = registry.getProxyById(getId());
         boolean registered = known != null && String.valueOf(known.getRemoteHost()).equals(String.valueOf(getRemoteHost()));
-        if (!registered && !NODE_ALLOWED_NETWORKS.allows(getRemoteHost().getHost())) {
-            String message = String.format("Node %s is not in NODE_ALLOWED_NETWORKS (%s), so it is not registered.",
-                    getRemoteHost(), NODE_ALLOWED_NETWORKS);
-            warnAboutRejectedNode(String.valueOf(getRemoteHost()), message);
-            throw new GridException(message);
-        }
         if (CHECK_NODE_REACHABILITY && !registered) {
             URL nodeUrl = getRemoteHost();
             NodeReachability.check(nodeUrl, NODE_REACHABILITY_TIMEOUT).ifPresent(reason -> {
@@ -182,7 +205,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             switch (platform) {
             case ANDROID:
                 appiumCheck = (remoteURL, sessionUUID) -> {
-                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create().withRequestConfig(APPIUM_STATUS_REQUEST))
+                    Response<String> response = nodeCredential.authenticate(HttpClientApache.create().withRequestConfig(APPIUM_STATUS_REQUEST))
                             .withUri(Path.APPIUM_STATUS_ADB, remoteURL.toString())
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
@@ -196,7 +219,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 break;
             case IOS:
                 appiumCheck = (remoteURL, sessionUUID) -> {
-                    Response<String> response = NODE_REGISTRATION_TOKEN.authenticate(HttpClientApache.create().withRequestConfig(APPIUM_STATUS_REQUEST))
+                    Response<String> response = nodeCredential.authenticate(HttpClientApache.create().withRequestConfig(APPIUM_STATUS_REQUEST))
                             .withUri(Path.APPIUM_STATUS_WDA, remoteURL.toString())
                             .get(new StringEntity("{\"exitCode\": 101}", ContentType.APPLICATION_JSON));
                     if (response.getStatus() != 200) {
@@ -380,17 +403,120 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     /**
-     * The requests of the hub to the node (the commands of the sessions, the status polling) carry the token of the node.
+     * The requests of the hub to the node (the commands of the sessions, the status polling) carry the node token of
+     * this node.
      */
     @Override
     public HttpClient getHttpClient(URL url, int connectionTimeout, int readTimeout) {
-        return NODE_REGISTRATION_TOKEN.authenticate(super.getHttpClient(url, connectionTimeout, readTimeout));
+        return authenticate(super.getHttpClient(url, connectionTimeout, readTimeout));
     }
 
     @Override
     @Deprecated
     public HttpClient getHttpClient(URL url) {
-        return NODE_REGISTRATION_TOKEN.authenticate(super.getHttpClient(url));
+        return authenticate(super.getHttpClient(url));
+    }
+
+    private HttpClient authenticate(HttpClient client) {
+        // null only while the constructor of Selenium runs
+        return nodeCredential == null ? client : nodeCredential.authenticate(client);
+    }
+
+    /**
+     * The registry starts the polling of a node when it is added: the node token of the node is verified from then on.
+     */
+    @Override
+    public void startPolling() {
+        super.startPolling();
+        startNodeTokenCheck();
+    }
+
+    private synchronized void startNodeTokenCheck() {
+        if (nodeTokenCheck != null) {
+            nodeTokenCheck.cancel(false);
+        }
+        long period = NODE_TOKEN_CHECK_PERIOD.toMillis();
+        nodeTokenCheck = NODE_TOKEN_CHECKS.scheduleWithFixedDelay(() -> {
+            try {
+                checkNodeToken(Instant.now());
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.WARNING, String.format("[NODE TOKEN] The check of the node token of node %s failed.", getRemoteHost()), e);
+            }
+        }, period, period, TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public void teardown() {
+        stopNodeTokenCheck();
+        super.teardown();
+    }
+
+    private synchronized void stopNodeTokenCheck() {
+        if (nodeTokenCheck != null) {
+            nodeTokenCheck.cancel(false);
+            nodeTokenCheck = null;
+        }
+    }
+
+    /**
+     * Verifies the node token of the node with STF again (without the cache): a node whose token STF rejects (revoked,
+     * re-enrolled, another address) is unregistered at once, a node STF cannot verify is kept for
+     * {@link #NODE_TOKEN_CHECK_GRACE} since its last verification.
+     *
+     * @return true if the node is kept
+     */
+    boolean checkNodeToken(Instant now) {
+        StfNodes.Verification verification = nodeAuthentication.verifyNow(nodeToken, nodeHost);
+        switch (verification.getStatus()) {
+        case VALID:
+            if (nodeTokenCheckFailed) {
+                LOGGER.info(() -> String.format("[NODE TOKEN] STF verified the node token of node %s ('%s') again.", getRemoteHost(), nodeToken.getLabel()));
+            }
+            nodeTokenCheckFailed = false;
+            nodeTokenVerifiedAt = now;
+            return true;
+        case REJECTED:
+            LOGGER.warning(() -> String.format("[NODE TOKEN] STF does not accept the node token of node %s ('%s') any more: the node is "
+                    + "revoked, joined again or moved to another address. The node is unregistered.", getRemoteHost(), nodeToken.getLabel()));
+            unregister();
+            return false;
+        default:
+            Duration unverified = Duration.between(nodeTokenVerifiedAt, now);
+            if (unverified.compareTo(NODE_TOKEN_CHECK_GRACE) > 0) {
+                LOGGER.warning(() -> String.format("[NODE TOKEN] STF could not verify the node token of node %s ('%s') for %ss (%s), "
+                                + "the node is unregistered.", getRemoteHost(), nodeToken.getLabel(), unverified.toSeconds(),
+                        NodeAuthentication.describe(verification.getHttpStatus())));
+                unregister();
+                return false;
+            }
+            if (!nodeTokenCheckFailed) {
+                LOGGER.warning(() -> String.format("[NODE TOKEN] STF could not verify the node token of node %s ('%s') (%s), the node is "
+                                + "kept for up to %ss since its last verification.", getRemoteHost(), nodeToken.getLabel(),
+                        NodeAuthentication.describe(verification.getHttpStatus()), NODE_TOKEN_CHECK_GRACE.toSeconds()));
+            }
+            nodeTokenCheckFailed = true;
+            return true;
+        }
+    }
+
+    /**
+     * Removes this node from the registry (which tears it down), not a node registered meanwhile with the same id.
+     */
+    private void unregister() {
+        GridRegistry registry = getRegistry();
+        if (registry instanceof MobileGridRegistry) {
+            ((MobileGridRegistry) registry).removeIfSame(this);
+        } else if (registry.getProxyById(getId()) == this) {
+            registry.removeIfPresent(this);
+        }
+        stopNodeTokenCheck();
+    }
+
+    /**
+     * @return the label of the node in the STF node registry
+     */
+    public String getNodeLabel() {
+        return nodeToken.getLabel();
     }
 
     /**
@@ -483,16 +609,29 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     /**
-     * Checks the token of the request before the proxy copies its configuration, see {@link NodeRegistrationToken#accept}.
+     * Checks the token of the request (see {@link NodeAuthentication}) and NODE_ALLOWED_NETWORKS before the proxy copies
+     * its configuration; the token is taken out of the request.
      */
-    private static RegistrationRequest acceptRegistrationToken(RegistrationRequest request) {
-        if (!NODE_REGISTRATION_TOKEN.accept(request)) {
-            String node = request.getConfiguration() == null ? "(no configuration)" : String.valueOf(request.getConfiguration().getRemoteHost());
-            String message = String.format("Node %s has no or another NODE_REGISTRATION_TOKEN than the hub, so it is not registered.", node);
-            warnAboutRejectedNode(node, message);
-            throw new GridException(message);
+    private static NodeAuthentication.Accepted acceptRegistration(RegistrationRequest request) {
+        String node = request.getConfiguration() == null ? "(no configuration)" : String.valueOf(request.getConfiguration().getRemoteHost());
+        try {
+            return nodeAuthentication.accept(request, host -> {
+                if (!NODE_ALLOWED_NETWORKS.allows(host)) {
+                    throw new GridException(String.format("Node %s is not in NODE_ALLOWED_NETWORKS (%s), so it is not registered.",
+                            node, NODE_ALLOWED_NETWORKS));
+                }
+            });
+        } catch (GridException e) {
+            warnAboutRejectedNode(node, e.getMessage());
+            throw e;
         }
-        return request;
+    }
+
+    /**
+     * Replaces the verification of the node tokens of the configuration, for tests.
+     */
+    static void useNodeAuthentication(NodeAuthentication authentication) {
+        nodeAuthentication = authentication;
     }
 
     /**
@@ -547,6 +686,22 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      */
     private static String describeExternalSession(TestSession session) {
         return session.getExternalKey() != null ? "'" + session.getExternalKey().getKey() + "'" : "(no Appium session)";
+    }
+
+    private static final class DaemonThreads implements java.util.concurrent.ThreadFactory {
+        private final String name;
+        private final AtomicInteger count = new AtomicInteger();
+
+        DaemonThreads(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public Thread newThread(Runnable task) {
+            Thread thread = new Thread(task, name + " " + count.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        }
     }
 
     private String sessionDuration() {

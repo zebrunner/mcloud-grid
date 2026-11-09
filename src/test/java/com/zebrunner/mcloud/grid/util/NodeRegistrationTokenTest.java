@@ -1,7 +1,6 @@
 package com.zebrunner.mcloud.grid.util;
 
 import org.openqa.grid.common.RegistrationRequest;
-import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.selenium.remote.http.HttpClient;
 import org.openqa.selenium.remote.http.HttpMethod;
 import org.openqa.selenium.remote.http.HttpRequest;
@@ -28,41 +27,26 @@ public class NodeRegistrationTokenTest {
     }
 
     @Test
-    public void hubWithoutTokenIsAConfigurationError() {
+    public void emptyTokenIsRefused() {
         for (String token : new String[] {null, "", " \n"}) {
-            GridConfigurationException e = Assert.expectThrows(GridConfigurationException.class, () -> NodeRegistrationToken.of(token));
-            Assert.assertTrue(e.getMessage().startsWith("NODE_REGISTRATION_TOKEN is not set"), e.getMessage());
+            Assert.expectThrows(IllegalArgumentException.class, () -> NodeRegistrationToken.of(token));
         }
     }
 
     @Test
-    public void nodeWithTheTokenOfTheHubIsAccepted() {
-        Assert.assertTrue(NodeRegistrationToken.of("s3cret").accept(request("s3cret")));
-        // the value of an env var may keep a trailing new line
-        Assert.assertTrue(NodeRegistrationToken.of(" s3cret\n").accept(request("s3cret ")));
+    public void tokenIsNotShown() {
+        Assert.assertEquals(NodeRegistrationToken.of("s3cret").toString(), "*****");
     }
 
     @Test
-    public void nodeWithoutOrWithAnotherTokenIsRejected() {
-        NodeRegistrationToken token = NodeRegistrationToken.of("s3cret");
+    public void sentTokenIsTakenOutOfTheRequestTrimmed() {
+        RegistrationRequest request = request(" mcn1.node-1.x\n");
 
-        Assert.assertFalse(token.accept(request(null)));
-        Assert.assertFalse(token.accept(request("")));
-        Assert.assertFalse(token.accept(request("s3cret2")));
-        Assert.assertFalse(token.accept(request("S3CRET")));
-    }
-
-    @Test
-    public void tokenIsTakenOutOfTheRequest() {
-        // also out of a rejected request
-        for (String hubToken : new String[] {"another", "s3cret"}) {
-            RegistrationRequest request = request("s3cret");
-
-            NodeRegistrationToken.of(hubToken).accept(request);
-
-            Assert.assertEquals(request.getConfiguration().custom, Map.of("other", "kept"), hubToken);
-            Assert.assertFalse(request.toJson().toString().contains("s3cret"), hubToken);
-        }
+        Assert.assertEquals(NodeRegistrationToken.take(request), "mcn1.node-1.x");
+        Assert.assertEquals(request.getConfiguration().custom, Map.of("other", "kept"));
+        Assert.assertFalse(request.toJson().toString().contains("mcn1.node-1.x"));
+        Assert.assertNull(NodeRegistrationToken.take(request));
+        Assert.assertNull(NodeRegistrationToken.take(request(null)));
     }
 
     @Test
@@ -73,7 +57,7 @@ public class NodeRegistrationTokenTest {
             return new HttpResponse();
         };
 
-        NodeRegistrationToken.of("s3cret").authenticate(client).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/status"));
+        NodeRegistrationToken.of(" s3cret\n").authenticate(client).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/status"));
 
         Assert.assertEquals(sent, List.of("s3cret"));
     }
@@ -83,6 +67,6 @@ public class NodeRegistrationTokenTest {
         RegistrationRequest request = request(null);
         request.getConfiguration().custom = null;
 
-        Assert.assertFalse(NodeRegistrationToken.of("s3cret").accept(request));
+        Assert.assertNull(NodeRegistrationToken.take(request));
     }
 }

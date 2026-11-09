@@ -20,7 +20,7 @@
 // timeouts of the hub, the devices of lost nodes are returned in STF, the queued requests are safe for the console.
 package com.zebrunner.mcloud.grid;
 
-import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
+import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
 import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.grid.internal.ActiveTestSessions;
@@ -70,7 +70,7 @@ import java.util.logging.Logger;
  * queue of Selenium removes the first request without a session instead (e.g. the cleanup of a timed out request
  * removed another one).</li>
  * <li>A node names the class of its proxy itself: only MobileRemoteProxy nodes are added, the others would skip
- * its checks (NODE_REGISTRATION_TOKEN, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
+ * its checks (the node token, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
  * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) replace the ones of the nodes.</li>
  * <li>The device of a session of a lost node is returned in STF.</li>
  * <li>The end of a session releases only the slot that still holds it (a late termination does not end the next session
@@ -114,20 +114,25 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     }
 
     /**
-     * Hub starts its registry before its server: the hub does not start without NODE_REGISTRATION_TOKEN.
+     * Hub starts its registry before its server: the hub does not start without STF, which verifies the node tokens of
+     * the nodes.
      */
     @Override
     public void start() {
-        checkRegistrationToken(System.getenv(NodeRegistrationToken.ENV));
+        checkNodeRegistration(isStfConfigured());
         matcher.start();
     }
 
-    static void checkRegistrationToken(String token) {
-        try {
-            NodeRegistrationToken.of(token);
-        } catch (GridConfigurationException e) {
-            LOGGER.severe("[CONFIGURATION] " + e.getMessage() + " The hub does not start.");
-            throw e;
+    protected boolean isStfConfigured() {
+        return STFClient.isSTFEnabled();
+    }
+
+    static void checkNodeRegistration(boolean stfEnabled) {
+        if (!stfEnabled) {
+            String message = "STF_URL and STF_TOKEN are not set: the nodes register with their node tokens, which the hub verifies "
+                    + "with STF, so no node could register. Set STF_URL and STF_TOKEN (the access token of an STF admin).";
+            LOGGER.severe("[CONFIGURATION] " + message + " The hub does not start.");
+            throw new GridConfigurationException(message);
         }
     }
 
@@ -234,6 +239,24 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
                 registered.teardown();
                 fireStateChanged();
             }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Removes the proxy only if it is the registered one, not a proxy registered meanwhile with the same id.
+     *
+     * @return true if it was removed
+     */
+    public boolean removeIfSame(RemoteProxy proxy) {
+        lock.lock();
+        try {
+            if (proxies.getProxyById(proxy.getId()) != proxy) {
+                return false;
+            }
+            removeIfPresent(proxy);
+            return true;
         } finally {
             lock.unlock();
         }

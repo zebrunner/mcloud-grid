@@ -2,9 +2,9 @@
 # Builds the grid image, starts it in Docker and stresses it with in-process fake Appium nodes.
 # Usage: tests/load_local.sh [extra -D options for GridLoadTest]
 #   e.g. tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
-# FAKE_STF_PORT=<port> enables STF in the hub with an in-process fake STF on that port (latency: -Dload.fakeStf.latencyMs=...),
+# The hub uses an in-process fake STF of the test container (FAKE_STF_PORT, 18090 by default; latency:
+# -Dload.fakeStf.latencyMs=...), which enrolls the fake nodes and verifies their node tokens.
 # HUB_ENV="NAME=value ..." passes more env vars to the hub container.
-# The hub requires a random NODE_REGISTRATION_TOKEN, the fake nodes register with it (LOAD_NODE_REGISTRATION_TOKEN).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -15,28 +15,19 @@ CONTAINER=${CONTAINER:-mcloud-grid-load}
 NETWORK=${NETWORK:-${CONTAINER}-net}
 TEST_CONTAINER=${TEST_CONTAINER:-${CONTAINER}-tests}
 PORT=${PORT:-4444}
-FAKE_STF_PORT=${FAKE_STF_PORT:-}
+FAKE_STF_PORT=${FAKE_STF_PORT:-18090}
 
-# the token reaches the containers through the environment, not their command lines
-NODE_REGISTRATION_TOKEN="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
-export NODE_REGISTRATION_TOKEN
-export LOAD_NODE_REGISTRATION_TOKEN="$NODE_REGISTRATION_TOKEN"
-hub_env=(--env NODE_REGISTRATION_TOKEN)
+# the hub reaches the fake STF in the test container through the docker network
+hub_env=(--env "STF_URL=http://${TEST_CONTAINER}:${FAKE_STF_PORT}" --env "STF_TOKEN=fake-stf-token")
 for variable in ${HUB_ENV:-}; do
   hub_env+=(--env "$variable")
 done
-test_options=()
-if [[ -n "$FAKE_STF_PORT" ]]; then
-  hub_env+=(--env "STF_URL=http://host.docker.internal:${FAKE_STF_PORT}" --env "STF_TOKEN=fake-stf-token")
-  test_options+=("-Dload.fakeStf.port=${FAKE_STF_PORT}")
-fi
 
 docker build -q -t "$IMAGE" . > /dev/null
 docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
 docker rm -f "$TEST_CONTAINER" > /dev/null 2>&1 || true
 docker network create "$NETWORK" > /dev/null 2>&1 || true
-# host-gateway makes host.docker.internal resolvable on Linux too (Docker Desktop provides it itself)
-docker run -d --name "$CONTAINER" --network "$NETWORK" -p "$PORT:4444" --add-host=host.docker.internal:host-gateway ${hub_env[@]+"${hub_env[@]}"} "$IMAGE" > /dev/null
+docker run -d --name "$CONTAINER" --network "$NETWORK" -p "$PORT:4444" "${hub_env[@]}" "$IMAGE" > /dev/null
 trap 'docker logs "$CONTAINER" > target/load-report/hub.log 2>&1 || true; docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true; docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; docker network rm "$NETWORK" >/dev/null 2>&1 || true' EXIT
 
 echo "waiting for hub on :$PORT"
@@ -56,5 +47,5 @@ MVN_DOCKER_ARGS="$container_mvn_args" "$MVN" -B -q -Pload test \
   -Dload.fakeNodes.host="$TEST_CONTAINER" \
   -Dload.sessions=200 \
   -Dload.concurrency=20 \
-  ${test_options[@]+"${test_options[@]}"} \
+  -Dload.fakeStf.port="$FAKE_STF_PORT" \
   "$@"
