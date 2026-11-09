@@ -80,4 +80,16 @@ public class SecretMaskingTest {
         Assert.assertEquals(SecretMasking.maskLogMessage("no token"), "no token");
         Assert.assertNull(SecretMasking.maskLogMessage(null));
     }
+
+    @Test
+    public void secretHeadersOfTheHttpClientDebugLogsAreMasked() {
+        Assert.assertEquals(SecretMasking.maskLogMessage("http-outgoing-0 >> Authorization: Bearer 0123abcd"),
+                "http-outgoing-0 >> Authorization: Bearer *****");
+        Assert.assertEquals(SecretMasking.maskLogMessage("http-outgoing-0 >> \"Authorization: Bearer 0123abcd[\\r][\\n]\""),
+                "http-outgoing-0 >> \"Authorization: Bearer *****[\\r][\\n]\"");
+        Assert.assertEquals(SecretMasking.maskLogMessage("authorization: Basic dXNlcjpwYXNz"), "authorization: Basic *****");
+        Assert.assertEquals(SecretMasking.maskLogMessage("http-outgoing-1 >> X-MCloud-Node-Token: s3cret"),
+                "http-outgoing-1 >> X-MCloud-Node-Token: *****");
+        Assert.assertEquals(SecretMasking.maskLogMessage("the Authorization header is required"), "the Authorization header is required");
+    }
 }

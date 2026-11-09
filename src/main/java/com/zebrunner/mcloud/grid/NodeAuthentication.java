@@ -1,5 +1,6 @@
 package com.zebrunner.mcloud.grid;
 
+import com.zebrunner.mcloud.grid.integration.client.NodeTokenVerifier;
 import com.zebrunner.mcloud.grid.integration.client.StfNodes;
 import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import com.zebrunner.mcloud.grid.util.NodeToken;
@@ -9,73 +10,33 @@ import org.openqa.grid.common.exception.GridException;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 /**
- * Decides whether a node may register by the token in 'custom' of its configuration:
- * <ul>
- * <li>a node token ({@code mcn1.<label>.<secret>}, see {@link NodeToken}) is accepted only when STF verifies it for the
- * host of the node URL (POST /api/v1/nodes/verify answers 200);</li>
- * <li>the legacy shared NODE_REGISTRATION_TOKEN is accepted when the hub has one, but not from the address of a node of
- * the registry of STF (any status): an enrolled node registers with its node token only.</li>
- * </ul>
- * The token is taken out of the request in any case. The messages of the rejections go to the node (the answer of
- * /grid/register) and to the log of the hub, they never contain a token.
+ * Decides whether a node may register by the node token in 'custom' of its configuration ({@code mcn1.<label>.<secret>},
+ * see {@link NodeToken}): it is accepted only when STF verifies it for the host of the node URL
+ * (POST /api/v1/nodes/verify answers 200). The token is taken out of the request in any case. The messages of the
+ * rejections go to the node (the answer of /grid/register) and to the log of the hub, they never contain a token.
  */
 public final class NodeAuthentication {
     private static final Logger LOGGER = Logger.getLogger(NodeAuthentication.class.getName());
 
-    private final NodeRegistrationToken sharedToken;
-    private final StfNodes stfNodes;
+    private final NodeTokenVerifier verifier;
 
     /**
-     * @param sharedToken the legacy NODE_REGISTRATION_TOKEN of the hub, null when it is not set
-     * @param stfNodes    the node registry of STF, null when the STF integration is off
+     * @param verifier the node registry of STF, null when STF_URL and STF_TOKEN are not set (then no node is accepted)
      */
-    public NodeAuthentication(NodeRegistrationToken sharedToken, StfNodes stfNodes) {
-        this.sharedToken = sharedToken;
-        this.stfNodes = stfNodes;
+    public NodeAuthentication(NodeTokenVerifier verifier) {
+        this.verifier = verifier;
     }
 
     /**
-     * @return the authentication of the hub configuration (NODE_REGISTRATION_TOKEN, STF_URL, STF_TOKEN)
+     * @return the authentication of the hub configuration (STF_URL, STF_TOKEN)
      */
     public static NodeAuthentication fromEnv() {
-        return new NodeAuthentication(NodeRegistrationToken.optional(System.getenv(NodeRegistrationToken.ENV)).orElse(null),
-                StfNodes.fromEnv().orElse(null));
-    }
-
-    /**
-     * @return the tokens the hub accepts, for the log of the configuration
-     */
-    public String describe() {
-        if (stfNodes != null && sharedToken != null) {
-            return "node tokens verified by STF and the shared NODE_REGISTRATION_TOKEN (legacy, not from the addresses of enrolled nodes)";
-        }
-        return stfNodes != null ? "node tokens verified by STF only" : "the shared NODE_REGISTRATION_TOKEN only (STF integration is off)";
-    }
-
-    /**
-     * Forgets the answers of STF, for tests.
-     */
-    public void clearCache() {
-        if (stfNodes != null) {
-            stfNodes.clearCache();
-        }
-    }
-
-    /**
-     * @return the answer of STF about the node token of a registered node, without the cache
-     */
-    public StfNodes.Verification verifyNow(NodeToken token, String host) {
-        if (stfNodes == null) {
-            return new StfNodes.Verification(StfNodes.Status.UNAVAILABLE, 0);
-        }
-        return stfNodes.verifyNow(token, host);
+        return new NodeAuthentication(StfNodes.fromEnv().orElse(null));
     }
 
     /**
@@ -83,13 +44,11 @@ public final class NodeAuthentication {
      */
     public static final class Accepted {
         private final RegistrationRequest request;
-        private final NodeRegistrationToken credential;
         private final NodeToken nodeToken;
         private final String host;
 
-        Accepted(RegistrationRequest request, NodeRegistrationToken credential, NodeToken nodeToken, String host) {
+        Accepted(RegistrationRequest request, NodeToken nodeToken, String host) {
             this.request = request;
-            this.credential = credential;
             this.nodeToken = nodeToken;
             this.host = host;
         }
@@ -102,15 +61,12 @@ public final class NodeAuthentication {
         }
 
         /**
-         * @return the token the hub sends to the node in its requests
+         * @return the token the hub sends to the node in its requests: its node token
          */
         public NodeRegistrationToken getCredential() {
-            return credential;
+            return NodeRegistrationToken.of(nodeToken.getValue());
         }
 
-        /**
-         * @return the node token of the node, null for a node with the shared token
-         */
         public NodeToken getNodeToken() {
             return nodeToken;
         }
@@ -136,39 +92,35 @@ public final class NodeAuthentication {
      * Takes the token out of the request and checks it.
      *
      * @param hostCheck the check of the host of the node URL (e.g. NODE_ALLOWED_NETWORKS), which throws a GridException
-     *                  when the node may not register; it runs before the requests to STF, after the checks without them
+     *                  when the node may not register; it runs before the request to STF, after the checks without it
      * @throws GridException with the reason when the node may not register
      */
     public Accepted accept(RegistrationRequest request, Consumer<String> hostCheck) {
         String sent = NodeRegistrationToken.take(request);
         String node = request.getConfiguration() == null ? "(no configuration)" : String.valueOf(request.getConfiguration().getRemoteHost());
         if (StringUtils.isEmpty(sent)) {
-            throw new GridException(sharedToken == null
-                    ? String.format("Node %s has no node token, so it is not registered. Join the node to get one.", node)
-                    : String.format("Node %s has no or another NODE_REGISTRATION_TOKEN than the hub, so it is not registered.", node));
+            throw new GridException(String.format("Node %s has no node token, so it is not registered. "
+                    + "Join the node to get one (NODE_REGISTRATION_TOKEN of the node is its node token).", node));
         }
-        String host = host(request).orElseThrow(() -> new GridException(String.format(
-                "Node %s has no valid URL, so it is not registered.", node)));
-        if (NodeToken.hasNodeTokenPrefix(sent)) {
-            return acceptNodeToken(request, node, host, sent, hostCheck);
+        if (!NodeToken.hasNodeTokenPrefix(sent)) {
+            throw new GridException(String.format("Node %s has a token that is not a node token (mcn1.<label>.<secret>), "
+                    + "so it is not registered. Join the node to get its node token.", node));
         }
-        return acceptSharedToken(request, node, host, sent, hostCheck);
-    }
-
-    private Accepted acceptNodeToken(RegistrationRequest request, String node, String host, String sent, Consumer<String> hostCheck) {
         NodeToken token = NodeToken.parse(sent).orElseThrow(() -> new GridException(String.format(
                 "Node %s has a malformed node token, so it is not registered. Join the node again to get a valid one.", node)));
-        if (stfNodes == null) {
-            throw new GridException(String.format("Node %s (%s) has a node token, but the STF integration of the hub is off "
-                    + "(STF_URL and STF_TOKEN), so it is not registered.", node, token.getLabel()));
+        String host = host(request).orElseThrow(() -> new GridException(String.format(
+                "Node %s has no valid URL, so it is not registered.", node)));
+        if (verifier == null) {
+            throw new GridException(String.format("Node %s (%s) has a node token, but STF_URL and STF_TOKEN of the hub are not set, "
+                    + "so it is not registered.", node, token.getLabel()));
         }
         hostCheck.accept(host);
-        StfNodes.Verification verification = stfNodes.verify(token, host);
+        StfNodes.Verification verification = verifier.verify(token, host);
         switch (verification.getStatus()) {
         case VALID:
             LOGGER.fine(() -> String.format("[NODE REGISTRATION] Node %s is the enrolled node '%s', STF verified its node token.",
                     node, token.getLabel()));
-            return new Accepted(request, NodeRegistrationToken.of(token.getValue()), token, host);
+            return new Accepted(request, token, host);
         case REJECTED:
             throw new GridException(String.format("Node %s has an unknown or revoked node token, so it is not registered. "
                     + "A node token is valid only for the address the node was enrolled with (%s is the host of the node URL); "
@@ -179,27 +131,14 @@ public final class NodeAuthentication {
         }
     }
 
-    private Accepted acceptSharedToken(RegistrationRequest request, String node, String host, String sent, Consumer<String> hostCheck) {
-        if (sharedToken == null) {
-            throw new GridException(String.format("Node %s registers with a shared NODE_REGISTRATION_TOKEN, but the hub accepts only "
-                    + "node tokens, so it is not registered. Join the node to get its node token.", node));
+    /**
+     * @return the answer of STF about the node token of a registered node, without the cache
+     */
+    public StfNodes.Verification verifyNow(NodeToken token, String host) {
+        if (verifier == null) {
+            return new StfNodes.Verification(StfNodes.Status.UNAVAILABLE, 0);
         }
-        if (!sharedToken.matches(sent)) {
-            throw new GridException(String.format("Node %s has no or another NODE_REGISTRATION_TOKEN than the hub, so it is not registered.", node));
-        }
-        hostCheck.accept(host);
-        if (stfNodes != null) {
-            Optional<Set<String>> enrolled = stfNodes.registeredAddresses();
-            if (enrolled.isEmpty()) {
-                throw new GridException(String.format("Node %s registers with the shared NODE_REGISTRATION_TOKEN, but STF could not tell "
-                        + "whether %s is the address of an enrolled node, so it is not registered; the node registers again later.", node, host));
-            }
-            if (enrolled.get().contains(host.toLowerCase(Locale.ROOT))) {
-                throw new GridException(String.format("Node %s registers with the shared NODE_REGISTRATION_TOKEN, but %s is the address "
-                        + "of an enrolled node, which registers with its node token only, so it is not registered.", node, host));
-            }
-        }
-        return new Accepted(request, sharedToken, null, host);
+        return verifier.verifyNow(token, host);
     }
 
     /**

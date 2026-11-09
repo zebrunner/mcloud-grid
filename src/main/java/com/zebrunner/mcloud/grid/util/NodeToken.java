@@ -27,7 +27,7 @@ public final class NodeToken {
     }
 
     /**
-     * @return true if the token is meant to be a node token (has its prefix), then it is never a shared token
+     * @return true if the token is meant to be a node token (has its prefix), even a malformed one
      */
     public static boolean hasNodeTokenPrefix(String token) {
         return token != null && token.startsWith(PREFIX);

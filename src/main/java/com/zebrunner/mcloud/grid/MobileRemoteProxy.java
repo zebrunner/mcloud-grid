@@ -91,12 +91,11 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         protected Boolean initialize() throws ConcurrentException {
             LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
             LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
-                            + "node registration: %s; node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
+                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
                             + "low battery check: %s; "
                             + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
                     STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
                     CHECK_APPIUM_STATUS ? "on" : "off",
-                    NODE_AUTHENTICATION.describe(),
                     CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
                     NODE_ALLOWED_NETWORKS,
                     MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
@@ -129,9 +128,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // nodes may register only from these networks, empty = from anywhere
     private static final AllowedNetworks NODE_ALLOWED_NETWORKS = AllowedNetworks.fromEnv("NODE_ALLOWED_NETWORKS", System.getenv("NODE_ALLOWED_NETWORKS"));
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
-    // the node tokens verified by STF and the legacy shared NODE_REGISTRATION_TOKEN; MobileGridRegistry does not start
-    // the hub without one of them
-    private static final NodeAuthentication NODE_AUTHENTICATION = NodeAuthentication.fromEnv();
+    // the node tokens verified by STF; MobileGridRegistry does not start the hub without STF_URL and STF_TOKEN
+    private static volatile NodeAuthentication nodeAuthentication = NodeAuthentication.fromEnv();
     // STF verifies the node token of a registered node again and again: a revoked node is unregistered
     static final Duration NODE_TOKEN_CHECK_PERIOD = Duration.ofSeconds(60);
     // a node is kept while STF does not answer for so long since the last verification of its node token
@@ -140,9 +138,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
 
     private static final Duration INACTIVITY_RELEASE_TIMEOUT = EnvUtils.getDurationInSeconds("INACTIVITY_RELEASE_TIMEOUT", Duration.ofMinutes(1));
 
-    // the token the hub sends to the node, the node token of the node or the shared one
+    // the node token of the node, which the hub sends only to it
     private final NodeRegistrationToken nodeCredential;
-    // null for a node with the shared token
     private final NodeToken nodeToken;
     private final String nodeHost;
     private volatile Instant nodeTokenVerifiedAt;
@@ -406,8 +403,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     /**
-     * The requests of the hub to the node (the commands of the sessions, the status polling) carry the token of the node:
-     * its own node token, or the shared one.
+     * The requests of the hub to the node (the commands of the sessions, the status polling) carry the node token of
+     * this node.
      */
     @Override
     public HttpClient getHttpClient(URL url, int connectionTimeout, int readTimeout) {
@@ -431,9 +428,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     @Override
     public void startPolling() {
         super.startPolling();
-        if (nodeToken != null) {
-            startNodeTokenCheck();
-        }
+        startNodeTokenCheck();
     }
 
     private synchronized void startNodeTokenCheck() {
@@ -471,10 +466,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      * @return true if the node is kept
      */
     boolean checkNodeToken(Instant now) {
-        if (nodeToken == null) {
-            return true;
-        }
-        StfNodes.Verification verification = NODE_AUTHENTICATION.verifyNow(nodeToken, nodeHost);
+        StfNodes.Verification verification = nodeAuthentication.verifyNow(nodeToken, nodeHost);
         switch (verification.getStatus()) {
         case VALID:
             if (nodeTokenCheckFailed) {
@@ -521,10 +513,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     /**
-     * @return the label of the node in the STF node registry, null for a node with the shared token
+     * @return the label of the node in the STF node registry
      */
     public String getNodeLabel() {
-        return nodeToken == null ? null : nodeToken.getLabel();
+        return nodeToken.getLabel();
     }
 
     /**
@@ -623,7 +615,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static NodeAuthentication.Accepted acceptRegistration(RegistrationRequest request) {
         String node = request.getConfiguration() == null ? "(no configuration)" : String.valueOf(request.getConfiguration().getRemoteHost());
         try {
-            return NODE_AUTHENTICATION.accept(request, host -> {
+            return nodeAuthentication.accept(request, host -> {
                 if (!NODE_ALLOWED_NETWORKS.allows(host)) {
                     throw new GridException(String.format("Node %s is not in NODE_ALLOWED_NETWORKS (%s), so it is not registered.",
                             node, NODE_ALLOWED_NETWORKS));
@@ -636,10 +628,10 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     /**
-     * Forgets the answers of STF about the nodes, for tests.
+     * Replaces the verification of the node tokens of the configuration, for tests.
      */
-    static void clearNodeAuthenticationCache() {
-        NODE_AUTHENTICATION.clearCache();
+    static void useNodeAuthentication(NodeAuthentication authentication) {
+        nodeAuthentication = authentication;
     }
 
     /**

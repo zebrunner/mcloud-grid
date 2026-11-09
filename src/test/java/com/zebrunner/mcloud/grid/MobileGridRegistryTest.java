@@ -52,7 +52,7 @@ public class MobileGridRegistryTest {
         IgnoredDevices.clear();
         GridHubConfiguration config = new GridHubConfiguration();
         config.capabilityMatcher = new MobileCapabilityMatcher();
-        config.registry = MobileGridRegistry.class.getName();
+        config.registry = StfConfiguredRegistry.class.getName();
         config.port = 0;
         config.timeout = 77;
         config.browserTimeout = 900;
@@ -68,6 +68,16 @@ public class MobileGridRegistryTest {
         registry.stop();
         Thread.interrupted();
         IgnoredDevices.clear();
+    }
+
+    /**
+     * The registry as the hub with STF_URL and STF_TOKEN starts it; the unit tests run without STF.
+     */
+    public static final class StfConfiguredRegistry extends MobileGridRegistry {
+        @Override
+        protected boolean isStfConfigured() {
+            return true;
+        }
     }
 
     /**
@@ -191,22 +201,18 @@ public class MobileGridRegistryTest {
     }
 
     @Test
-    public void hubDoesNotStartWithoutNodeTokensAndSharedToken() {
-        // the registry of setUp is started with NODE_REGISTRATION_TOKEN of the test executions (pom.xml)
-        MobileGridRegistry.checkNodeRegistration(GridFixtures.REGISTRATION_TOKEN, false);
-        for (String token : new String[] {null, "", " "}) {
-            GridConfigurationException e = Assert.expectThrows(GridConfigurationException.class,
-                    () -> MobileGridRegistry.checkNodeRegistration(token, false));
-            Assert.assertTrue(e.getMessage().startsWith("Neither the STF integration (STF_URL and STF_TOKEN), which verifies the node tokens, "
-                    + "nor NODE_REGISTRATION_TOKEN is set: no node could register."), e.getMessage());
-        }
-    }
+    public void hubDoesNotStartWithoutStf() {
+        GridHubConfiguration config = new GridHubConfiguration();
+        config.registry = MobileGridRegistry.class.getName();
+        config.port = 0;
+        // the unit tests run without STF_URL and STF_TOKEN
+        Assert.expectThrows(GridConfigurationException.class, () -> new Hub(config));
 
-    @Test
-    public void hubStartsWithNodeTokensOnly() {
-        // with the STF integration the nodes register with their node tokens, the shared token is optional
-        MobileGridRegistry.checkNodeRegistration(null, true);
-        MobileGridRegistry.checkNodeRegistration(GridFixtures.REGISTRATION_TOKEN, true);
+        MobileGridRegistry.checkNodeRegistration(true);
+        GridConfigurationException e = Assert.expectThrows(GridConfigurationException.class,
+                () -> MobileGridRegistry.checkNodeRegistration(false));
+        Assert.assertEquals(e.getMessage(), "STF_URL and STF_TOKEN are not set: the nodes register with their node tokens, which the "
+                + "hub verifies with STF, so no node could register. Set STF_URL and STF_TOKEN (the access token of an STF admin).");
     }
 
     @Test

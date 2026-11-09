@@ -41,7 +41,7 @@ final class LoadConfig {
     final String fakeNodesPlatform;
     /** Artificial latency of fake node session creation, ms. */
     final long fakeNodeSessionDelayMs;
-    /** Port of the in-process fake STF the hub uses (STF_URL of the hub must point to it), 0 = no fake STF. */
+    /** Port of the in-process fake STF the hub uses (STF_URL of the hub must point to it), 0 = no fake STF; required for fake nodes. */
     final int fakeStfPort;
     /** Latency of every fake STF response, ms. */
     final long fakeStfLatencyMs;
@@ -49,8 +49,6 @@ final class LoadConfig {
     final String reportDir;
     /** Preemptive Authorization header for every WebDriver request; never print this value. */
     final String authorization;
-    /** NODE_REGISTRATION_TOKEN of the hub the fake nodes register with (LOAD_NODE_REGISTRATION_TOKEN), required for them; never print this value. */
-    final String nodeRegistrationToken;
 
     private LoadConfig() {
         this(System.getenv("LOAD_GRID_USERNAME"), System.getenv("LOAD_GRID_PASSWORD"));
@@ -75,16 +73,15 @@ final class LoadConfig {
         fakeStfPort = Integer.getInteger("load.fakeStf.port", 0);
         fakeStfLatencyMs = Long.getLong("load.fakeStf.latencyMs", 0L);
         reportDir = System.getProperty("load.reportDir", "target/load-report");
-        String token = System.getenv("LOAD_NODE_REGISTRATION_TOKEN");
-        nodeRegistrationToken = token == null || token.isEmpty() ? null : token;
         authorization = basicAuthorization(username, password);
         if (sessions <= 0 || concurrency <= 0 || commandsPerSession < 0 || commandDuration.isNegative()
                 || commandInterval.isZero() || commandInterval.isNegative() || sessionHold.isNegative() || newSessionTimeout.isZero()
                 || newSessionTimeout.isNegative()) {
             throw new IllegalArgumentException("Sessions, concurrency, timeouts and command interval must be positive; command count and duration cannot be negative");
         }
-        if (fakeNodes > 0 && nodeRegistrationToken == null) {
-            throw new IllegalArgumentException("Fake nodes need LOAD_NODE_REGISTRATION_TOKEN: NODE_REGISTRATION_TOKEN of the hub");
+        if (fakeNodes > 0 && fakeStfPort <= 0) {
+            throw new IllegalArgumentException("Fake nodes need the fake STF (load.fakeStf.port, STF_URL of the hub pointing to it): "
+                    + "the hub verifies their node tokens with STF");
         }
     }
 

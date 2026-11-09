@@ -27,12 +27,10 @@ public class NodeRegistrationTokenTest {
     }
 
     @Test
-    public void emptyTokenIsNotSet() {
+    public void emptyTokenIsRefused() {
         for (String token : new String[] {null, "", " \n"}) {
-            Assert.assertTrue(NodeRegistrationToken.optional(token).isEmpty(), String.valueOf(token));
             Assert.expectThrows(IllegalArgumentException.class, () -> NodeRegistrationToken.of(token));
         }
-        Assert.assertTrue(NodeRegistrationToken.optional("s3cret").isPresent());
     }
 
     @Test
@@ -41,43 +39,14 @@ public class NodeRegistrationTokenTest {
     }
 
     @Test
-    public void sentTokenIsTakenTrimmed() {
+    public void sentTokenIsTakenOutOfTheRequestTrimmed() {
         RegistrationRequest request = request(" mcn1.node-1.x\n");
 
         Assert.assertEquals(NodeRegistrationToken.take(request), "mcn1.node-1.x");
         Assert.assertEquals(request.getConfiguration().custom, Map.of("other", "kept"));
+        Assert.assertFalse(request.toJson().toString().contains("mcn1.node-1.x"));
         Assert.assertNull(NodeRegistrationToken.take(request));
         Assert.assertNull(NodeRegistrationToken.take(request(null)));
-    }
-
-    @Test
-    public void nodeWithTheTokenOfTheHubIsAccepted() {
-        Assert.assertTrue(NodeRegistrationToken.of("s3cret").accept(request("s3cret")));
-        // the value of an env var may keep a trailing new line
-        Assert.assertTrue(NodeRegistrationToken.of(" s3cret\n").accept(request("s3cret ")));
-    }
-
-    @Test
-    public void nodeWithoutOrWithAnotherTokenIsRejected() {
-        NodeRegistrationToken token = NodeRegistrationToken.of("s3cret");
-
-        Assert.assertFalse(token.accept(request(null)));
-        Assert.assertFalse(token.accept(request("")));
-        Assert.assertFalse(token.accept(request("s3cret2")));
-        Assert.assertFalse(token.accept(request("S3CRET")));
-    }
-
-    @Test
-    public void tokenIsTakenOutOfTheRequest() {
-        // also out of a rejected request
-        for (String hubToken : new String[] {"another", "s3cret"}) {
-            RegistrationRequest request = request("s3cret");
-
-            NodeRegistrationToken.of(hubToken).accept(request);
-
-            Assert.assertEquals(request.getConfiguration().custom, Map.of("other", "kept"), hubToken);
-            Assert.assertFalse(request.toJson().toString().contains("s3cret"), hubToken);
-        }
     }
 
     @Test
@@ -88,7 +57,7 @@ public class NodeRegistrationTokenTest {
             return new HttpResponse();
         };
 
-        NodeRegistrationToken.of("s3cret").authenticate(client).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/status"));
+        NodeRegistrationToken.of(" s3cret\n").authenticate(client).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/status"));
 
         Assert.assertEquals(sent, List.of("s3cret"));
     }
@@ -98,6 +67,6 @@ public class NodeRegistrationTokenTest {
         RegistrationRequest request = request(null);
         request.getConfiguration().custom = null;
 
-        Assert.assertFalse(NodeRegistrationToken.of("s3cret").accept(request));
+        Assert.assertNull(NodeRegistrationToken.take(request));
     }
 }

@@ -35,8 +35,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 
 /**
- * The tokens of the registration of the nodes: the node tokens verified by the STF stub, the shared token refused from
- * the addresses of enrolled nodes, the caches of the answers of STF.
+ * The node tokens of the registration of the nodes, verified by the STF stub, and the cache of the answers of STF.
  */
 @Test(groups = "stf", singleThreaded = true)
 public class NodeAuthenticationTest {
@@ -44,7 +43,7 @@ public class NodeAuthenticationTest {
     private static final String HOST = "10.0.0.5";
     private static final String TOKEN = "mcn1.node-1.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
     private static final String OTHER_TOKEN = "mcn1.node-1.ZbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
-    private static final String SHARED = "shared-secret";
+    private static final String NOT_A_NODE_TOKEN = "0123456789abcdef0123456789abcdef";
 
     private final StfStub stf = new StfStub();
     private final AtomicReference<Instant> now = new AtomicReference<>();
@@ -66,7 +65,6 @@ public class NodeAuthenticationTest {
         now.set(Instant.parse("2026-11-09T12:00:00Z"));
         stfNodes = new StfNodes(stf.server().baseUrl(), StfStub.DEFAULT_TOKEN, now::get);
         stf.enrolledNode(TOKEN, "node-1", HOST);
-        stf.nodes("10.0.0.9", "Node-A.Example.com");
     }
 
     private static RegistrationRequest request(String nodeUrl, String token) {
@@ -79,18 +77,14 @@ public class NodeAuthenticationTest {
         return request;
     }
 
-    private NodeAuthentication withSharedToken() {
-        return new NodeAuthentication(NodeRegistrationToken.of(SHARED), stfNodes);
-    }
-
-    private NodeAuthentication nodeTokensOnly() {
-        return new NodeAuthentication(null, stfNodes);
+    private NodeAuthentication authentication() {
+        return new NodeAuthentication(stfNodes);
     }
 
     private static String rejection(NodeAuthentication authentication, RegistrationRequest request) {
         GridException e = Assert.expectThrows(GridException.class, () -> authentication.accept(request));
         Assert.assertFalse(e.getMessage().contains("AbCdEf"), e.getMessage());
-        Assert.assertFalse(e.getMessage().contains(SHARED), e.getMessage());
+        Assert.assertFalse(e.getMessage().contains(NOT_A_NODE_TOKEN), e.getMessage());
         return e.getMessage();
     }
 
@@ -107,7 +101,7 @@ public class NodeAuthenticationTest {
     public void nodeTokenVerifiedByStfIsAccepted() throws Exception {
         RegistrationRequest request = request(NODE_URL, TOKEN);
 
-        NodeAuthentication.Accepted accepted = nodeTokensOnly().accept(request);
+        NodeAuthentication.Accepted accepted = authentication().accept(request);
 
         Assert.assertEquals(accepted.getNodeToken().getLabel(), "node-1");
         Assert.assertEquals(accepted.getHost(), HOST);
@@ -117,17 +111,17 @@ public class NodeAuthenticationTest {
         stf.server().verify(1, postRequestedFor(urlEqualTo("/api/v1/nodes/verify"))
                 .withHeader("Authorization", equalTo("Bearer " + StfStub.DEFAULT_TOKEN))
                 .withRequestBody(equalToJson("{\"token\":\"" + TOKEN + "\",\"host\":\"" + HOST + "\"}")));
-        stf.server().verify(0, getRequestedFor(urlEqualTo("/api/v1/nodes")));
+        stf.server().verify(0, getRequestedFor(urlMatching(".*")));
     }
 
     public void nodeTokenRejectedByStfIsNotAccepted() {
-        String message = rejection(withSharedToken(), request(NODE_URL, OTHER_TOKEN));
+        String message = rejection(authentication(), request(NODE_URL, OTHER_TOKEN));
 
         Assert.assertTrue(message.startsWith("Node " + NODE_URL + " has an unknown or revoked node token, so it is not registered."), message);
     }
 
     public void nodeTokenAtAnotherAddressIsNotAccepted() {
-        String message = rejection(nodeTokensOnly(), request("http://10.0.0.6:7521", TOKEN));
+        String message = rejection(authentication(), request("http://10.0.0.6:7521", TOKEN));
 
         Assert.assertTrue(message.startsWith("Node http://10.0.0.6:7521 has an unknown or revoked node token"), message);
         stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/nodes/verify")).withRequestBody(equalToJson("{\"token\":\"" + TOKEN
@@ -138,7 +132,7 @@ public class NodeAuthenticationTest {
         for (int status : new int[] {500, 401, 404}) {
             stf.verifyAnswers(status);
 
-            String message = rejection(nodeTokensOnly(), request(NODE_URL, TOKEN));
+            String message = rejection(authentication(), request(NODE_URL, TOKEN));
 
             Assert.assertTrue(message.startsWith("Node " + NODE_URL + " has a node token, but STF could not verify it (HTTP " + status
                     + "), so it is not registered"), message);
@@ -150,7 +144,7 @@ public class NodeAuthenticationTest {
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
         }
-        NodeAuthentication authentication = new NodeAuthentication(null, new StfNodes("http://localhost:" + port, "x", now::get));
+        NodeAuthentication authentication = new NodeAuthentication(new StfNodes("http://localhost:" + port, "x", now::get));
 
         String message = rejection(authentication, request(NODE_URL, TOKEN));
 
@@ -158,7 +152,7 @@ public class NodeAuthenticationTest {
     }
 
     public void answersOfStfAreCachedBriefly() {
-        NodeAuthentication authentication = nodeTokensOnly();
+        NodeAuthentication authentication = authentication();
 
         authentication.accept(request(NODE_URL, TOKEN));
         rejection(authentication, request(NODE_URL, OTHER_TOKEN));
@@ -178,7 +172,7 @@ public class NodeAuthenticationTest {
     }
 
     public void failedVerificationIsNotCached() {
-        NodeAuthentication authentication = nodeTokensOnly();
+        NodeAuthentication authentication = authentication();
         stf.verifyAnswers(503);
         rejection(authentication, request(NODE_URL, TOKEN));
 
@@ -188,11 +182,11 @@ public class NodeAuthenticationTest {
     }
 
     public void verificationWithoutTheCacheSeesARevocation() {
-        NodeAuthentication.Accepted accepted = nodeTokensOnly().accept(request(NODE_URL, TOKEN));
+        NodeAuthentication.Accepted accepted = authentication().accept(request(NODE_URL, TOKEN));
         stf.verifyAnswers(403);
 
         Assert.assertEquals(stfNodes.verify(accepted.getNodeToken(), HOST).getStatus(), StfNodes.Status.VALID);
-        Assert.assertEquals(nodeTokensOnly().verifyNow(accepted.getNodeToken(), HOST).getStatus(), StfNodes.Status.REJECTED);
+        Assert.assertEquals(authentication().verifyNow(accepted.getNodeToken(), HOST).getStatus(), StfNodes.Status.REJECTED);
         // the new answer replaces the cached one
         Assert.assertEquals(stfNodes.verify(accepted.getNodeToken(), HOST).getStatus(), StfNodes.Status.REJECTED);
     }
@@ -201,111 +195,46 @@ public class NodeAuthenticationTest {
         stf.server().stubFor(post("/api/v1/nodes/verify").atPriority(1)
                 .willReturn(aResponse().withStatus(200).withBody("{\"label\":\"node-2\",\"address\":\"10.0.0.5\"}")));
 
-        Assert.assertTrue(rejection(nodeTokensOnly(), request(NODE_URL, TOKEN)).contains("has an unknown or revoked node token"));
+        Assert.assertTrue(rejection(authentication(), request(NODE_URL, TOKEN)).contains("has an unknown or revoked node token"));
     }
 
     public void malformedNodeTokenIsRejectedWithoutStf() {
-        String message = rejection(withSharedToken(), request(NODE_URL, "mcn1.node-1.short"));
+        String message = rejection(authentication(), request(NODE_URL, "mcn1.node-1.short"));
 
         Assert.assertTrue(message.startsWith("Node " + NODE_URL + " has a malformed node token, so it is not registered."), message);
         stf.server().verify(0, postRequestedFor(urlMatching(".*")));
     }
 
-    public void nodeTokenIsRejectedWithoutStfIntegration() {
-        NodeAuthentication authentication = new NodeAuthentication(NodeRegistrationToken.of(SHARED), null);
+    public void nodeTokenIsRejectedWithoutStf() {
+        NodeAuthentication authentication = new NodeAuthentication(null);
 
         String message = rejection(authentication, request(NODE_URL, TOKEN));
 
-        Assert.assertTrue(message.contains("(node-1) has a node token, but the STF integration of the hub is off"), message);
-        Assert.assertEquals(authentication.verifyNow(NodeToken.parse(TOKEN).orElseThrow(), HOST).getStatus(),
-                StfNodes.Status.UNAVAILABLE);
+        Assert.assertTrue(message.contains("(node-1) has a node token, but STF_URL and STF_TOKEN of the hub are not set"), message);
+        Assert.assertEquals(authentication.verifyNow(NodeToken.parse(TOKEN).orElseThrow(), HOST).getStatus(), StfNodes.Status.UNAVAILABLE);
     }
 
-    public void sharedTokenIsAcceptedFromANodeThatIsNotEnrolled() throws Exception {
-        RegistrationRequest request = request("http://10.0.0.7:4723", SHARED);
+    public void tokenThatIsNotANodeTokenIsRejectedWithoutStf() {
+        String message = rejection(authentication(), request(NODE_URL, NOT_A_NODE_TOKEN));
 
-        NodeAuthentication.Accepted accepted = withSharedToken().accept(request);
-
-        Assert.assertNull(accepted.getNodeToken());
-        Assert.assertEquals(sentHeaders(accepted.getCredential()), List.of(SHARED));
-        Assert.assertFalse(request.toJson().toString().contains(SHARED));
-        stf.server().verify(getRequestedFor(urlEqualTo("/api/v1/nodes")).withHeader("Authorization", equalTo("Bearer " + StfStub.DEFAULT_TOKEN)));
-        stf.server().verify(0, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
-    }
-
-    public void sharedTokenIsRefusedFromTheAddressOfAnEnrolledNode() {
-        // the first node of the stub is revoked: any status counts; the addresses are compared ignoring the case
-        for (String nodeUrl : new String[] {"http://10.0.0.9:4723", "http://node-a.example.com:4723"}) {
-            String message = rejection(withSharedToken(), request(nodeUrl, SHARED));
-
-            Assert.assertTrue(message.startsWith("Node " + nodeUrl + " registers with the shared NODE_REGISTRATION_TOKEN, but "
-                    + nodeUrl.substring(7, nodeUrl.lastIndexOf(':')) + " is the address of an enrolled node"), message);
-        }
-        // the addresses are cached
-        stf.server().verify(1, getRequestedFor(urlEqualTo("/api/v1/nodes")));
-    }
-
-    public void sharedTokenIsAcceptedWhenStfHasNoNodeRegistry() {
-        stf.server().stubFor(get("/api/v1/nodes").atPriority(1).willReturn(aResponse().withStatus(404)));
-
-        withSharedToken().accept(request(NODE_URL, SHARED));
-    }
-
-    public void sharedTokenIsRefusedWhenTheEnrolledNodesAreUnknown() {
-        stf.server().stubFor(get("/api/v1/nodes").atPriority(1).willReturn(aResponse().withStatus(500)));
-
-        String message = rejection(withSharedToken(), request("http://10.0.0.7:4723", SHARED));
-
-        Assert.assertTrue(message.contains("but STF could not tell whether 10.0.0.7 is the address of an enrolled node"), message);
-    }
-
-    public void lastKnownEnrolledNodesAreUsedWhenStfDoesNotAnswer() {
-        NodeAuthentication authentication = withSharedToken();
-        authentication.accept(request("http://10.0.0.7:4723", SHARED));
-        stf.server().stubFor(get("/api/v1/nodes").atPriority(1).willReturn(aResponse().withStatus(500)));
-        now.set(now.get().plus(StfNodes.CACHE_TIME));
-
-        authentication.accept(request("http://10.0.0.7:4723", SHARED));
-        Assert.assertTrue(rejection(authentication, request("http://node-a.example.com:4723", SHARED)).contains("is the address of an enrolled node"));
-        stf.server().verify(3, getRequestedFor(urlEqualTo("/api/v1/nodes")));
-    }
-
-    public void sharedTokenWithoutStfIntegrationIsAccepted() {
-        new NodeAuthentication(NodeRegistrationToken.of(SHARED), null).accept(request(NODE_URL, SHARED));
-
-        stf.server().verify(0, getRequestedFor(urlMatching(".*")));
-    }
-
-    public void anotherSharedTokenIsRejectedWithoutStf() {
-        String message = rejection(withSharedToken(), request(NODE_URL, "another"));
-
-        Assert.assertEquals(message, "Node " + NODE_URL + " has no or another NODE_REGISTRATION_TOKEN than the hub, so it is not registered.");
-        stf.server().verify(0, getRequestedFor(urlMatching(".*")));
-    }
-
-    public void sharedTokenIsRejectedByAHubOfNodeTokensOnly() {
-        String message = rejection(nodeTokensOnly(), request(NODE_URL, SHARED));
-
-        Assert.assertTrue(message.startsWith("Node " + NODE_URL + " registers with a shared NODE_REGISTRATION_TOKEN, but the hub accepts "
-                + "only node tokens, so it is not registered."), message);
-        stf.server().verify(0, getRequestedFor(urlMatching(".*")));
+        Assert.assertEquals(message, "Node " + NODE_URL + " has a token that is not a node token (mcn1.<label>.<secret>), "
+                + "so it is not registered. Join the node to get its node token.");
+        stf.server().verify(0, postRequestedFor(urlMatching(".*")));
     }
 
     public void nodeWithoutTokenIsRejected() {
-        Assert.assertEquals(rejection(nodeTokensOnly(), request(NODE_URL, null)),
-                "Node " + NODE_URL + " has no node token, so it is not registered. Join the node to get one.");
-        Assert.assertEquals(rejection(withSharedToken(), request(NODE_URL, " ")),
-                "Node " + NODE_URL + " has no or another NODE_REGISTRATION_TOKEN than the hub, so it is not registered.");
+        for (String token : new String[] {null, " "}) {
+            Assert.assertEquals(rejection(authentication(), request(NODE_URL, token)), "Node " + NODE_URL + " has no node token, "
+                    + "so it is not registered. Join the node to get one (NODE_REGISTRATION_TOKEN of the node is its node token).");
+        }
     }
 
     public void hostCheckRunsBeforeTheRequestsToStf() {
-        for (String token : new String[] {TOKEN, SHARED}) {
-            GridException e = Assert.expectThrows(GridException.class, () -> withSharedToken().accept(request(NODE_URL, token), host -> {
-                throw new GridException("not allowed: " + host);
-            }));
+        GridException e = Assert.expectThrows(GridException.class, () -> authentication().accept(request(NODE_URL, TOKEN), host -> {
+            throw new GridException("not allowed: " + host);
+        }));
 
-            Assert.assertEquals(e.getMessage(), "not allowed: " + HOST);
-        }
+        Assert.assertEquals(e.getMessage(), "not allowed: " + HOST);
         stf.server().verify(0, getRequestedFor(urlMatching(".*")));
         stf.server().verify(0, postRequestedFor(urlMatching(".*")));
     }
@@ -315,12 +244,6 @@ public class NodeAuthenticationTest {
         Assert.assertEquals(NodeAuthentication.host(request("http://[fd00::5]:4723", null)).orElseThrow(), "fd00::5");
         RegistrationRequest invalid = request("not a url", null);
         Assert.assertTrue(NodeAuthentication.host(invalid).isEmpty());
-        Assert.assertTrue(rejection(withSharedToken(), request("not a url", SHARED)).contains("has no valid URL"));
-    }
-
-    public void configurationIsDescribed() {
-        Assert.assertEquals(nodeTokensOnly().describe(), "node tokens verified by STF only");
-        Assert.assertTrue(withSharedToken().describe().startsWith("node tokens verified by STF and the shared NODE_REGISTRATION_TOKEN"));
-        Assert.assertTrue(new NodeAuthentication(NodeRegistrationToken.of(SHARED), null).describe().startsWith("the shared"));
+        Assert.assertTrue(rejection(authentication(), request("not a url", TOKEN)).contains("has no valid URL"));
     }
 }

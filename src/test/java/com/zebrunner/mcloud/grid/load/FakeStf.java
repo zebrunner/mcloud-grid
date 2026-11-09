@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,19 +20,25 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Minimal STF API for load tests: devices of the fake nodes, reservation and release by the grid user,
- * a fixed latency of every request and request counters by endpoint.
+ * Minimal STF API for load tests: the node registry of the fake nodes (their node tokens verified for their address),
+ * devices of the fake nodes, reservation and release by the grid user, a fixed latency of every request and request
+ * counters by endpoint.
  */
 final class FakeStf implements AutoCloseable {
     static final String TOKEN = "fake-stf-token";
     private static final String USER = "grid";
     private static final Pattern SERIAL = Pattern.compile("\"serial\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern VERIFY_TOKEN = Pattern.compile("\"token\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern VERIFY_HOST = Pattern.compile("\"host\"\\s*:\\s*\"([^\"]+)\"");
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final HttpServer server;
     private final long latencyMs;
     // serial -> owner name, "" when free
     private final Map<String, String> devices = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> requests = new ConcurrentHashMap<>();
+    // node token -> address of the node
+    private final Map<String, String> nodes = new ConcurrentHashMap<>();
 
     FakeStf(int port, long latencyMs) throws IOException {
         this.latencyMs = latencyMs;
@@ -37,6 +46,19 @@ final class FakeStf implements AutoCloseable {
         this.server.setExecutor(Executors.newCachedThreadPool());
         this.server.createContext("/", this::handle);
         this.server.start();
+    }
+
+    /**
+     * Enrolls a node at the address, as POST /api/v1/nodes/enroll of STF does.
+     *
+     * @return the node token of the node: mcn1.<label>.<32 random bytes base64url>
+     */
+    String enroll(String label, String address) {
+        byte[] secret = new byte[32];
+        RANDOM.nextBytes(secret);
+        String token = "mcn1." + label + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+        nodes.put(token, address.toLowerCase(Locale.ROOT));
+        return token;
     }
 
     void addDevice(String serial) {
@@ -70,6 +92,16 @@ final class FakeStf implements AutoCloseable {
             }
             if (!("Bearer " + TOKEN).equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
                 respond(exchange, 401, "{\"success\":false}");
+            } else if ("POST".equals(method) && "/api/v1/nodes/verify".equals(path)) {
+                Matcher token = VERIFY_TOKEN.matcher(body);
+                Matcher host = VERIFY_HOST.matcher(body);
+                String address = token.find() ? nodes.get(token.group(1)) : null;
+                if (address != null && host.find() && address.equals(host.group(1).toLowerCase(Locale.ROOT))) {
+                    String label = token.group(1).split("\\.")[1];
+                    respond(exchange, 200, "{\"label\":\"" + label + "\",\"address\":\"" + address + "\"}");
+                } else {
+                    respond(exchange, 403, "{\"success\":false}");
+                }
             } else if ("GET".equals(method) && "/api/v1/user".equals(path)) {
                 respond(exchange, 200, "{\"success\":true,\"user\":{\"name\":\"" + USER + "\",\"email\":\"grid@example.com\"}}");
             } else if ("GET".equals(method) && "/api/v1/devices".equals(path)) {

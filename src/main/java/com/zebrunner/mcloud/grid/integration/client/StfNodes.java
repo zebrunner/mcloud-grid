@@ -1,31 +1,26 @@
 package com.zebrunner.mcloud.grid.integration.client;
 
 import com.zebrunner.mcloud.grid.models.stf.STFNode;
-import com.zebrunner.mcloud.grid.models.stf.STFNodes;
 import com.zebrunner.mcloud.grid.util.HttpClient;
 import com.zebrunner.mcloud.grid.util.NodeToken;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 /**
  * The node registry of STF for the registration of the nodes: the verification of the node tokens
- * (POST /api/v1/nodes/verify) and the addresses of the enrolled nodes (GET /api/v1/nodes), both with the admin token of
- * the hub (STF_TOKEN). The answers are cached for {@link #CACHE_TIME}: the nodes register again every few seconds while
- * they are rejected.
+ * (POST /api/v1/nodes/verify) with the admin token of the hub (STF_TOKEN). The definite answers are cached for
+ * {@link #CACHE_TIME}: the nodes register again every few seconds while they are rejected.
  */
-public final class StfNodes {
+public final class StfNodes implements NodeTokenVerifier {
     public static final Duration CACHE_TIME = Duration.ofSeconds(30);
     private static final Logger LOGGER = Logger.getLogger(StfNodes.class.getName());
     // the tokens and the hosts come from the registration requests: the cache does not grow without a limit
@@ -36,10 +31,7 @@ public final class StfNodes {
     private final String adminToken;
     private final Supplier<Instant> clock;
     private final Map<String, CachedVerification> verifications = new ConcurrentHashMap<>();
-    private final Object addressesLock = new Object();
     private final Object warningLock = new Object();
-    private Set<String> addresses;
-    private Instant addressesUntil = Instant.MIN;
     private Instant lastConfigurationWarning;
 
     public StfNodes(String stfUrl, String adminToken, Supplier<Instant> clock) {
@@ -93,6 +85,7 @@ public final class StfNodes {
     /**
      * @return the answer of STF about the token at the host, a cached one when STF answered it recently
      */
+    @Override
     public Verification verify(NodeToken token, String host) {
         CachedVerification cached = verifications.get(cacheKey(token, host));
         if (cached != null && clock.get().isBefore(cached.until)) {
@@ -104,6 +97,7 @@ public final class StfNodes {
     /**
      * @return the answer of STF about the token at the host without the cache, which keeps a definite answer
      */
+    @Override
     public Verification verifyNow(NodeToken token, String host) {
         Map<String, String> body = new HashMap<>();
         body.put("token", token.getValue());
@@ -142,55 +136,6 @@ public final class StfNodes {
         }
         verifications.put(cacheKey(token, host), new CachedVerification(verification, clock.get().plus(CACHE_TIME)));
         return verification;
-    }
-
-    /**
-     * The addresses of the nodes in the registry of STF, any status: a shared token is not accepted from them. An STF
-     * without the registry (HTTP 404) has none; when STF does not answer, the last known addresses are used.
-     *
-     * @return the addresses in lower case, empty if STF did not answer and the addresses are not known yet
-     */
-    public Optional<Set<String>> registeredAddresses() {
-        synchronized (addressesLock) {
-            Instant now = clock.get();
-            if (addresses != null && now.isBefore(addressesUntil)) {
-                return Optional.of(addresses);
-            }
-            HttpClient.Response<STFNodes> response = HttpClient.uri(Path.STF_NODES_PATH, stfUrl)
-                    .withAuthorization("Bearer " + adminToken)
-                    .get(STFNodes.class);
-            if (response.getStatus() == 200 && response.getObject() != null) {
-                Set<String> known = new HashSet<>();
-                if (response.getObject().getNodes() != null) {
-                    for (STFNode node : response.getObject().getNodes()) {
-                        if (node != null && StringUtils.isNotBlank(node.getAddress())) {
-                            known.add(node.getAddress().trim().toLowerCase(Locale.ROOT));
-                        }
-                    }
-                }
-                addresses = Collections.unmodifiableSet(known);
-                addressesUntil = now.plus(CACHE_TIME);
-            } else if (response.getStatus() == 404) {
-                LOGGER.fine("[NODE REGISTRATION] STF has no node registry (HTTP 404 of /api/v1/nodes): no node is enrolled.");
-                addresses = Collections.emptySet();
-                addressesUntil = now.plus(CACHE_TIME);
-            } else {
-                LOGGER.warning(() -> String.format("[NODE REGISTRATION] Could not get the enrolled nodes from STF (HTTP %s)%s.",
-                        response.getStatus(), addresses == null ? "" : ", the last known ones are used"));
-            }
-            return Optional.ofNullable(addresses);
-        }
-    }
-
-    /**
-     * Forgets the answers of STF, for tests.
-     */
-    public void clearCache() {
-        verifications.clear();
-        synchronized (addressesLock) {
-            addresses = null;
-            addressesUntil = Instant.MIN;
-        }
     }
 
     /**

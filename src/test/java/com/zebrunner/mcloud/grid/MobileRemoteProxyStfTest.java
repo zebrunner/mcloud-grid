@@ -49,7 +49,8 @@ import static com.zebrunner.mcloud.grid.integration.client.StfStub.device;
 public class MobileRemoteProxyStfTest {
     private static final String ANDROID_UDID = "emulator-5554";
     private static final String IOS_UDID = "00008110-000A";
-    private static final String NODE_TOKEN = "mcn1.node-1.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+    private static final String NODE_TOKEN = GridFixtures.NODE_TOKEN;
+    private static final String OTHER_NODE_TOKEN = "mcn1.node-2.ZbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
 
     private final StfStub stf = new StfStub();
     private GridRegistry registry;
@@ -70,14 +71,13 @@ public class MobileRemoteProxyStfTest {
     public void reset() {
         stf.reset();
         STFClient.clearCache();
-        MobileRemoteProxy.clearNodeAuthenticationCache();
         IgnoredDevices.clear();
         registry = GridFixtures.registry();
+        // the node tokens are verified by the STF stub, with fresh caches
+        GridFixtures.useStfNodeAuthentication();
         stf.user(DEFAULT_TOKEN, BOT_USER);
         stf.devices(device(ANDROID_UDID), device(IOS_UDID));
-        // no enrolled node: the shared token of the other tests is accepted
-        stf.nodes();
-        stf.enrolledNode(NODE_TOKEN, "node-1", "localhost");
+        stf.enrolledNode(NODE_TOKEN, GridFixtures.NODE_LABEL, "localhost");
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(okJson("{\"success\":true}")));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(okJson("{\"success\":true}")));
         stf.server().stubFor(delete(urlMatching("/api/v1/user/devices/.*")).willReturn(okJson("{\"success\":true}")));
@@ -89,6 +89,7 @@ public class MobileRemoteProxyStfTest {
     public void stopPolling() {
         // the polling of the registered nodes would send their requests to the node of the next tests
         registry.stop();
+        GridFixtures.useTestNodeAuthentication();
     }
 
     private static Map<String, Object> request(String platform) {
@@ -233,20 +234,21 @@ public class MobileRemoteProxyStfTest {
     }
 
     public void nodeWithoutRegistrationTokenIsRejected() {
-        // NODE_REGISTRATION_TOKEN=test-registration-token in the 'stf-tests' execution
         RegistrationRequest request = GridFixtures.registrationRequest(nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
         request.getConfiguration().custom.clear();
 
         GridException e = Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
-        Assert.assertTrue(e.getMessage().contains("has no or another NODE_REGISTRATION_TOKEN than the hub"), e.getMessage());
+        Assert.assertTrue(e.getMessage().contains("Node " + nodeUrl + " has no node token, so it is not registered."), e.getMessage());
         stf.server().verify(0, getRequestedFor(urlMatching("/api/v1/devices.*")));
+        stf.server().verify(0, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
     }
 
     public void nodeWithAnotherRegistrationTokenIsRejected() {
         RegistrationRequest request = GridFixtures.registrationRequest(nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
         request.getConfiguration().custom.put(NodeRegistrationToken.CUSTOM_KEY, "another-token");
 
-        Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
+        GridException e = Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
+        Assert.assertTrue(e.getMessage().contains("has a token that is not a node token"), e.getMessage());
     }
 
     public void knownNodeWithoutRegistrationTokenIsRejected() {
@@ -264,7 +266,7 @@ public class MobileRemoteProxyStfTest {
 
         Assert.assertFalse(proxy.getOriginalRegistrationRequest().getConfiguration().custom.containsKey(NodeRegistrationToken.CUSTOM_KEY));
         Assert.assertFalse(proxy.getConfig().custom.containsKey(NodeRegistrationToken.CUSTOM_KEY));
-        Assert.assertFalse(proxy.getOriginalRegistrationRequest().toJson().toString().contains(GridFixtures.REGISTRATION_TOKEN));
+        Assert.assertFalse(proxy.getOriginalRegistrationRequest().toJson().toString().contains(GridFixtures.NODE_TOKEN));
     }
 
     public void nodeNotPresentInStfIsRejected() {
@@ -377,7 +379,7 @@ public class MobileRemoteProxyStfTest {
         Assert.assertNotNull(proxy.getNewSession(request("Android")));
 
         stf.server().verify(getRequestedFor(urlEqualTo("/wd/hub/status-adb"))
-                .withHeader(NodeRegistrationToken.HEADER, equalTo(GridFixtures.REGISTRATION_TOKEN)));
+                .withHeader(NodeRegistrationToken.HEADER, equalTo(GridFixtures.NODE_TOKEN)));
     }
 
     public void requestsOfTheHubToTheNodeSendTheNodeToken() throws Exception {
@@ -393,7 +395,7 @@ public class MobileRemoteProxyStfTest {
                 .map(request -> request.getHeader(NodeRegistrationToken.HEADER))
                 .collect(Collectors.toList());
         Assert.assertTrue(tokens.size() >= 2, tokens.toString());
-        Assert.assertTrue(tokens.stream().allMatch(GridFixtures.REGISTRATION_TOKEN::equals), tokens.toString());
+        Assert.assertTrue(tokens.stream().allMatch(GridFixtures.NODE_TOKEN::equals), tokens.toString());
     }
 
     public void deviceReservedWithPersonalTokenIsNotReturned() {
@@ -422,14 +424,21 @@ public class MobileRemoteProxyStfTest {
         Assert.assertNotNull(proxy.getNewSession(request("Android")));
         proxy.getHttpClient(new URL(nodeUrl), 1000, 1000).execute(new HttpRequest(HttpMethod.GET, "/wd/hub/node-token"));
 
-        Assert.assertEquals(proxy.getNodeLabel(), "node-1");
+        Assert.assertEquals(proxy.getNodeLabel(), GridFixtures.NODE_LABEL);
         stf.server().verify(getRequestedFor(urlEqualTo("/wd/hub/status-adb")).withHeader(NodeRegistrationToken.HEADER, equalTo(NODE_TOKEN)));
         stf.server().verify(getRequestedFor(urlEqualTo("/wd/hub/node-token")).withHeader(NodeRegistrationToken.HEADER, equalTo(NODE_TOKEN)));
         Assert.assertFalse(proxy.getOriginalRegistrationRequest().toJson().toString().contains(NODE_TOKEN));
         Assert.assertFalse(proxy.getConfig().toString().contains(NODE_TOKEN));
         Assert.assertFalse(proxy.toString().contains(NODE_TOKEN));
-        // the other nodes keep the shared token
-        Assert.assertNull(GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID)).getNodeLabel());
+
+        // another node sends its own token
+        stf.enrolledNode(OTHER_NODE_TOKEN, "node-2", "localhost");
+        MobileRemoteProxy other = new MobileRemoteProxy(GridFixtures.registrationRequest(nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID),
+                OTHER_NODE_TOKEN), registry);
+        Assert.assertEquals(other.getNodeLabel(), "node-2");
+        Assert.assertNotNull(other.getNewSession(request("iOS")));
+        stf.server().verify(getRequestedFor(urlEqualTo("/wd/hub/status-wda")).withHeader(NodeRegistrationToken.HEADER, equalTo(OTHER_NODE_TOKEN)));
+        stf.server().verify(0, getRequestedFor(urlEqualTo("/wd/hub/status-wda")).withHeader(NodeRegistrationToken.HEADER, equalTo(NODE_TOKEN)));
     }
 
     public void nodeWithARevokedNodeTokenIsRejected() {
@@ -475,7 +484,7 @@ public class MobileRemoteProxyStfTest {
 
         // a verification restarts the 10 minutes
         stf.reset();
-        stf.enrolledNode(NODE_TOKEN, "node-1", "localhost");
+        stf.enrolledNode(NODE_TOKEN, GridFixtures.NODE_LABEL, "localhost");
         Assert.assertTrue(proxy.checkNodeToken(registered.plus(Duration.ofMinutes(9))));
         stf.verifyAnswers(500);
         Assert.assertTrue(proxy.checkNodeToken(registered.plus(Duration.ofMinutes(18))));
@@ -497,28 +506,5 @@ public class MobileRemoteProxyStfTest {
         Assert.assertFalse(old.checkNodeToken(Instant.now()));
 
         Assert.assertSame(registry.getProxyById(nodeUrl), current);
-    }
-
-    public void nodeWithTheSharedTokenIsNotVerifiedAgain() {
-        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
-        registry.add(proxy);
-        stf.verifyAnswers(403);
-
-        Assert.assertTrue(proxy.checkNodeToken(Instant.now().plus(Duration.ofHours(1))));
-
-        Assert.assertSame(registry.getProxyById(nodeUrl), proxy);
-        stf.server().verify(0, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
-    }
-
-    public void sharedTokenIsRefusedAtTheAddressOfAnEnrolledNode() {
-        stf.nodes("localhost");
-
-        GridException e = Assert.expectThrows(GridException.class,
-                () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID)));
-
-        Assert.assertTrue(e.getMessage().contains("registers with the shared NODE_REGISTRATION_TOKEN, but localhost is the address of an "
-                + "enrolled node"), e.getMessage());
-        // the enrolled node registers with its node token
-        Assert.assertEquals(nodeTokenProxy(GridFixtures.androidNodeCaps(ANDROID_UDID)).getNodeLabel(), "node-1");
     }
 }

@@ -83,19 +83,6 @@ public final class StfStub {
         server.stubFor(post("/api/v1/nodes/verify").atPriority(1).willReturn(aResponse().withStatus(status).withBody("{\"success\":false}")));
     }
 
-    /**
-     * GET /api/v1/nodes: the nodes of the registry of STF at these addresses (the first one is revoked: any status counts).
-     */
-    public void nodes(String... addresses) {
-        StringBuilder nodes = new StringBuilder();
-        for (int i = 0; i < addresses.length; i++) {
-            nodes.append(i == 0 ? "" : ",").append(String.format("{\"label\":\"node-%s\",\"address\":\"%s\",\"status\":\"%s\"}",
-                    i, addresses[i], i == 0 ? "revoked" : "active"));
-        }
-        server.stubFor(get("/api/v1/nodes").withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN))
-                .willReturn(okJson("{\"nodes\":[" + nodes + "]}")));
-    }
-
     public void devices(DeviceJson... devices) {
         server.stubFor(get("/api/v1/devices")
                 .willReturn(okJson("{\"success\":true,\"devices\":[" + Arrays.stream(devices).map(DeviceJson::toString).collect(Collectors.joining(",")) + "]}")));

@@ -69,6 +69,6 @@ public class ProxyHtmlRendererTest {
         String html = proxy.getHtmlRender().renderSummary();
 
         Assert.assertTrue(html.contains("<p>remoteHost: http://node-1:4723</p>"), html);
-        Assert.assertFalse(html.contains(GridFixtures.REGISTRATION_TOKEN), html);
+        Assert.assertFalse(html.contains(GridFixtures.NODE_TOKEN), html);
     }
 }

@@ -5,45 +5,33 @@ import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
 import org.openqa.selenium.remote.http.HttpClient;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * A token a node registers with in 'custom' of its configuration ({@link #CUSTOM_KEY}) and the hub sends back to the
- * node with every request in {@link #HEADER} (zebrunner/appium answers nothing else but the container itself): the
- * node token of the node (see {@link NodeToken}) or the legacy secret shared by the hub and all its nodes
- * (NODE_REGISTRATION_TOKEN of both).
+ * The node token a node registers with in 'custom' of its configuration ({@link #CUSTOM_KEY}, NODE_REGISTRATION_TOKEN of
+ * zebrunner/appium), see {@link NodeToken}, and the hub sends back to that node with every request in {@link #HEADER}
+ * (zebrunner/appium answers nothing else but the container itself).
  */
 public final class NodeRegistrationToken {
-    public static final String ENV = "NODE_REGISTRATION_TOKEN";
     public static final String CUSTOM_KEY = "registrationToken";
     public static final String HEADER = "X-MCloud-Node-Token";
 
     private final String token;
-    private final byte[] digest;
 
     private NodeRegistrationToken(String token) {
         this.token = token;
-        this.digest = sha256(token);
     }
 
     /**
      * @throws IllegalArgumentException when the token is empty
      */
     public static NodeRegistrationToken of(String token) {
-        return optional(token).orElseThrow(() -> new IllegalArgumentException("The token is empty"));
-    }
-
-    /**
-     * @return the token, empty when it is not set (e.g. NODE_REGISTRATION_TOKEN of the hub)
-     */
-    public static Optional<NodeRegistrationToken> optional(String token) {
         String value = StringUtils.trimToEmpty(token);
-        return value.isEmpty() ? Optional.empty() : Optional.of(new NodeRegistrationToken(value));
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("The token is empty");
+        }
+        return new NodeRegistrationToken(value);
     }
 
     /**
@@ -62,23 +50,6 @@ public final class NodeRegistrationToken {
             configuration.custom = custom;
         }
         return sent == null ? null : sent.trim();
-    }
-
-    /**
-     * @return true if the sent token is this one
-     */
-    public boolean matches(String sent) {
-        // the digests have the same length: the comparison takes the same time for any token
-        return sent != null && MessageDigest.isEqual(digest, sha256(sent.trim()));
-    }
-
-    /**
-     * Takes the token out of the request (see {@link #take}) and compares it with this one.
-     *
-     * @return true if the request has this token
-     */
-    public boolean accept(RegistrationRequest request) {
-        return matches(take(request));
     }
 
     /**
@@ -101,13 +72,5 @@ public final class NodeRegistrationToken {
     @Override
     public String toString() {
         return SecretMasking.MASK;
-    }
-
-    private static byte[] sha256(String value) {
-        try {
-            return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
     }
 }

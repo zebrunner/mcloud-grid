@@ -23,7 +23,7 @@
     <!-- NodeAuthentication shares the node registry of STF (its caches) with whoever made it: it is a service, not data -->
     <Match>
         <Class name="com.zebrunner.mcloud.grid.NodeAuthentication"/>
-        <Field name="stfNodes"/>
+        <Field name="verifier"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
     <!-- Tests intentionally use fixtures and mocks in ways SpotBugs dislikes -->
