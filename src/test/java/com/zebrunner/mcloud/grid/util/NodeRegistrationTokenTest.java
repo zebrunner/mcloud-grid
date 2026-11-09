@@ -1,7 +1,6 @@
 package com.zebrunner.mcloud.grid.util;
 
 import org.openqa.grid.common.RegistrationRequest;
-import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.selenium.remote.http.HttpClient;
 import org.openqa.selenium.remote.http.HttpMethod;
 import org.openqa.selenium.remote.http.HttpRequest;
@@ -28,11 +27,27 @@ public class NodeRegistrationTokenTest {
     }
 
     @Test
-    public void hubWithoutTokenIsAConfigurationError() {
+    public void emptyTokenIsNotSet() {
         for (String token : new String[] {null, "", " \n"}) {
-            GridConfigurationException e = Assert.expectThrows(GridConfigurationException.class, () -> NodeRegistrationToken.of(token));
-            Assert.assertTrue(e.getMessage().startsWith("NODE_REGISTRATION_TOKEN is not set"), e.getMessage());
+            Assert.assertTrue(NodeRegistrationToken.optional(token).isEmpty(), String.valueOf(token));
+            Assert.expectThrows(IllegalArgumentException.class, () -> NodeRegistrationToken.of(token));
         }
+        Assert.assertTrue(NodeRegistrationToken.optional("s3cret").isPresent());
+    }
+
+    @Test
+    public void tokenIsNotShown() {
+        Assert.assertEquals(NodeRegistrationToken.of("s3cret").toString(), "*****");
+    }
+
+    @Test
+    public void sentTokenIsTakenTrimmed() {
+        RegistrationRequest request = request(" mcn1.node-1.x\n");
+
+        Assert.assertEquals(NodeRegistrationToken.take(request), "mcn1.node-1.x");
+        Assert.assertEquals(request.getConfiguration().custom, Map.of("other", "kept"));
+        Assert.assertNull(NodeRegistrationToken.take(request));
+        Assert.assertNull(NodeRegistrationToken.take(request(null)));
     }
 
     @Test

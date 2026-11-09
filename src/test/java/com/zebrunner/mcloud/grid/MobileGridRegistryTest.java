@@ -191,14 +191,22 @@ public class MobileGridRegistryTest {
     }
 
     @Test
-    public void hubDoesNotStartWithoutRegistrationToken() {
+    public void hubDoesNotStartWithoutNodeTokensAndSharedToken() {
         // the registry of setUp is started with NODE_REGISTRATION_TOKEN of the test executions (pom.xml)
-        MobileGridRegistry.checkRegistrationToken(GridFixtures.REGISTRATION_TOKEN);
+        MobileGridRegistry.checkNodeRegistration(GridFixtures.REGISTRATION_TOKEN, false);
         for (String token : new String[] {null, "", " "}) {
             GridConfigurationException e = Assert.expectThrows(GridConfigurationException.class,
-                    () -> MobileGridRegistry.checkRegistrationToken(token));
-            Assert.assertTrue(e.getMessage().startsWith("NODE_REGISTRATION_TOKEN is not set"), e.getMessage());
+                    () -> MobileGridRegistry.checkNodeRegistration(token, false));
+            Assert.assertTrue(e.getMessage().startsWith("Neither the STF integration (STF_URL and STF_TOKEN), which verifies the node tokens, "
+                    + "nor NODE_REGISTRATION_TOKEN is set: no node could register."), e.getMessage());
         }
+    }
+
+    @Test
+    public void hubStartsWithNodeTokensOnly() {
+        // with the STF integration the nodes register with their node tokens, the shared token is optional
+        MobileGridRegistry.checkNodeRegistration(null, true);
+        MobileGridRegistry.checkNodeRegistration(GridFixtures.REGISTRATION_TOKEN, true);
     }
 
     @Test
@@ -208,6 +216,21 @@ public class MobileGridRegistryTest {
         registry.add(proxy);
 
         Assert.assertSame(registry.getProxyById(NODE_URL), proxy);
+    }
+
+    @Test
+    public void onlyTheRegisteredProxyIsRemovedBySameIdentity() {
+        MobileRemoteProxy old = GridFixtures.proxy(registry, NODE_URL, GridFixtures.androidNodeCaps("emulator-5554"));
+        registry.add(old);
+        MobileRemoteProxy current = GridFixtures.proxy(registry, NODE_URL, GridFixtures.androidNodeCaps("emulator-5554"));
+        registry.add(current);
+
+        // a late check of the replaced node does not remove the node registered again with its id
+        Assert.assertFalse(((MobileGridRegistry) registry).removeIfSame(old));
+        Assert.assertSame(registry.getProxyById(NODE_URL), current);
+
+        Assert.assertTrue(((MobileGridRegistry) registry).removeIfSame(current));
+        Assert.assertNull(registry.getProxyById(NODE_URL));
     }
 
     @Test

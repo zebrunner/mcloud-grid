@@ -24,6 +24,8 @@ public enum Path {
     STF_USER_DEVICES_PATH("/api/v1/user/devices"),
     STF_USER_DEVICES_BY_ID_PATH("/api/v1/user/devices/%s"),
     STF_USER_DEVICES_REMOTE_CONNECT_PATH("/api/v1/user/devices/%s/remoteConnect"),
+    STF_NODES_PATH("/api/v1/nodes"),
+    STF_NODES_VERIFY_PATH("/api/v1/nodes/verify"),
     APPIUM_START_RECORDING_SCREEN_PATH("/session/%s/appium/start_recording_screen"),
     APPIUM_STOP_RECORDING_SCREEN_PATH("/session/%s/appium/stop_recording_screen"),
     APPIUM_GET_LOG_TYPES_PATH("/session/%s/log/types"),

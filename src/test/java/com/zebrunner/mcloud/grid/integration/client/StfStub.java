@@ -9,7 +9,9 @@ import java.util.stream.Collectors;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.any;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
@@ -59,6 +61,39 @@ public final class StfStub {
         server.stubFor(any(urlMatching("/api/v1/.*")).atPriority(1)
                 .withHeader("Authorization", equalTo("Bearer " + token))
                 .willReturn(aResponse().withStatus(401).withBody("{\"success\":false,\"description\":\"Bad Credentials\"}")));
+    }
+
+    /**
+     * The node registry of STF: POST /api/v1/nodes/verify answers 200 with the node for the token at its address and
+     * 403 (the generic error of the API) for anything else.
+     */
+    public void enrolledNode(String token, String label, String address) {
+        server.stubFor(post("/api/v1/nodes/verify").atPriority(10)
+                .willReturn(aResponse().withStatus(403).withBody("{\"success\":false}")));
+        server.stubFor(post("/api/v1/nodes/verify").atPriority(5)
+                .withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN))
+                .withRequestBody(equalToJson("{\"token\":\"" + token + "\",\"host\":\"" + address + "\"}"))
+                .willReturn(okJson("{\"label\":\"" + label + "\",\"address\":\"" + address + "\"}")));
+    }
+
+    /**
+     * POST /api/v1/nodes/verify answers the status for every token.
+     */
+    public void verifyAnswers(int status) {
+        server.stubFor(post("/api/v1/nodes/verify").atPriority(1).willReturn(aResponse().withStatus(status).withBody("{\"success\":false}")));
+    }
+
+    /**
+     * GET /api/v1/nodes: the nodes of the registry of STF at these addresses (the first one is revoked: any status counts).
+     */
+    public void nodes(String... addresses) {
+        StringBuilder nodes = new StringBuilder();
+        for (int i = 0; i < addresses.length; i++) {
+            nodes.append(i == 0 ? "" : ",").append(String.format("{\"label\":\"node-%s\",\"address\":\"%s\",\"status\":\"%s\"}",
+                    i, addresses[i], i == 0 ? "revoked" : "active"));
+        }
+        server.stubFor(get("/api/v1/nodes").withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN))
+                .willReturn(okJson("{\"nodes\":[" + nodes + "]}")));
     }
 
     public void devices(DeviceJson... devices) {

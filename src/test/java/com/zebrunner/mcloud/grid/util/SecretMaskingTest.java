@@ -70,4 +70,14 @@ public class SecretMaskingTest {
         Assert.assertEquals(SecretMasking.maskUrl("a?token=b"), "a?token=b");
         Assert.assertEquals(SecretMasking.maskUrl("http://hub:4444/wd/hub"), "http://hub:4444/wd/hub");
     }
+
+    @Test
+    public void nodeTokenKeepsItsLabelOnly() {
+        String token = "mcn1.node-1.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde";
+        Assert.assertEquals(SecretMasking.maskLogMessage("token " + token + " of the node"), "token mcn1.node-1.***** of the node");
+        Assert.assertEquals(SecretMasking.maskLogMessage("{\"custom\":{\"registrationToken\":\"" + token + "\"}}"),
+                "{\"custom\":{\"registrationToken\":\"*****\"}}");
+        Assert.assertEquals(SecretMasking.maskLogMessage("no token"), "no token");
+        Assert.assertNull(SecretMasking.maskLogMessage(null));
+    }
 }

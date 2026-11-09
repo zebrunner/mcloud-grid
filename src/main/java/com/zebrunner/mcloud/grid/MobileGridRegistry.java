@@ -20,6 +20,7 @@
 // timeouts of the hub, the devices of lost nodes are returned in STF, the queued requests are safe for the console.
 package com.zebrunner.mcloud.grid;
 
+import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
 import org.openqa.grid.common.exception.GridConfigurationException;
@@ -70,7 +71,7 @@ import java.util.logging.Logger;
  * queue of Selenium removes the first request without a session instead (e.g. the cleanup of a timed out request
  * removed another one).</li>
  * <li>A node names the class of its proxy itself: only MobileRemoteProxy nodes are added, the others would skip
- * its checks (NODE_REGISTRATION_TOKEN, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
+ * its checks (the node token or NODE_REGISTRATION_TOKEN, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
  * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) replace the ones of the nodes.</li>
  * <li>The device of a session of a lost node is returned in STF.</li>
  * <li>The end of a session releases only the slot that still holds it (a late termination does not end the next session
@@ -114,20 +115,30 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     }
 
     /**
-     * Hub starts its registry before its server: the hub does not start without NODE_REGISTRATION_TOKEN.
+     * Hub starts its registry before its server: the hub does not start when no node could register, without
+     * the STF integration (which verifies the node tokens) and without NODE_REGISTRATION_TOKEN.
      */
     @Override
     public void start() {
-        checkRegistrationToken(System.getenv(NodeRegistrationToken.ENV));
+        checkNodeRegistration(System.getenv(NodeRegistrationToken.ENV), STFClient.isSTFEnabled());
         matcher.start();
     }
 
-    static void checkRegistrationToken(String token) {
-        try {
-            NodeRegistrationToken.of(token);
-        } catch (GridConfigurationException e) {
-            LOGGER.severe("[CONFIGURATION] " + e.getMessage() + " The hub does not start.");
-            throw e;
+    static void checkNodeRegistration(String sharedToken, boolean stfEnabled) {
+        boolean shared = NodeRegistrationToken.optional(sharedToken).isPresent();
+        if (!shared && !stfEnabled) {
+            String message = "Neither the STF integration (STF_URL and STF_TOKEN), which verifies the node tokens, nor "
+                    + NodeRegistrationToken.ENV + " is set: no node could register. Set STF_URL and STF_TOKEN (an STF admin) "
+                    + "for the node tokens, or " + NodeRegistrationToken.ENV + " for the shared token (legacy).";
+            LOGGER.severe("[CONFIGURATION] " + message + " The hub does not start.");
+            throw new GridConfigurationException(message);
+        }
+        if (!shared) {
+            LOGGER.info("[CONFIGURATION] Nodes register with their node tokens only, " + NodeRegistrationToken.ENV
+                    + " (the shared token) is not set.");
+        } else if (stfEnabled) {
+            LOGGER.info("[CONFIGURATION] Nodes register with their node tokens or with the shared " + NodeRegistrationToken.ENV
+                    + " (legacy, refused for the addresses of the enrolled nodes); unset it when all the nodes are enrolled.");
         }
     }
 
@@ -234,6 +245,24 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
                 registered.teardown();
                 fireStateChanged();
             }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Removes the proxy only if it is the registered one, not a proxy registered meanwhile with the same id.
+     *
+     * @return true if it was removed
+     */
+    public boolean removeIfSame(RemoteProxy proxy) {
+        lock.lock();
+        try {
+            if (proxies.getProxyById(proxy.getId()) != proxy) {
+                return false;
+            }
+            removeIfPresent(proxy);
+            return true;
         } finally {
             lock.unlock();
         }

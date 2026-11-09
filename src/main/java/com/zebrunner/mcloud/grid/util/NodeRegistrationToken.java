@@ -2,7 +2,6 @@ package com.zebrunner.mcloud.grid.util;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.grid.common.RegistrationRequest;
-import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.grid.internal.utils.configuration.GridNodeConfiguration;
 import org.openqa.selenium.remote.http.HttpClient;
 
@@ -11,11 +10,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
- * The secret shared by the hub and its nodes (NODE_REGISTRATION_TOKEN of both): a node registers with it in 'custom' of
- * its configuration, the hub sends it to the node with every request in {@link #HEADER} (zebrunner/appium answers
- * nothing else but the container itself). The hub does not start without it.
+ * A token a node registers with in 'custom' of its configuration ({@link #CUSTOM_KEY}) and the hub sends back to the
+ * node with every request in {@link #HEADER} (zebrunner/appium answers nothing else but the container itself): the
+ * node token of the node (see {@link NodeToken}) or the legacy secret shared by the hub and all its nodes
+ * (NODE_REGISTRATION_TOKEN of both).
  */
 public final class NodeRegistrationToken {
     public static final String ENV = "NODE_REGISTRATION_TOKEN";
@@ -31,25 +32,27 @@ public final class NodeRegistrationToken {
     }
 
     /**
-     * @param token the token of the hub
-     * @throws GridConfigurationException when it is empty
+     * @throws IllegalArgumentException when the token is empty
      */
     public static NodeRegistrationToken of(String token) {
+        return optional(token).orElseThrow(() -> new IllegalArgumentException("The token is empty"));
+    }
+
+    /**
+     * @return the token, empty when it is not set (e.g. NODE_REGISTRATION_TOKEN of the hub)
+     */
+    public static Optional<NodeRegistrationToken> optional(String token) {
         String value = StringUtils.trimToEmpty(token);
-        if (value.isEmpty()) {
-            throw new GridConfigurationException(ENV + " is not set: the hub registers only the nodes with its token, "
-                    + "set it for the hub and for every node (NODE_REGISTRATION_TOKEN of mcloud-agent).");
-        }
-        return new NodeRegistrationToken(value);
+        return value.isEmpty() ? Optional.empty() : Optional.of(new NodeRegistrationToken(value));
     }
 
     /**
      * Takes the token out of the request, so that it is in no copy of the node configuration the hub keeps and shows
-     * (the console, /grid/api/proxy), and compares it with the token of the hub.
+     * (the console, /grid/api/proxy).
      *
-     * @return true if the request has the token of the hub
+     * @return the token the node sent, trimmed; null if it sent none
      */
-    public boolean accept(RegistrationRequest request) {
+    public static String take(RegistrationRequest request) {
         GridNodeConfiguration configuration = request.getConfiguration();
         String sent = null;
         if (configuration != null && configuration.custom != null && configuration.custom.containsKey(CUSTOM_KEY)) {
@@ -58,8 +61,24 @@ public final class NodeRegistrationToken {
             sent = custom.remove(CUSTOM_KEY);
             configuration.custom = custom;
         }
+        return sent == null ? null : sent.trim();
+    }
+
+    /**
+     * @return true if the sent token is this one
+     */
+    public boolean matches(String sent) {
         // the digests have the same length: the comparison takes the same time for any token
         return sent != null && MessageDigest.isEqual(digest, sha256(sent.trim()));
+    }
+
+    /**
+     * Takes the token out of the request (see {@link #take}) and compares it with this one.
+     *
+     * @return true if the request has this token
+     */
+    public boolean accept(RegistrationRequest request) {
+        return matches(take(request));
     }
 
     /**
@@ -77,6 +96,11 @@ public final class NodeRegistrationToken {
      */
     public HttpClientApache authenticate(HttpClientApache client) {
         return client.withHeader(HEADER, token);
+    }
+
+    @Override
+    public String toString() {
+        return SecretMasking.MASK;
     }
 
     private static byte[] sha256(String value) {

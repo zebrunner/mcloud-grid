@@ -54,11 +54,18 @@ public final class GridFixtures {
     }
 
     public static RegistrationRequest registrationRequest(String nodeUrl, Map<String, Object> capabilities) {
+        return registrationRequest(nodeUrl, capabilities, REGISTRATION_TOKEN);
+    }
+
+    /**
+     * @param token the token in 'custom' of the configuration: a node token or the shared one
+     */
+    public static RegistrationRequest registrationRequest(String nodeUrl, Map<String, Object> capabilities, String token) {
         GridNodeConfiguration config = new GridNodeConfiguration();
         config.id = nodeUrl;
         config.remoteHost = nodeUrl;
         config.proxy = MobileRemoteProxy.class.getName();
-        config.custom = new HashMap<>(Map.of(NodeRegistrationToken.CUSTOM_KEY, REGISTRATION_TOKEN));
+        config.custom = new HashMap<>(Map.of(NodeRegistrationToken.CUSTOM_KEY, token));
         MutableCapabilities caps = new MutableCapabilities(capabilities);
         caps.setCapability(RegistrationRequest.MAX_INSTANCES, 1);
         List<MutableCapabilities> list = new ArrayList<>();

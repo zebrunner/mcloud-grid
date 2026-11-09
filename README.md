@@ -29,11 +29,11 @@ The image build compiles and packages the hub; tests and linters run separately 
 ```bash
 docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
   -e GRID_TIMEOUT=60 -e GRID_BROWSER_TIMEOUT=60 \
-  -e STF_URL=http://stf.example.com -e STF_TOKEN=<token> -e NODE_REGISTRATION_TOKEN=<node token> \
+  -e STF_URL=http://stf.example.com -e STF_TOKEN=<token> \
   --name mcloud-grid zebrunner/mcloud-grid:latest
 ```
 
-The hub runs as an unprivileged user and stops gracefully on `docker stop`. It does not start without `NODE_REGISTRATION_TOKEN`, see [Node registration](#node-registration).
+The hub runs as an unprivileged user and stops gracefully on `docker stop`. The nodes register with their node tokens, which STF verifies; the hub does not start when no node could register: without the STF integration (`STF_URL`, `STF_TOKEN`) and without the legacy `NODE_REGISTRATION_TOKEN`, see [Node registration](#node-registration).
 
 ## Configuration
 
@@ -55,7 +55,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. It d
 | `SE_OPTS` | | Extra hub options, e.g. `-debug`; `-servlets` replaces the [servlets](#endpoints) of the hub config |
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
-| `NODE_REGISTRATION_TOKEN` | | Required: the secret a node registers with and the hub sends to the nodes, see [Node registration](#node-registration); the hub does not start without it |
+| `NODE_REGISTRATION_TOKEN` | | Legacy: the secret shared by the hub and the nodes not enrolled yet, not accepted from the address of an enrolled node; not set = node tokens only, see [Node registration](#node-registration). The hub does not start without it and without the STF integration |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
 | `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
@@ -67,7 +67,7 @@ STF integration is enabled when both `STF_URL` and `STF_TOKEN` are set.
 | Env var | Default | Meaning |
 | --- | --- | --- |
 | `STF_URL` | | STF address |
-| `STF_TOKEN` | | Access token of the STF user that reserves devices for automation; when the user is an STF admin, a device that does not answer the reservation is also marked unhealthy in STF |
+| `STF_TOKEN` | | Access token of the STF user that reserves devices for automation; it must be an STF admin for the node tokens (the hub verifies them with the node registry of STF), and then a device that does not answer the reservation is also marked unhealthy in STF |
 | `STF_TIMEOUT` | `3600` | Reservation timeout of a device in STF, s |
 | `CHECK_APPIUM_STATUS` | `false` | Check `/status-adb` (Android) or `/status-wda` (iOS) of the node before a session |
 | `APPIUM_STATUS_TIMEOUT` | `10` | How long the hub waits for the Appium status check, s; zebrunner/appium gives WebDriverAgent 3 s and a second attempt, adb 5 s |
@@ -102,14 +102,28 @@ The node capabilities of the reserved device are passed to the session as `zebru
 A node registers with the hub through `/grid/register`, which answers anyone who reaches the hub, and gets the sessions of its device with their commands and capabilities. So the hub registers a node only when:
 
 - its proxy is `MobileRemoteProxy` (the registry of the hub config, `MobileGridRegistry`, rejects the others): a node with another class would skip the checks below;
-- it sends `NODE_REGISTRATION_TOKEN` of the hub in `custom` of its configuration (`"custom": {"registrationToken": "<token>"}`), which [zebrunner/appium](https://github.com/zebrunner/appium) does with its own `NODE_REGISTRATION_TOKEN`; the hub takes the token out of the configuration it keeps, so the console, `/grid/api/proxy` and the logs do not show it;
-- its address is in `NODE_ALLOWED_NETWORKS` and reachable (`CHECK_NODE_REACHABILITY`), and its device is in STF.
+- it sends its node token (or the legacy shared token, see below) in `custom` of its configuration (`"custom": {"registrationToken": "<token>"}`), which [zebrunner/appium](https://github.com/zebrunner/appium) does with its `NODE_REGISTRATION_TOKEN`; the hub takes the token out of the configuration it keeps, so the console, `/grid/api/proxy` and the logs do not show it;
+- its address is in `NODE_ALLOWED_NETWORKS` (checked before any request to STF) and reachable (`CHECK_NODE_REACHABILITY`), and its device is in STF.
 
-A node that registers again at the same address (e.g. after the hub restarted) is checked for the token only; a node with the id of a registered one at another address is checked as a new node. A rejected node is logged with the reason once in 10 minutes. Without `NODE_REGISTRATION_TOKEN` the hub does not start: it logs `NODE_REGISTRATION_TOKEN is not set` (then the JVM prints the stack trace of the exception) and exits with `1`. Generate the token with e.g. `openssl rand -hex 24` and set it for the hub and for every node (`NODE_REGISTRATION_TOKEN` of mcloud-agent); a node without it is not registered until it has the token.
+#### Node tokens
 
-The same token authenticates the hub to the nodes: every request of the hub to a node (the commands of the sessions, the status polling, the Appium status checks) carries it in the header `X-MCloud-Node-Token`, and zebrunner/appium answers only such requests and the ones of its own container. So the Appium of a device is used through the hub only, which reserves the device in STF.
+A node gets its node token `mcn1.<label>.<secret>` when it joins the farm with an invite of the admin (`./zebrunner.sh node-invite` of [mcloud](https://github.com/zebrunner/mcloud), `./zebrunner.sh join` of [mcloud-agent](https://github.com/zebrunner/mcloud-agent)): STF keeps the node (its label and its address) in its node registry, and only the SHA-256 of the token. The hub accepts a node token only when STF verifies it for the address of the node: `POST /api/v1/nodes/verify` with the token and the host of the node URL, authorized by `STF_TOKEN` (an STF admin), answers `200` only for an active node whose registered address is that host. The answers are cached for 30 s (by the SHA-256 of the token and the host), so the retries of a rejected node do not load STF.
 
-The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is in no log of Appium; the hub masks it (and the registration token) in its own logs, e.g. the session requests Selenium logs with `-debug`.
+- The hub sends the node token of a node only to that node, in the header `X-MCloud-Node-Token` of its requests (the commands of the sessions, the status polling, the Appium status checks); zebrunner/appium answers only such requests and the ones of its own container. So the Appium of a device is used through the hub only, which reserves the device in STF.
+- STF verifies the node token of every registered node again every 60 s: a node whose token it rejects (`403`: the node is revoked, joined again with a new token, or registers from another address) is unregistered at once, its sessions end and their devices are returned in STF. While STF does not answer, the node is kept for up to 10 minutes since its last verification, then it is unregistered too. The logs name the node by its label, never by its token.
+- A node token that STF rejects, cannot verify (STF down, `STF_TOKEN` not an admin, an STF without the node registry), or that has not the format of one, is not registered; the node gets the reason in the answer of `/grid/register`, e.g. `Node http://10.0.0.5:7521 has an unknown or revoked node token, so it is not registered.` The messages never contain a token.
+
+#### Legacy shared token
+
+`NODE_REGISTRATION_TOKEN` of the hub is the secret all the nodes not enrolled yet share with it, for the migration to the node tokens. It is accepted from any node that sends it, but not from the address of a node of the node registry of STF, in any status (`GET /api/v1/nodes` with `STF_TOKEN`, cached for 30 s; an STF without the node registry has no such nodes, and when STF does not answer the last known addresses are used, or the node is not registered until STF answers): an enrolled node registers with its node token only, so a stolen shared token is no use at its address. The hub sends the shared token to the nodes registered with it.
+
+The hub starts without `NODE_REGISTRATION_TOKEN` when the STF integration is on (`STF_URL` and `STF_TOKEN`): then it registers the nodes with node tokens only. Without both it does not start: it logs `no node could register` (then the JVM prints the stack trace of the exception) and exits with `1`.
+
+To turn the legacy mode off when every node is enrolled: unset `NODE_REGISTRATION_TOKEN` of the hub and restart it, or rotate it so that no node knows it (`./zebrunner.sh nodes legacy-off` of mcloud does that); a node still registering with the shared token is then rejected with `registers with a shared NODE_REGISTRATION_TOKEN, but the hub accepts only node tokens`, join it to get its node token.
+
+A node that registers again at the same address (e.g. after the hub restarted) is checked for the token only; a node with the id of a registered one at another address is checked as a new node. A rejected node is logged with the reason once in 10 minutes.
+
+The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is in no log of Appium; the hub masks it, the registration token and any node token (`mcn1.<label>.*****`) in its own logs, e.g. the session requests and the registration requests Selenium logs with `-debug`.
 
 `/lifecycle-manager` of Selenium, which shuts the hub down for anyone, is turned off in the hub config (`withoutServlets`).
 
