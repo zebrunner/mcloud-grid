@@ -37,7 +37,7 @@ jobs:
         run: mvn -B verify
       - name: Tests report
         if: ${{ !cancelled() }}
-        uses: mikepenz/action-junit-report@8a133bfa3ecb0ea9024c1e2ae788b4c25f6cdb9d # v6.6.2
+        uses: mikepenz/action-junit-report@a16be3a69023e9bd7e748ede768b3282ea7b30ce # v6.7.1
         with:
           report_paths: target/surefire-reports/**/TEST-*.xml
           check_name: tests report
@@ -80,7 +80,7 @@ jobs:
       # one report per path: the action pairs report_paths with check_name items
       - name: Docker image report
         if: ${{ !cancelled() }}
-        uses: mikepenz/action-junit-report@8a133bfa3ecb0ea9024c1e2ae788b4c25f6cdb9d # v6.6.2
+        uses: mikepenz/action-junit-report@a16be3a69023e9bd7e748ede768b3282ea7b30ce # v6.7.1
         with:
           report_paths: ${{ runner.temp }}/junit/*.xml
           check_name: docker image report
@@ -89,7 +89,7 @@ jobs:
           require_tests: true
       - name: Load test report
         if: ${{ !cancelled() && steps.load_test.outcome != 'skipped' }}
-        uses: mikepenz/action-junit-report@8a133bfa3ecb0ea9024c1e2ae788b4c25f6cdb9d # v6.6.2
+        uses: mikepenz/action-junit-report@a16be3a69023e9bd7e748ede768b3282ea7b30ce # v6.7.1
         with:
           report_paths: target/surefire-reports/**/TEST-*.xml
           check_name: load test report
