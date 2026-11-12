@@ -110,17 +110,13 @@ wait_hub() {
 }
 
 section "STF"
-# the registry fails the start of the hub without STF_URL and STF_TOKEN: no node token could be verified
+# without STF_URL and STF_TOKEN the hub starts (the first start of MCloud, before an access token of STF) and refuses every
+# node: no node token could be verified (see "node registration")
 docker run --detach --name "$NO_STF_CONTAINER" --env STF_TOKEN="$STF_TOKEN" --env JAVA_HEAP_OPTS="-Xms64m -Xmx512m" "$IMAGE" > /dev/null
-for _ in $(seq 1 60); do
-  [[ "$(docker inspect --format '{{.State.Running}}' "$NO_STF_CONTAINER")" == "false" ]] && break
-  sleep 1
-done
-check "the hub exits without STF_URL" "false 1" "$(docker inspect --format '{{.State.Running}} {{.State.ExitCode}}' "$NO_STF_CONTAINER")"
+check "the hub is up without STF_URL" "200" "$(wait_hub "$NO_STF_CONTAINER")"
 logs="$(docker logs "$NO_STF_CONTAINER" 2>&1)"
 check_contains "the missing STF is logged" \
   '"level":"SEVERE","logger":"com.zebrunner.mcloud.grid.MobileGridRegistry"' "$(grep 'STF_URL and STF_TOKEN are not set' <<< "$logs")"
-check_not_contains "the hub is not up without STF" "Selenium Grid hub is up and running" "$logs"
 
 if start_fake_stf; then
   pass "the fake STF starts"
@@ -211,6 +207,8 @@ check "a node with its node token at its address is accepted" "200" "$(register 
 check "a node with an unknown node token is rejected" "500" "$(register 192.0.2.5 "$mobile" "$UNKNOWN_NODE_TOKEN")"
 check "a node token at another address is rejected" "500" "$(register 192.0.2.6 "$mobile" "$NODE_TOKEN")"
 check "a node token STF does not verify is rejected" "500" "$(register 192.0.2.7 "$mobile" "$NODE_TOKEN" "$STF_DOWN_CONTAINER")"
+check "without STF_URL a node with its node token is rejected" "500" "$(register 192.0.2.3 "$mobile" "$NODE_TOKEN" "$NO_STF_CONTAINER")"
+check_contains "the hub without STF_URL logs why" "STF_URL and STF_TOKEN of the hub are not set" "$(docker logs "$NO_STF_CONTAINER" 2>&1)"
 check_contains "the hub verifies the node tokens with STF_TOKEN" "POST /api/v1/nodes/verify True" "$(cat "$WORK/stf.log")"
 check_not_contains "the hub sends no request to STF without STF_TOKEN" " False" "$(cat "$WORK/stf.log")"
 logs="$(docker logs "$STF_DOWN_CONTAINER" 2>&1)"

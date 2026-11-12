@@ -35,7 +35,7 @@ docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
   --name mcloud-grid zebrunner/mcloud-grid:latest
 ```
 
-The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF_URL` and `STF_TOKEN` (the access token of an STF admin) are required: the nodes register with their node tokens, which the hub verifies with STF (see [Node registration](#node-registration)); without them the hub does not start.
+The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF_URL` and `STF_TOKEN` (the access token of an STF admin) are required: the nodes register with their node tokens, which the hub verifies with STF (see [Node registration](#node-registration)); without them the hub starts, logs `STF_URL and STF_TOKEN are not set` (`SEVERE`) and refuses every node, as on the first start of MCloud before an admin of STF has an access token.
 
 ## Configuration
 
@@ -63,7 +63,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 
 ### STF and device health
 
-`STF_URL` and `STF_TOKEN` are required: the hub does not start without them.
+`STF_URL` and `STF_TOKEN` are required for the nodes: without them the hub starts but refuses every node.
 
 | Env var | Default | Meaning |
 | --- | --- | --- |
@@ -183,9 +183,9 @@ The node gets the reason in the answer of `/grid/register` (the log of the appiu
 
 A registered node that disappears with `[NODE TOKEN] STF does not accept the node token of node ... any more` was revoked, joined again or moved: join it again.
 
-### The hub does not start
+### No node registers
 
-`STF_URL and STF_TOKEN are not set` in the log (then the JVM prints the stack trace and exits with `1`): set both, the hub verifies the node tokens with STF.
+`STF_URL and STF_TOKEN are not set` in the log of the start (`SEVERE`) and `STF_URL and STF_TOKEN of the hub are not set` for every node: set both and restart the hub, it verifies the node tokens with STF.
 
 ## Development
 
