@@ -60,6 +60,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -420,6 +421,17 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private HttpClient authenticate(HttpClient client) {
         // null only while the constructor of Selenium runs
         return nodeCredential == null ? client : nodeCredential.authenticate(client);
+    }
+
+    /**
+     * Sets the node token of this node on another request of the hub to it (the WebSocket of a Playwright session).
+     *
+     * @param setHeader sets a header of the request: name, value
+     */
+    public void authenticate(BiConsumer<String, String> setHeader) {
+        if (nodeCredential != null) {
+            nodeCredential.authenticate(setHeader);
+        }
     }
 
     /**

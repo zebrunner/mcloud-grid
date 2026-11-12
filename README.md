@@ -59,6 +59,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
 | `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
+| `PLAYWRIGHT_IDLE_TIMEOUT` | `120` | A side of a Playwright WebSocket that answers no ping for it is closed with the other side, s; see [Playwright](#playwright) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
 
 ### STF and device health
@@ -128,6 +129,15 @@ When the hub loses a node (it is down for `unregisterIfStillDownAfter` of the no
 
 With `GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true` a request for a device that is not registered fails at once (`cannot find : Capabilities {...}`, or `Empty pool of VM for setup` when no device is registered at all). With `false` it waits in the queue for up to `GRID_NEW_SESSION_WAIT_TIMEOUT` and gets a device that registers meanwhile (a restarted device, a new emulator), otherwise it fails with `Request timed out waiting for a node to become available`.
 
+### Playwright
+
+A Playwright session is an Appium session of the `Playwright` automation of [zebrunner/appium](https://github.com/zebrunner/appium#playwright) (`appium:automationName: Playwright`): the hub queues it, reserves the device in STF and releases it as any other session. The driver serves the Playwright server of the device on the WebSocket `/mcloud/playwright/<session id>` of the node, `PlaywrightServlet` passes the WebSocket of the client on to it: `ws://hub:4444/grid/admin/PlaywrightServlet/<Appium session id>` (`/mcloud/playwright/<session id>` of MCloud).
+
+- The hub connects to the node first, with the node token of the node and the headers Playwright checks (`User-Agent`, its version) or uses (`x-playwright-*`), never the other headers of the client: an unknown session is `404`, a session the node does not serve (another automation) is `502`.
+- The frames are passed on in parts as they come, a message of any size (screenshots, traces).
+- While a WebSocket of the session is open the session does not time out: the client sends no WebDriver commands then. Playwright sends no pings, the hub pings both sides every 30 s; a side that answers nothing for `PLAYWRIGHT_IDLE_TIMEOUT` (a client that is gone without a close) is closed with the other one.
+- When the last WebSocket of a session is closed the inactivity of the session counts from then: a session the client did not delete (`DELETE /wd/hub/session/<id>`) is released after `GRID_TIMEOUT` as any session without commands.
+
 ## Endpoints
 
 | Endpoint | Content |
@@ -135,6 +145,7 @@ With `GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true` a request for a device that is 
 | `/grid/console` | Selenium grid console, with the UDID of every device; the values of the nodes and of the queued requests are escaped, the secrets of the queued requests are masked |
 | `/grid/admin/DevicesServlet` | Devices as JSON: platform, type, node, status `free`/`busy`/`ignored`/`down`, why and until when a device is ignored, its session (Appium session id, start, inactivity, last command) |
 | `/grid/admin/AllSessionsServlet` | Active sessions as JSON with the requested capabilities and the device; secrets are masked as `*****`: `zebrunner:STF_TOKEN`, `remoteURL` of `zebrunner:slotCapabilities` (the remote ADB address), capabilities named like a token, password, secret, key or credential, and the user info and such query parameters of URLs (e.g. `appium:app`) |
+| `/grid/admin/PlaywrightServlet/<session id>` | The WebSocket of a Playwright session, see [Playwright](#playwright) |
 | `/grid/admin/MetricsServlet` | Prometheus metrics: `mcloud_grid_devices{platform,status}`, `mcloud_grid_sessions`, `mcloud_grid_new_session_requests` (the queue) |
 | `POST /grid/admin/TerminateSessionServlet?udid=<udid>` or `?sessionId=<id>` | Terminates the session of a device and releases it in STF, see below |
 | `/wd/hub/status` | Hub status, also the healthcheck of the image |
