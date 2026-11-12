@@ -348,6 +348,8 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
 
     @Override
     public void addNewSessionRequest(RequestHandler handler) {
+        // a Playwright session while the option is off is refused before the queue, as a device the grid does not have
+        PlaywrightSessions.verifyAllowed(handler.getRequest().getDesiredCapabilities());
         lock.lock();
         try {
             proxies.verifyAbilityToHandleDesiredCapabilities(handler.getRequest().getDesiredCapabilities());

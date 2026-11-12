@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.servlets;
 
 import com.zebrunner.mcloud.grid.MobileRemoteProxy;
+import com.zebrunner.mcloud.grid.PlaywrightSessions;
 import com.zebrunner.mcloud.grid.util.EnvUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.server.handler.ContextHandler;
@@ -40,6 +41,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -53,6 +55,9 @@ import java.util.logging.Logger;
  * WebSocket /mcloud/playwright/&lt;session id&gt; of its Appium. This servlet passes the WebSocket of the client on to
  * that one with the node token of the node (the client cannot reach the node itself) and the headers Playwright checks
  * (its version in User-Agent).
+ * <p>
+ * The Playwright sessions are an option of the farm (PLAYWRIGHT_ENABLED, see {@link PlaywrightSessions}): without it the
+ * WebSocket is refused with 501 and the hub refuses the new Playwright sessions.
  * <p>
  * While a WebSocket of the session is open the session does not time out: the Playwright client sends no WebDriver
  * commands. The hub pings both sides instead (Playwright sends no pings itself), a side that does not answer for
@@ -78,18 +83,21 @@ public class PlaywrightServlet extends JettyWebSocketServlet {
     private static final String CONNECTIONS = "PLAYWRIGHT_CONNECTIONS";
 
     private final transient Function<String, Optional<Target>> locator;
+    private final transient BooleanSupplier enabled;
     private transient WebSocketClient client;
     private transient ScheduledExecutorService pings;
 
     public PlaywrightServlet() {
-        this(null);
+        this(null, PlaywrightSessions::isEnabled);
     }
 
     /**
      * @param locator the session of an id, null for the sessions of the registry of the hub
+     * @param enabled whether the Playwright sessions are enabled (PLAYWRIGHT_ENABLED)
      */
-    PlaywrightServlet(Function<String, Optional<Target>> locator) {
+    PlaywrightServlet(Function<String, Optional<Target>> locator, BooleanSupplier enabled) {
         this.locator = locator;
+        this.enabled = enabled;
     }
 
     @Override
@@ -144,6 +152,10 @@ public class PlaywrightServlet extends JettyWebSocketServlet {
      * Connects to the node of the session first, so a client gets the reason as the HTTP status of its upgrade.
      */
     private Object connect(JettyServerUpgradeRequest request, JettyServerUpgradeResponse response) {
+        if (!enabled.getAsBoolean()) {
+            sendError(response, HttpServletResponse.SC_NOT_IMPLEMENTED, PlaywrightSessions.DISABLED_MESSAGE);
+            return null;
+        }
         String sessionId = StringUtils.strip(StringUtils.defaultString(request.getHttpServletRequest().getPathInfo()), "/");
         Optional<Target> found = StringUtils.isBlank(sessionId) || sessionId.contains("/") ? Optional.empty() : locate(sessionId);
         if (found.isEmpty()) {
