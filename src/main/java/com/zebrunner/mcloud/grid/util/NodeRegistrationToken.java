@@ -7,6 +7,7 @@ import org.openqa.selenium.remote.http.HttpClient;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 /**
  * The node token a node registers with in 'custom' of its configuration ({@link #CUSTOM_KEY}, NODE_REGISTRATION_TOKEN of
@@ -67,6 +68,15 @@ public final class NodeRegistrationToken {
      */
     public HttpClientApache authenticate(HttpClientApache client) {
         return client.withHeader(HEADER, token);
+    }
+
+    /**
+     * Sets the header of the token on another request of the hub to the node, e.g. the WebSocket of a Playwright session.
+     *
+     * @param setHeader sets a header of the request: name, value
+     */
+    public void authenticate(BiConsumer<String, String> setHeader) {
+        setHeader.accept(HEADER, token);
     }
 
     @Override

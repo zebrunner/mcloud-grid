@@ -169,6 +169,11 @@ check_contains "MetricsServlet is registered" "mcloud_grid_new_session_requests 
 check "TerminateSessionServlet is registered (no running session)" "404" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Authorization: Bearer key' \
     'http://localhost:4444/grid/admin/TerminateSessionServlet?udid=x')"
+# the WebSocket support of Jetty starts with the servlet in the context of the hub of Selenium
+check "PlaywrightServlet is registered (no running session)" "404" \
+  "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+    -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+    'http://localhost:4444/grid/admin/PlaywrightServlet/no-such-session')"
 check "grid console responds" "200" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
 
