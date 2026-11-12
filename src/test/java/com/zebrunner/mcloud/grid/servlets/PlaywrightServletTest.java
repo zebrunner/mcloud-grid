@@ -168,6 +168,7 @@ public class PlaywrightServletTest {
 
     @Test
     public void passesTheMessagesWithTheHeadersOfPlaywrightAndTheNodeToken() throws Exception {
+        allClosed();
         int opened = open.get();
         int closedBefore = closed.get();
         Recorder recorder = new Recorder();
@@ -211,6 +212,8 @@ public class PlaywrightServletTest {
         nodeSession.close(StatusCode.SHUTDOWN, "session deleted");
         Assert.assertTrue(recorder.closedLatch.await(10, TimeUnit.SECONDS));
         Assert.assertEquals(recorder.closeStatus, StatusCode.SHUTDOWN);
+        // the bridge counts its close after the client gets it: not in the counters of the next test
+        allClosed();
     }
 
     @Test
@@ -235,6 +238,13 @@ public class PlaywrightServletTest {
         // a session of another automation: the node has no Playwright WebSocket for it
         ExecutionException error = Assert.expectThrows(ExecutionException.class, () -> connect("appium-2", new Recorder()));
         Assert.assertEquals(upgradeStatus(error), 502);
+    }
+
+    /**
+     * The bridges of the earlier tests are closed: every open one is counted as closed.
+     */
+    private void allClosed() throws InterruptedException {
+        waitFor(() -> open.get() == closed.get());
     }
 
     private static void waitFor(java.util.function.BooleanSupplier condition) throws InterruptedException {
