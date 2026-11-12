@@ -22,7 +22,6 @@ package com.zebrunner.mcloud.grid;
 
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
-import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.grid.internal.ActiveTestSessions;
 import org.openqa.grid.internal.BaseGridRegistry;
 import org.openqa.grid.internal.ExternalSessionKey;
@@ -114,8 +113,8 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     }
 
     /**
-     * Hub starts its registry before its server: the hub does not start without STF, which verifies the node tokens of
-     * the nodes.
+     * Hub starts its registry before its server. Without STF, which verifies the node tokens, the hub starts but refuses
+     * every node (NodeAuthentication): the first start of MCloud runs before an admin of STF has an access token.
      */
     @Override
     public void start() {
@@ -127,13 +126,16 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         return STFClient.isSTFEnabled();
     }
 
-    static void checkNodeRegistration(boolean stfEnabled) {
+    /**
+     * @return false when no node can register: STF_URL and STF_TOKEN are not set (logged)
+     */
+    static boolean checkNodeRegistration(boolean stfEnabled) {
         if (!stfEnabled) {
-            String message = "STF_URL and STF_TOKEN are not set: the nodes register with their node tokens, which the hub verifies "
-                    + "with STF, so no node could register. Set STF_URL and STF_TOKEN (the access token of an STF admin).";
-            LOGGER.severe("[CONFIGURATION] " + message + " The hub does not start.");
-            throw new GridConfigurationException(message);
+            LOGGER.severe("[CONFIGURATION] STF_URL and STF_TOKEN are not set: the nodes register with their node tokens, which the "
+                    + "hub verifies with STF, so the hub refuses every node. Set STF_URL and STF_TOKEN (the access token of an STF admin) "
+                    + "and restart the hub.");
         }
+        return stfEnabled;
     }
 
     @Override

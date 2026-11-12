@@ -1,7 +1,6 @@
 package com.zebrunner.mcloud.grid;
 
 import org.openqa.grid.common.RegistrationRequest;
-import org.openqa.grid.common.exception.GridConfigurationException;
 import org.openqa.grid.internal.ExternalSessionKey;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.internal.RemoteProxy;
@@ -201,18 +200,39 @@ public class MobileGridRegistryTest {
     }
 
     @Test
-    public void hubDoesNotStartWithoutStf() {
+    public void hubStartsWithoutStfAndLogsIt() {
         GridHubConfiguration config = new GridHubConfiguration();
         config.registry = MobileGridRegistry.class.getName();
         config.port = 0;
-        // the unit tests run without STF_URL and STF_TOKEN
-        Assert.expectThrows(GridConfigurationException.class, () -> new Hub(config));
+        List<LogRecord> records = new CopyOnWriteArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                records.add(record);
+            }
 
-        MobileGridRegistry.checkNodeRegistration(true);
-        GridConfigurationException e = Assert.expectThrows(GridConfigurationException.class,
-                () -> MobileGridRegistry.checkNodeRegistration(false));
-        Assert.assertEquals(e.getMessage(), "STF_URL and STF_TOKEN are not set: the nodes register with their node tokens, which the "
-                + "hub verifies with STF, so no node could register. Set STF_URL and STF_TOKEN (the access token of an STF admin).");
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger logger = Logger.getLogger(MobileGridRegistry.class.getName());
+        logger.addHandler(handler);
+        try {
+            // the unit tests run without STF_URL and STF_TOKEN: the first start of MCloud, the nodes are refused (NodeAuthenticationTest)
+            Hub hub = new Hub(config);
+            hub.getRegistry().stop();
+        } finally {
+            logger.removeHandler(handler);
+        }
+        Assert.assertTrue(records.stream().anyMatch(r -> r.getLevel() == Level.SEVERE
+                && r.getMessage().startsWith("[CONFIGURATION] STF_URL and STF_TOKEN are not set")), records.toString());
+
+        Assert.assertTrue(MobileGridRegistry.checkNodeRegistration(true));
+        Assert.assertFalse(MobileGridRegistry.checkNodeRegistration(false));
     }
 
     @Test

@@ -128,7 +128,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // nodes may register only from these networks, empty = from anywhere
     private static final AllowedNetworks NODE_ALLOWED_NETWORKS = AllowedNetworks.fromEnv("NODE_ALLOWED_NETWORKS", System.getenv("NODE_ALLOWED_NETWORKS"));
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
-    // the node tokens verified by STF; MobileGridRegistry does not start the hub without STF_URL and STF_TOKEN
+    // the node tokens verified by STF; without STF_URL and STF_TOKEN every node is refused
     private static volatile NodeAuthentication nodeAuthentication = NodeAuthentication.fromEnv();
     // STF verifies the node token of a registered node again and again: a revoked node is unregistered
     static final Duration NODE_TOKEN_CHECK_PERIOD = Duration.ofSeconds(60);
