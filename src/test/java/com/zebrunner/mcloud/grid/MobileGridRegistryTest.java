@@ -9,6 +9,7 @@ import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.utils.configuration.GridHubConfiguration;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
 import org.openqa.grid.web.Hub;
+import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.web.servlet.handler.RequestHandler;
 import org.openqa.grid.web.servlet.handler.RequestType;
 import org.openqa.grid.web.servlet.handler.SeleniumBasedRequest;
@@ -154,6 +155,10 @@ public class MobileGridRegistryTest {
     private RequestHandler request(String platform) {
         Map<String, Object> capabilities = new HashMap<>();
         capabilities.put("platformName", platform);
+        return request(capabilities);
+    }
+
+    private RequestHandler request(Map<String, Object> capabilities) {
         HttpServletRequest servletRequest = (HttpServletRequest) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[] {HttpServletRequest.class}, (proxy, method, args) -> null);
         SeleniumBasedRequest request = new SeleniumBasedRequest(servletRequest, registry, RequestType.START_SESSION, capabilities) {
@@ -191,6 +196,35 @@ public class MobileGridRegistryTest {
                 Assert.fail("Timed out waiting for " + what);
             }
             Thread.sleep(20);
+        }
+    }
+
+    @Test
+    public void playwrightSessionIsRefusedBeforeTheQueueWhileTheOptionIsOff() {
+        TestProxy proxy = node(NODE_URL, "emulator-5554");
+        Map<String, Object> capabilities = new HashMap<>();
+        capabilities.put("platformName", "Android");
+        capabilities.put("appium:automationName", "Playwright");
+
+        GridException error = Assert.expectThrows(GridException.class, () -> request(capabilities));
+
+        Assert.assertEquals(error.getMessage(), PlaywrightSessions.DISABLED_MESSAGE);
+        Assert.assertEquals(registry.getNewSessionRequestCount(), 0);
+        Assert.assertFalse(proxy.isBusy(), "no device is taken for it");
+    }
+
+    @Test
+    public void playwrightSessionGetsADeviceWithTheOption() throws Exception {
+        PlaywrightSessions.setEnabled(true);
+        try {
+            node(NODE_URL, "emulator-5554");
+            Map<String, Object> capabilities = new HashMap<>();
+            capabilities.put("platformName", "Android");
+            capabilities.put("appium:automationName", "Playwright");
+
+            Assert.assertNotNull(boundSession(request(capabilities)));
+        } finally {
+            PlaywrightSessions.setEnabled(false);
         }
     }
 

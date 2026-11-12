@@ -29,6 +29,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PlaywrightServletTest {
@@ -42,6 +43,7 @@ public class PlaywrightServletTest {
     private final AtomicInteger open = new AtomicInteger();
     private final AtomicInteger closed = new AtomicInteger();
     private volatile Session nodeSession;
+    private final AtomicBoolean enabled = new AtomicBoolean(true);
 
     /**
      * The WebSocket of the driver on the node: answers every message with the same one.
@@ -128,7 +130,7 @@ public class PlaywrightServletTest {
             URI uri = URI.create("ws://127.0.0.1:" + nodePort + PlaywrightServlet.NODE_PATH + sessionId);
             return Optional.of(new PlaywrightServlet.Target("udid-1", uri, NodeRegistrationToken.of(TOKEN)::authenticate,
                     open::incrementAndGet, closed::incrementAndGet));
-        })), "/grid/admin/PlaywrightServlet/*");
+        }, enabled::get)), "/grid/admin/PlaywrightServlet/*");
         hub.setHandler(hubContext);
         hub.start();
 
@@ -166,6 +168,7 @@ public class PlaywrightServletTest {
 
     @Test
     public void passesTheMessagesWithTheHeadersOfPlaywrightAndTheNodeToken() throws Exception {
+        allClosed();
         int opened = open.get();
         int closedBefore = closed.get();
         Recorder recorder = new Recorder();
@@ -209,6 +212,19 @@ public class PlaywrightServletTest {
         nodeSession.close(StatusCode.SHUTDOWN, "session deleted");
         Assert.assertTrue(recorder.closedLatch.await(10, TimeUnit.SECONDS));
         Assert.assertEquals(recorder.closeStatus, StatusCode.SHUTDOWN);
+        // the bridge counts its close after the client gets it: not in the counters of the next test
+        allClosed();
+    }
+
+    @Test
+    public void refusedWhenThePlaywrightSessionsAreNotEnabled() {
+        enabled.set(false);
+        try {
+            ExecutionException error = Assert.expectThrows(ExecutionException.class, () -> connect("appium-1", new Recorder()));
+            Assert.assertEquals(upgradeStatus(error), 501);
+        } finally {
+            enabled.set(true);
+        }
     }
 
     @Test
@@ -222,6 +238,13 @@ public class PlaywrightServletTest {
         // a session of another automation: the node has no Playwright WebSocket for it
         ExecutionException error = Assert.expectThrows(ExecutionException.class, () -> connect("appium-2", new Recorder()));
         Assert.assertEquals(upgradeStatus(error), 502);
+    }
+
+    /**
+     * The bridges of the earlier tests are closed: every open one is counted as closed.
+     */
+    private void allClosed() throws InterruptedException {
+        waitFor(() -> open.get() == closed.get());
     }
 
     private static void waitFor(java.util.function.BooleanSupplier condition) throws InterruptedException {

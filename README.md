@@ -59,6 +59,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
 | `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
+| `PLAYWRIGHT_ENABLED` | `false` | Run the Playwright sessions: the option of the farm, see [Playwright](#playwright) |
 | `PLAYWRIGHT_IDLE_TIMEOUT` | `120` | A side of a Playwright WebSocket that answers no ping for it is closed with the other side, s; see [Playwright](#playwright) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
 
@@ -133,6 +134,7 @@ With `GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true` a request for a device that is 
 
 A Playwright session is an Appium session of the `Playwright` automation of [zebrunner/appium](https://github.com/zebrunner/appium#playwright) (`appium:automationName: Playwright`): the hub queues it, reserves the device in STF and releases it as any other session. The driver serves the Playwright server of the device on the WebSocket `/mcloud/playwright/<session id>` of the node, `PlaywrightServlet` passes the WebSocket of the client on to it: `ws://hub:4444/grid/admin/PlaywrightServlet/<Appium session id>` (`/mcloud/playwright/<session id>` of MCloud).
 
+- The Playwright sessions are an option of the farm, off by default: `PLAYWRIGHT_ENABLED=true` turns them on. Without it the hub refuses a new session of the `Playwright` automation before the queue (`Playwright sessions are not enabled on this grid`, as a device it does not have: no device is reserved) and the WebSocket with `501`; the other sessions are not affected.
 - The hub connects to the node first, with the node token of the node and the headers Playwright checks (`User-Agent`, its version) or uses (`x-playwright-*`), never the other headers of the client: an unknown session is `404`, a session the node does not serve (another automation) is `502`.
 - The frames are passed on in parts as they come, a message of any size (screenshots, traces).
 - While a WebSocket of the session is open the session does not time out: the client sends no WebDriver commands then. Playwright sends no pings, the hub pings both sides every 30 s; a side that answers nothing for `PLAYWRIGHT_IDLE_TIMEOUT` (a client that is gone without a close) is closed with the other one.

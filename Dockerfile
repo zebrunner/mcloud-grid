@@ -43,6 +43,8 @@ ENV \
     STF_TOKEN="" \
     STF_TIMEOUT=3600 \
     CHECK_APPIUM_STATUS=false \
+    # Playwright sessions (README.md#playwright), an option of the farm
+    PLAYWRIGHT_ENABLED=false \
     # Grid settings
     # As a boolean, maps to "throwOnCapabilityNotPresent"
     GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true \

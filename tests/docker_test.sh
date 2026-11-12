@@ -169,11 +169,16 @@ check_contains "MetricsServlet is registered" "mcloud_grid_new_session_requests 
 check "TerminateSessionServlet is registered (no running session)" "404" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Authorization: Bearer key' \
     'http://localhost:4444/grid/admin/TerminateSessionServlet?udid=x')"
-# the WebSocket support of Jetty starts with the servlet in the context of the hub of Selenium
-check "PlaywrightServlet is registered (no running session)" "404" \
+# the WebSocket support of Jetty starts with the servlet in the context of the hub of Selenium; the Playwright sessions
+# are off by default (PLAYWRIGHT_ENABLED)
+check "PlaywrightServlet is registered, the Playwright sessions are off" "501" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
     -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
     'http://localhost:4444/grid/admin/PlaywrightServlet/no-such-session')"
+check_contains "a Playwright session is refused while the option is off" "set PLAYWRIGHT_ENABLED=true of the hub" \
+  "$(docker exec "$CONTAINER" curl -s -H 'Content-Type: application/json' \
+    -d '{"capabilities":{"alwaysMatch":{"platformName":"Android","appium:automationName":"Playwright"}}}' \
+    http://localhost:4444/wd/hub/session)"
 check "grid console responds" "200" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
 
