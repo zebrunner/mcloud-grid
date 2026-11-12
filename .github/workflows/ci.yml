@@ -105,3 +105,12 @@ jobs:
             ${{ runner.temp }}/junit/
             target/surefire-reports/**/TEST-*.xml
             target/load-report/
+
+  # the image of a merge into develop to public.ecr.aws after all the checks (CONVENTIONS.md#versions)
+  publish:
+    needs: [lint, tests, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    permissions:
+      contents: read
+      id-token: write
+    uses: zebrunner/mcloud-conventions/.github/workflows/docker-publish.yml@v1

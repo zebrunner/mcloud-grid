@@ -5,6 +5,7 @@
 .venv
 target
 tests
+VERSION
 config
 scripts
 *.md
