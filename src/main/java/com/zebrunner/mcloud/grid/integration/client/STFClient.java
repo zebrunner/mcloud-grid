@@ -74,15 +74,16 @@ public final class STFClient {
      * one at a time, so it makes as few STF requests as possible: the device itself (not the list of all devices), the reservation
      * and, for Android, remoteConnect. The STF user of the token is requested only when the device already has an owner.
      *
+     * @param platform the platform of the device (of the node): a request may name the device by its udid or deviceName only
      * @return the reserved device, null if it is not reserved
      */
-    public static STFDevice reserveSTFDevice(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
+    public static STFDevice reserveSTFDevice(String deviceUDID, Platform platform, Map<String, Object> requestedCapabilities, String sessionUUID) {
         synchronized (deviceLock(deviceUDID)) {
-            return reserve(deviceUDID, requestedCapabilities, sessionUUID);
+            return reserve(deviceUDID, platform, requestedCapabilities, sessionUUID);
         }
     }
 
-    private static STFDevice reserve(String deviceUDID, Map<String, Object> requestedCapabilities, String sessionUUID) {
+    private static STFDevice reserve(String deviceUDID, Platform platform, Map<String, Object> requestedCapabilities, String sessionUUID) {
         LOGGER.fine(() -> String.format("[%s][%s] Reserving the device in STF.", deviceUDID, sessionUUID));
 
         String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TOKEN")
@@ -182,7 +183,7 @@ public final class STFClient {
             return notReady(deviceUDID, sessionUUID);
         }
 
-        if (Platform.ANDROID.equals(Platform.fromCapabilities(requestedCapabilities))) {
+        if (Platform.ANDROID.equals(platform)) {
             LOGGER.fine(() -> String.format("[%s][%s] Starting remoteConnect of the device.", deviceUDID, sessionUUID));
 
             HttpClient.Response<RemoteConnectUserDevice> remoteConnect = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
