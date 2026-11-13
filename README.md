@@ -24,7 +24,7 @@ make push VERSION=3.1    # built by docker buildx and pushed: docker login publi
 
 The image build compiles and packages the hub; tests and linters run separately (see [Development](#development)).
 
-The file `VERSION` is the release in work (bumped by hand after a release, CONVENTIONS.md#versions). The `publish` job of CI pushes the image of every merge into `develop` after all the checks passed: `public.ecr.aws/zebrunner/mcloud-grid:<VERSION>-develop-<sha>` (7 characters of the commit) and `<VERSION>-develop-latest`, the newest commit of `develop`.
+The file `VERSION` is the release in work (bumped by hand after a release, CONVENTIONS.md#versions), and the version of `pom.xml` with it (`PomVersionTest` checks it). The `publish` job of CI pushes the image of every merge into `develop` after all the checks passed: `public.ecr.aws/zebrunner/mcloud-grid:<VERSION>-develop-<sha>` (7 characters of the commit) and `<VERSION>-develop-latest`, the newest commit of `develop`.
 
 ## Run
 
