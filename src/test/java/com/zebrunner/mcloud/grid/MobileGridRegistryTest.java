@@ -87,6 +87,8 @@ public class MobileGridRegistryTest {
         final CountDownLatch prepareStarted = new CountDownLatch(1);
         final List<String> events = new CopyOnWriteArrayList<>();
         volatile CountDownLatch proceed = new CountDownLatch(0);
+        // the return of the device in STF (afterSession, abandon, releaseLostSession) waits for it
+        volatile CountDownLatch returned = new CountDownLatch(0);
         volatile boolean ready = true;
         volatile RuntimeException failure;
         volatile RuntimeException claimFailure;
@@ -99,6 +101,7 @@ public class MobileGridRegistryTest {
         @Override
         public void afterSession(TestSession session) {
             events.add("afterSession");
+            awaitReturn();
             if (afterSessionFailure != null) {
                 throw afterSessionFailure;
             }
@@ -132,11 +135,21 @@ public class MobileGridRegistryTest {
         @Override
         public void abandon(TestSession session) {
             events.add("abandon");
+            awaitReturn();
         }
 
         @Override
         public void releaseLostSession(TestSession session, SessionTerminationReason reason) {
             events.add("lost " + reason);
+            awaitReturn();
+        }
+
+        private void awaitReturn() {
+            try {
+                returned.await(WAIT.toSeconds(), TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -420,6 +433,60 @@ public class MobileGridRegistryTest {
         await("the return of the device", () -> proxy.events.contains("abandon"));
         await("the release of the slot", () -> proxy.getTotalUsed() == 0);
         Assert.assertEquals(registry.getActiveSessions().size(), 0);
+    }
+
+    @Test
+    public void abandonedDeviceIsNotClaimedBeforeItsReturn() throws Exception {
+        TestProxy proxy = node(NODE_URL, "emulator-5554");
+        proxy.proceed = new CountDownLatch(1);
+        RequestHandler gone = request("Android");
+        Assert.assertTrue(proxy.prepareStarted.await(WAIT.toSeconds(), TimeUnit.SECONDS));
+        registry.removeNewSessionRequest(gone);
+        proxy.returned = new CountDownLatch(1);
+        proxy.proceed.countDown();
+        await("the return of the device", () -> proxy.events.contains("abandon"));
+
+        RequestHandler next = request("Android");
+        Thread.sleep(300);
+
+        // a reservation of the next request would be ended by the return in STF
+        Assert.assertEquals(proxy.events, List.of("prepare", "abandon"));
+        proxy.returned.countDown();
+        Assert.assertSame(boundSession(next).getSlot().getProxy(), proxy);
+    }
+
+    @Test
+    public void deviceOfALostNodeIsNotClaimedOnItsNewNodeBeforeItsReturn() throws Exception {
+        TestProxy old = node(NODE_URL, "emulator-5554");
+        boundSession(request("Android"));
+        old.returned = new CountDownLatch(1);
+        // the node registers again: the old node is lost with its session
+        TestProxy current = node(NODE_URL, "emulator-5554");
+        await("the return of the device", () -> old.events.contains("lost " + SessionTerminationReason.PROXY_REREGISTRATION));
+
+        RequestHandler next = request("Android");
+        Thread.sleep(300);
+
+        Assert.assertEquals(current.events, List.of());
+        old.returned.countDown();
+        Assert.assertSame(boundSession(next).getSlot().getProxy(), current);
+    }
+
+    @Test
+    public void deviceOfAnEndingSessionIsNotClaimedOnItsNewNodeBeforeItsReturn() throws Exception {
+        TestProxy old = node(NODE_URL, "emulator-5554");
+        TestSession session = boundSession(request("Android"));
+        old.returned = new CountDownLatch(1);
+        registry.terminate(session, SessionTerminationReason.CLIENT_STOPPED_SESSION);
+        await("the return of the device", () -> old.events.contains("afterSession"));
+        TestProxy current = node(NODE_URL, "emulator-5554");
+
+        RequestHandler next = request("Android");
+        Thread.sleep(300);
+
+        Assert.assertEquals(current.events, List.of());
+        old.returned.countDown();
+        Assert.assertSame(boundSession(next).getSlot().getProxy(), current);
     }
 
     @Test
