@@ -246,4 +246,48 @@ public class NodeAuthenticationTest {
         Assert.assertTrue(NodeAuthentication.host(invalid).isEmpty());
         Assert.assertTrue(rejection(authentication(), request("not a url", TOKEN)).contains("has no valid URL"));
     }
+
+    private static String randomToken(int i) {
+        return "mcn1.node-1." + ("Rnd" + i + "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde").substring(0, 43);
+    }
+
+    public void verificationsOfNewTokensAreLimitedPerHostAndForAllHosts() {
+        NodeAuthentication authentication = new NodeAuthentication(stfNodes, new VerificationLimit(now::get, 3, 5));
+        List<String> checkedHosts = new ArrayList<>();
+
+        // a token counted in this period is verified again: the nodes of a host share its token, a failed answer is not cached
+        stf.verifyAnswers(503);
+        for (int i = 0; i < 5; i++) {
+            Assert.assertTrue(rejection(authentication, request(NODE_URL, TOKEN)).contains("STF could not verify it (HTTP 503)"));
+        }
+        stf.server().verify(5, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
+        stf.reset();
+        stf.enrolledNode(TOKEN, "node-1", HOST);
+
+        authentication.accept(request(NODE_URL, TOKEN), checkedHosts::add);
+        rejection(authentication, request(NODE_URL, randomToken(1)));
+        rejection(authentication, request(NODE_URL, randomToken(2)));
+        stf.server().verify(3, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
+
+        // a new token of the host: neither the host check (DNS) nor STF
+        GridException e = Assert.expectThrows(GridException.class,
+                () -> authentication.accept(request(NODE_URL, randomToken(3)), checkedHosts::add));
+        Assert.assertTrue(e.getMessage().contains("is not registered now: the hub verifies with STF at most 3 node tokens of a host "
+                + "and 5 of all the hosts in 30s"), e.getMessage());
+        Assert.assertEquals(checkedHosts, List.of(HOST));
+        stf.server().verify(3, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
+        // the answers STF gave recently are not limited
+        authentication.accept(request(NODE_URL, TOKEN), checkedHosts::add);
+        Assert.assertEquals(checkedHosts, List.of(HOST, HOST));
+
+        // another host has its own limit, all the hosts share one
+        rejection(authentication, request("http://10.0.0.6:7521", randomToken(4)));
+        rejection(authentication, request("http://10.0.0.7:7521", randomToken(5)));
+        Assert.assertTrue(rejection(authentication, request("http://10.0.0.8:7521", randomToken(6))).contains("is not registered now"));
+        stf.server().verify(5, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
+
+        now.set(now.get().plus(VerificationLimit.PERIOD));
+        Assert.assertTrue(rejection(authentication, request(NODE_URL, randomToken(7))).contains("has an unknown or revoked node token"));
+        stf.server().verify(6, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
+    }
 }

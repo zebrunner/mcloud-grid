@@ -10,6 +10,7 @@ import org.openqa.grid.common.exception.GridException;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -24,12 +25,18 @@ public final class NodeAuthentication {
     private static final Logger LOGGER = Logger.getLogger(NodeAuthentication.class.getName());
 
     private final NodeTokenVerifier verifier;
+    private final VerificationLimit limit;
 
     /**
      * @param verifier the node registry of STF, null when STF_URL and STF_TOKEN are not set (then no node is accepted)
      */
     public NodeAuthentication(NodeTokenVerifier verifier) {
+        this(verifier, new VerificationLimit(Instant::now));
+    }
+
+    NodeAuthentication(NodeTokenVerifier verifier, VerificationLimit limit) {
         this.verifier = verifier;
+        this.limit = limit;
     }
 
     /**
@@ -93,6 +100,7 @@ public final class NodeAuthentication {
      *
      * @param hostCheck the check of the host of the node URL (e.g. NODE_ALLOWED_NETWORKS), which throws a GridException
      *                  when the node may not register; it runs before the request to STF, after the checks without it
+     *                  and the {@link VerificationLimit} of the tokens STF did not answer recently
      * @throws GridException with the reason when the node may not register
      */
     public Accepted accept(RegistrationRequest request, Consumer<String> hostCheck) {
@@ -114,8 +122,13 @@ public final class NodeAuthentication {
             throw new GridException(String.format("Node %s (%s) has a node token, but STF_URL and STF_TOKEN of the hub are not set, "
                     + "so it is not registered.", node, token.getLabel()));
         }
+        Optional<StfNodes.Verification> cached = verifier.cached(token, host);
+        if (!cached.isPresent() && !limit.tryAcquire(token, host)) {
+            throw new GridException(String.format("Node %s (%s) is not registered now: the hub verifies with STF at most %s; "
+                    + "the node registers again later.", node, token.getLabel(), limit));
+        }
         hostCheck.accept(host);
-        StfNodes.Verification verification = verifier.verify(token, host);
+        StfNodes.Verification verification = cached.orElseGet(() -> verifier.verifyNow(token, host));
         switch (verification.getStatus()) {
         case VALID:
             LOGGER.fine(() -> String.format("[NODE REGISTRATION] Node %s is the enrolled node '%s', STF verified its node token.",
