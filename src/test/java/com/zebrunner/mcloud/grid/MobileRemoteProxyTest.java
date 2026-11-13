@@ -176,4 +176,12 @@ public class MobileRemoteProxyTest {
 
         Assert.assertTrue(IgnoredDevices.isIgnored(UDID));
     }
+
+    @Test
+    public void zeroNewCommandTimeoutLimitIsNoLimit() {
+        // MAX_NEW_COMMAND_TIMEOUT=0 used to set every newCommandTimeout to 0, which disables the timeout in Appium
+        Assert.assertNull(MobileRemoteProxy.newCommandTimeoutLimit(Duration.ZERO));
+        Assert.assertNull(MobileRemoteProxy.newCommandTimeoutLimit(null));
+        Assert.assertEquals(MobileRemoteProxy.newCommandTimeoutLimit(Duration.ofSeconds(300)), Duration.ofSeconds(300));
+    }
 }

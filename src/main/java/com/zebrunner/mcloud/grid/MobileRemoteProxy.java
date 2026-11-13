@@ -118,8 +118,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // adb/wda timeout
     private static final Duration UNHEALTHY_MOBILE_TIMEOUT = EnvUtils.getDurationInSeconds("UNHEALTHY_MOBILE_TIMEOUT", Duration.ofMinutes(1));
 
-    // optional upper limit of the 'appium:newCommandTimeout' capability, not set = no limit
-    private static final Duration MAX_NEW_COMMAND_TIMEOUT = EnvUtils.getDurationInSeconds("MAX_NEW_COMMAND_TIMEOUT", null);
+    // optional upper limit of the 'appium:newCommandTimeout' capability, not set or 0 = no limit
+    private static final Duration MAX_NEW_COMMAND_TIMEOUT = newCommandTimeoutLimit(EnvUtils.getDurationInSeconds("MAX_NEW_COMMAND_TIMEOUT", null));
 
     // a node registered with an address the hub cannot reach is rejected, see #144
     private static final boolean CHECK_NODE_REACHABILITY = !"false".equalsIgnoreCase(System.getenv("CHECK_NODE_REACHABILITY"));
@@ -529,6 +529,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      */
     public String getNodeLabel() {
         return nodeToken.getLabel();
+    }
+
+    /**
+     * @return the limit of 'newCommandTimeout', null (no limit) for 0: a limit of 0 would disable the timeout in Appium
+     */
+    static Duration newCommandTimeoutLimit(Duration configured) {
+        return configured == null || configured.isZero() ? null : configured;
     }
 
     /**
