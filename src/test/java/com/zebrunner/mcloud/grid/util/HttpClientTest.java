@@ -9,6 +9,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.time.Duration;
 import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
@@ -98,6 +99,23 @@ public class HttpClientTest {
         server.stubFor(get("/api/v1/user").willReturn(okJson("{\"success\":true}")));
 
         Assert.assertEquals(HttpClient.uri(Path.STF_USER_PATH, server.baseUrl()).get(User.class).getStatus(), 200);
+    }
+
+    @Test
+    public void slowAnswerTimesOutAfterTheDefaultTimeout() {
+        server.stubFor(get("/api/v1/user").willReturn(okJson("{\"success\":true}").withFixedDelay(3500)));
+
+        Assert.assertEquals(HttpClient.uri(Path.STF_USER_PATH, server.baseUrl()).get(User.class).getStatus(), 0);
+    }
+
+    @Test
+    public void socketTimeoutWaitsForASlowAnswer() {
+        server.stubFor(get("/api/v1/user").willReturn(okJson("{\"success\":true}").withFixedDelay(3500)));
+
+        Assert.assertEquals(HttpClient.uri(Path.STF_USER_PATH, server.baseUrl())
+                .withSocketTimeout(Duration.ofSeconds(6))
+                .get(User.class)
+                .getStatus(), 200);
     }
 
     @Test
