@@ -319,6 +319,39 @@ public class MobileGridRegistryTest {
     }
 
     @Test
+    public void nodeOfAnotherHostCannotTakeTheIdOfARegisteredNode() throws Exception {
+        TestProxy registered = node(NODE_URL, "emulator-5554");
+        TestSession session = boundSession(request("Android"));
+        RegistrationRequest request = GridFixtures.registrationRequest("http://127.0.0.2:4723", GridFixtures.androidNodeCaps("emulator-5556"));
+        request.getConfiguration().id = NODE_URL;
+
+        GridException e = Assert.expectThrows(GridException.class, () -> new MobileRemoteProxy(request, registry));
+
+        Assert.assertEquals(e.getMessage(), "Node http://127.0.0.2:4723 registers with the id 'http://localhost:4723' of the node "
+                + "http://localhost:4723 at another host, so it is not registered: the id of a node must be its own "
+                + "(zebrunner/appium uses the URL of the node).");
+        Assert.assertSame(registry.getProxyById(NODE_URL), registered);
+        Assert.assertSame(session.getSlot().getSession(), session);
+        Assert.assertEquals(registry.getActiveSessions().size(), 1);
+    }
+
+    @Test
+    public void nodeOfAnotherHostAddedLaterDoesNotReplaceTheRegisteredNode() throws Exception {
+        // two registrations at once: the proxy of the other host is made before the first node is added
+        RegistrationRequest request = GridFixtures.registrationRequest("http://127.0.0.2:4723", GridFixtures.androidNodeCaps("emulator-5556"));
+        request.getConfiguration().id = NODE_URL;
+        MobileRemoteProxy other = new MobileRemoteProxy(request, registry);
+        TestProxy registered = node(NODE_URL, "emulator-5554");
+        TestSession session = boundSession(request("Android"));
+
+        registry.add(other);
+
+        Assert.assertSame(registry.getProxyById(NODE_URL), registered);
+        Assert.assertEquals(registry.getAllProxies().size(), 1);
+        Assert.assertSame(session.getSlot().getSession(), session);
+    }
+
+    @Test
     public void timeoutsOfTheHubReplaceTheOnesOfTheNode() {
         TestProxy proxy = node(NODE_URL, "emulator-5554");
 

@@ -177,6 +177,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         // was checked when it was added, a node with its id at another address is a new one
         // NODE_ALLOWED_NETWORKS is checked with the token, see acceptRegistration
         RemoteProxy known = registry.getProxyById(getId());
+        // the registry replaces the node with the same id and ends its sessions: only the node of the same host may
+        // (MobileGridRegistry checks it again when it adds the node)
+        if (known instanceof MobileRemoteProxy && !((MobileRemoteProxy) known).isAtHostOf(this)) {
+            String message = idOfAnotherNode(this, known);
+            warnAboutRejectedNode(String.valueOf(getRemoteHost()), message);
+            throw new GridException(message);
+        }
         boolean registered = known != null && String.valueOf(known.getRemoteHost()).equals(String.valueOf(getRemoteHost()));
         if (CHECK_NODE_REACHABILITY && !registered) {
             URL nodeUrl = getRemoteHost();
@@ -522,6 +529,22 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             registry.removeIfPresent(this);
         }
         stopNodeTokenCheck();
+    }
+
+    /**
+     * @return true if the other node is at the host of this one, the host STF verified the node token for
+     */
+    public boolean isAtHostOf(MobileRemoteProxy other) {
+        return nodeHost != null && nodeHost.equalsIgnoreCase(other.nodeHost);
+    }
+
+    /**
+     * @return the reason why the node may not take the id of the registered one
+     */
+    static String idOfAnotherNode(RemoteProxy node, RemoteProxy registered) {
+        return String.format("Node %s registers with the id '%s' of the node %s at another host, so it is not registered: "
+                + "the id of a node must be its own (zebrunner/appium uses the URL of the node).", node.getRemoteHost(), node.getId(),
+                registered.getRemoteHost());
     }
 
     /**
