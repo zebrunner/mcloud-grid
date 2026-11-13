@@ -52,6 +52,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -387,19 +388,34 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         disconnectSTFDevice(session);
     }
 
+    /**
+     * The session is active (e.g. listed by AllSessionsServlet) when beforeSession changes its requested capabilities:
+     * the changes and {@link #requestedCapabilities(TestSession)} take the lock of the session.
+     */
     @Override
     public void beforeSession(TestSession session) {
         String internalKey = session.getInternalKey();
-        if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
-            //override platformName for the appium capabilities into tvOS
-            LOGGER.fine(() -> String.format("[%s][%s] tvOS device: 'platformName' of the session is tvOS.", udid, internalKey));
-            session.getRequestedCapabilities()
-                    .put(CapabilityType.PLATFORM_NAME, "tvOS");
+        synchronized (session) {
+            if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
+                //override platformName for the appium capabilities into tvOS
+                LOGGER.fine(() -> String.format("[%s][%s] tvOS device: 'platformName' of the session is tvOS.", udid, internalKey));
+                session.getRequestedCapabilities()
+                        .put(CapabilityType.PLATFORM_NAME, "tvOS");
+            }
+            limitNewCommandTimeout(session.getRequestedCapabilities(), internalKey);
+            // the hub keeps the personal STF token of the session (STF_TOKEN of the session), Appium would log it
+            for (String name : new String[] {"zebrunner:" + STF_TOKEN, "appium:" + STF_TOKEN, STF_TOKEN}) {
+                session.getRequestedCapabilities().remove(name);
+            }
         }
-        limitNewCommandTimeout(session.getRequestedCapabilities(), internalKey);
-        // the hub keeps the personal STF token of the session (STF_TOKEN of the session), Appium would log it
-        for (String name : new String[] {"zebrunner:" + STF_TOKEN, "appium:" + STF_TOKEN, STF_TOKEN}) {
-            session.getRequestedCapabilities().remove(name);
+    }
+
+    /**
+     * @return a copy of the requested capabilities of the session, safe while beforeSession changes them
+     */
+    public static Map<String, Object> requestedCapabilities(TestSession session) {
+        synchronized (session) {
+            return new LinkedHashMap<>(session.getRequestedCapabilities());
         }
     }
 
