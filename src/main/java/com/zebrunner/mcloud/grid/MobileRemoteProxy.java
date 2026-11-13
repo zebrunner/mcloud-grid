@@ -78,6 +78,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String IS_MANUALLY_RESERVED = "IS_MANUALLY_RESERVED";
     private static final String STF_DISCONNECTED = "STF_DISCONNECTED";
+    /** {@link #terminateSession}: the session ended meanwhile, its device is returned in STF (or reserved by the next session). */
+    public static final int SESSION_ENDED = -1;
     private static final String STF_TOKEN = "STF_TOKEN";
     private static final String STARTED_LOGGED = "STARTED_LOGGED";
     private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
@@ -585,14 +587,22 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      * Returns the device to STF once per session: on inactivity timeout the grid calls both beforeRelease and afterSession.
      */
     private void disconnectSTFDevice(TestSession session) {
-        if (!STFClient.isSTFEnabled() || session.get(STF_DISCONNECTED) != null) {
+        if (!STFClient.isSTFEnabled()) {
             return;
         }
-        session.put(STF_DISCONNECTED, true);
-        String stfToken = Optional.ofNullable(session.get(STF_TOKEN))
-                .map(String::valueOf)
-                .orElse(STFClient.DEFAULT_STF_TOKEN);
-        STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), stfToken, session.getInternalKey());
+        // under the lock of the device: terminateSession must not release it after it is returned (and reserved again)
+        STFClient.withDeviceLock(udid, () -> {
+            if (session.get(STF_DISCONNECTED) != null) {
+                return null;
+            }
+            session.put(STF_DISCONNECTED, true);
+            String stfToken = Optional.ofNullable(session.get(STF_TOKEN))
+                    .map(String::valueOf)
+                    .orElse(STFClient.DEFAULT_STF_TOKEN);
+            STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), stfToken,
+                    session.getInternalKey());
+            return null;
+        });
     }
 
     /**
@@ -601,16 +611,25 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      * or for an STF admin, so a key of any other user is refused (403) and the session keeps running. Whether the key belongs
      * to an admin is not checked here, STF decides.
      *
-     * @return HTTP status of the STF release: 200 when the session is terminated
+     * @return HTTP status of the STF release: 200 when the session is terminated; {@link #SESSION_ENDED} when the session
+     *         ended meanwhile: its device is not released, it may be reserved by the next session already
      */
     public int terminateSession(TestSession session, String stfToken) {
         String internalKey = session.getInternalKey();
-        int status = STFClient.releaseDevice(udid, platform, stfToken, internalKey);
+        int status = STFClient.withDeviceLock(udid, () -> {
+            if (session.get(STF_DISCONNECTED) != null) {
+                return SESSION_ENDED;
+            }
+            int released = STFClient.releaseDevice(udid, platform, stfToken, internalKey);
+            if (released == 200) {
+                // the device is already released in STF, afterSession must not return it again with the grid token
+                session.put(STF_DISCONNECTED, true);
+            }
+            return released;
+        });
         if (status != 200) {
             return status;
         }
-        // the device is already released in STF, afterSession must not return it again with the grid token
-        session.put(STF_DISCONNECTED, true);
         if (session.getExternalKey() != null && !session.sendDeleteSessionRequest()) {
             LOGGER.warning(() -> String.format("[%s][%s] Node did not delete the Appium session %s, the device is released anyway.",
                     udid, internalKey, describeExternalSession(session)));

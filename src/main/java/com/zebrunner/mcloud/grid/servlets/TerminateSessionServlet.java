@@ -100,6 +100,10 @@ public class TerminateSessionServlet extends RegistryBasedServlet {
         case 200:
             respond(resp, HttpServletResponse.SC_OK, true, "The session is terminated and the device is released.", proxy.getUdid(), sessionId);
             break;
+        case MobileRemoteProxy.SESSION_ENDED:
+            respond(resp, HttpServletResponse.SC_NOT_FOUND, false, "No running session matches the request: the session ended.",
+                    proxy.getUdid(), sessionId);
+            break;
         case 401:
             respond(resp, HttpServletResponse.SC_UNAUTHORIZED, false, "STF did not accept the key.", proxy.getUdid(), sessionId);
             break;

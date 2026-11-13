@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -296,6 +297,15 @@ public final class STFClient {
      */
     private static Object deviceLock(String udid) {
         return DEVICE_LOCKS.computeIfAbsent(udid, key -> new Object());
+    }
+
+    /**
+     * Runs the action under the lock of the device that its reservation and its return in STF take.
+     */
+    public static <T> T withDeviceLock(String udid, Supplier<T> action) {
+        synchronized (deviceLock(udid)) {
+            return action.get();
+        }
     }
 
     /**

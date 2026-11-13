@@ -109,6 +109,31 @@ public class TerminateSessionServletStfTest {
         stf.server().verify(0, deleteRequestedFor(urlEqualTo(DEVICE_PATH)).withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN)));
     }
 
+    public void sessionThatEndedIsNotReleasedAgain() {
+        // the session ended (its device is returned, it may be reserved by the next session) after the servlet found it
+        proxy.afterSession(session);
+        stf.server().resetRequests();
+
+        Assert.assertEquals(proxy.terminateSession(session, "user-key"), MobileRemoteProxy.SESSION_ENDED);
+        stf.server().verify(0, deleteRequestedFor(urlMatching("/api/v1/user/devices/.*")));
+        stf.server().verify(0, deleteRequestedFor(urlEqualTo("/wd/hub/session/" + APPIUM_SESSION)));
+    }
+
+    public void returnOfTheSessionWaitsForItsTermination() throws Exception {
+        stf.server().stubFor(delete(DEVICE_PATH).withHeader("Authorization", equalTo("Bearer user-key"))
+                .willReturn(okJson("{\"success\":true}").withFixedDelay(500)));
+        Thread termination = new Thread(() -> proxy.terminateSession(session, "user-key"));
+        termination.start();
+        // the release in STF takes 500 ms
+        Thread.sleep(200);
+
+        // the end of the session meanwhile: the device is released by the termination only, not returned again
+        proxy.afterSession(session);
+        termination.join();
+        stf.server().verify(1, deleteRequestedFor(urlEqualTo(DEVICE_PATH)));
+        stf.server().verify(0, deleteRequestedFor(urlEqualTo(DEVICE_PATH)).withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN)));
+    }
+
     public void findsSessionByAppiumSessionId() throws Exception {
         ServletStubs.Response response = terminate("Bearer admin-key", Map.of("sessionId", APPIUM_SESSION));
 
