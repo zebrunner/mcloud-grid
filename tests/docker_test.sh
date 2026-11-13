@@ -1,5 +1,6 @@
 #!/bin/bash
-# Checks of the docker image: build, unprivileged user, no start without STF, config generation from env vars, options
+# Checks of the docker image: build, unprivileged user, the start without STF, the validation of the configuration (exit 0),
+# config generation from env vars, options
 # passed to the JVM and the hub, hub status, node registration with node tokens verified by a fake STF and graceful
 # shutdown.
 # IMAGE overrides the tag of the built image.
@@ -13,6 +14,7 @@ IMAGE="${IMAGE:-mcloud-grid:test}"
 CONTAINER="mcloud-grid-test-$$"
 NO_STF_CONTAINER="${CONTAINER}-no-stf"
 STF_DOWN_CONTAINER="${CONTAINER}-stf-down"
+INVALID_CONTAINER="${CONTAINER}-invalid"
 STF_TOKEN="stf-admin-token-$$"
 # the node token of the node enrolled at 192.0.2.3 in the fake STF; its secret part is looked for in the logs
 NODE_SECRET="AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde"
@@ -23,7 +25,7 @@ STF_PID=""
 # called by the EXIT trap of lib.sh
 # shellcheck disable=SC2329
 cleanup() {
-  docker rm -f "$CONTAINER" "$NO_STF_CONTAINER" "$STF_DOWN_CONTAINER" > /dev/null 2>&1 || true
+  docker rm -f "$CONTAINER" "$NO_STF_CONTAINER" "$STF_DOWN_CONTAINER" "$INVALID_CONTAINER" > /dev/null 2>&1 || true
   if [[ -n "$STF_PID" ]]; then
     kill "$STF_PID" 2> /dev/null || true
   fi
@@ -109,6 +111,22 @@ wait_hub() {
   echo "$status"
 }
 
+section "configuration"
+# every invalid variable of config.json is logged, then the container exits with 0: a restart does not fix it
+docker run --name "$INVALID_CONTAINER" --env GRID_TIMEOUT=1h --env GRID_DEBUG= --env GRID_CLEAN_UP_CYCLE=0 \
+  --env GRID_NEW_SESSION_WAIT_TIMEOUT=0600000 --env 'GRID_CAPABILITY_MATCHER=a"b' "$IMAGE" > "$WORK/invalid.log" 2>&1
+check "an invalid configuration exits with 0" "0" "$?"
+logs="$(cat "$WORK/invalid.log")"
+check_contains "an invalid number is logged" "GRID_TIMEOUT '1h' is not a whole number of at least 0." "$logs"
+check_contains "an empty boolean is logged" "GRID_DEBUG '' is not true or false." "$logs"
+check_contains "a number below the minimum is logged" "GRID_CLEAN_UP_CYCLE '0' is not a whole number of at least 1." "$logs"
+check_contains "a number that is not a JSON number is logged" "GRID_NEW_SESSION_WAIT_TIMEOUT '0600000' is not a whole number" "$logs"
+check_contains "an invalid class name is logged" "GRID_CAPABILITY_MATCHER 'a\\\"b' is not the name of a Java class." "$logs"
+check_not_contains "the hub is not started with an invalid configuration" "Starting Selenium hub" "$logs"
+check "the log lines of the validation are JSON" "ok" \
+  "$(python3 -c 'import json, sys; [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]; print("ok")' "$WORK/invalid.log" 2>&1)"
+docker rm -f "$INVALID_CONTAINER" > /dev/null 2>&1
+
 section "STF"
 # without STF_URL and STF_TOKEN the hub starts (the first start of MCloud, before an access token of STF) and refuses every
 # node: no node token could be verified (see "node registration")
@@ -143,6 +161,7 @@ docker run --detach --name "$CONTAINER" \
   --env STF_TOKEN="$STF_TOKEN" \
   --env CHECK_NODE_REACHABILITY=false \
   --env GRID_TIMEOUT=77 \
+  --env GRID_CLEAN_UP_CYCLE=3000 \
   --env GRID_NEW_SESSION_WAIT_TIMEOUT=12345 \
   --env JAVA_HEAP_OPTS="-Xms64m -Xmx512m" \
   --env JAVA_OPTS="-Dmcloud.test=true" \
@@ -155,7 +174,8 @@ config="$(docker exec "$CONTAINER" cat /opt/selenium/config.json)"
 check_contains "config.json takes GRID_TIMEOUT" '"timeout": 77,' "$config"
 check_contains "config.json takes GRID_NEW_SESSION_WAIT_TIMEOUT" '"newSessionWaitTimeout": 12345,' "$config"
 check_contains "config.json takes the default GRID_BROWSER_TIMEOUT" '"browserTimeout": 900,' "$config"
-check_contains "config.json uses the mobile proxy" '"proxy": "com.zebrunner.mcloud.grid.MobileRemoteProxy"' "$config"
+check_contains "config.json takes GRID_CLEAN_UP_CYCLE" '"cleanUpCycle": 3000,' "$config"
+check_not_contains "config.json names no proxy: every node names its own" '"proxy"' "$config"
 check_contains "config.json uses the mobile capability matcher" '"capabilityMatcher": "com.zebrunner.mcloud.grid.MobileCapabilityMatcher"' "$config"
 check_contains "config.json uses the mobile registry" '"registry": "com.zebrunner.mcloud.grid.MobileGridRegistry"' "$config"
 check_contains "config.json turns the lifecycle servlet off" '"org.openqa.grid.web.servlet.LifecycleServlet"' "$config"

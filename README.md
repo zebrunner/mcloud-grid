@@ -46,11 +46,11 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `GRID_NEW_SESSION_WAIT_TIMEOUT` | `600000` | How long a new session request waits in the queue, ms |
 | `GRID_TIMEOUT` | `150` | Client inactivity timeout of a session, s; it replaces the one of the nodes (`0` keeps the one of the nodes) |
 | `GRID_BROWSER_TIMEOUT` | `900` | Timeout of a command on the node, s (0 = none); it replaces the one of the nodes (zebrunner/appium sends `0`): a hung command fails after it and the device is released, instead of staying busy until the restart of the hub |
-| `GRID_CLEAN_UP_CYCLE` | `5000` | How often the hub checks timed out sessions, ms |
+| `GRID_CLEAN_UP_CYCLE` | `5000` | How often the hub checks timed out sessions, ms; it replaces the one of the nodes (zebrunner/appium sends `5000`) |
 | `GRID_THROW_ON_CAPABILITY_NOT_PRESENT` | `true` | Reject requests no registered device can serve; see [Queueing](#queueing) |
 | `GRID_JETTY_MAX_THREADS` | `-1` | Jetty threads of the hub (-1 = default) |
 | `GRID_DEBUG` | `false` | Debug logging of the hub |
-| `GRID_PROXY`, `GRID_CAPABILITY_MATCHER` | mobile proxy and matcher | Classes of the node proxy and capability matcher; a node names the class of its proxy itself, the hub registers only `MobileRemoteProxy` (and its subclasses), see [Node registration](#node-registration) |
+| `GRID_CAPABILITY_MATCHER` | `com.zebrunner.mcloud.grid.MobileCapabilityMatcher` | Class of the capability matcher; the class of the proxy is named by every node itself, the hub registers only `MobileRemoteProxy` (and its subclasses), see [Node registration](#node-registration); `GRID_PROXY` of the older images is ignored |
 | `JAVA_HEAP_OPTS` | `-Xms1G -Xmx4G` | JVM heap of the hub |
 | `JAVA_OPTS` | | Other JVM options |
 | `JAVA_HOME`, `PATH`, `LANG` | `/opt/java/openjdk`, its `bin` first, `C.UTF-8` | The Java runtime of the image (Temurin 11, the modules of the hub only) and the UTF-8 locale |
@@ -62,6 +62,8 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `PLAYWRIGHT_ENABLED` | `false` | Run the Playwright sessions: the option of the farm, see [Playwright](#playwright) |
 | `PLAYWRIGHT_IDLE_TIMEOUT` | `120` | A side of a Playwright WebSocket that answers no ping for it is closed with the other side, s; see [Playwright](#playwright) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
+
+The variables of the hub config (`GRID_*`) are validated before the hub starts, see [Exit codes and health](#exit-codes-and-health): the numbers are whole numbers (`GRID_NEW_SESSION_WAIT_TIMEOUT` and `GRID_JETTY_MAX_THREADS` at least `-1`, `GRID_TIMEOUT` and `GRID_BROWSER_TIMEOUT` at least `0`, `GRID_CLEAN_UP_CYCLE` at least `1`), the booleans `true` or `false`.
 
 ### STF and device health
 
@@ -199,6 +201,13 @@ A registered node that disappears with `[NODE TOKEN] STF does not accept the nod
 ### No node registers
 
 `STF_URL and STF_TOKEN are not set` in the log of the start (`SEVERE`) and `STF_URL and STF_TOKEN of the hub are not set` for every node: set both and restart the hub, it verifies the node tokens with STF.
+
+## Exit codes and health
+
+- The entrypoint validates the variables of the hub config (`GRID_*`) first: every invalid one is logged (`SEVERE`, e.g. `GRID_TIMEOUT '1h' is not a whole number of at least 0.`), then the container exits with `0`, so a restart policy does not restart it: a restart does not fix the configuration. Fix the variables and start the container again.
+- `1`: `/opt/selenium/config.json` could not be written, a restart may fix it.
+- Otherwise the container runs the hub until it stops: `docker stop` stops it gracefully (`shutdown complete` in the log).
+- The healthcheck of the image is `GET /wd/hub/status` of the hub every 30 s (timeout 5 s, 3 retries, start period 30 s).
 
 ## Development
 

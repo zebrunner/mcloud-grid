@@ -1,4 +1,5 @@
 #!/bin/bash
+# Prints config.json of the hub; entrypoint.sh validates the variables first.
 
 cat << _EOF
 {
@@ -14,7 +15,6 @@ cat << _EOF
   "browserTimeout": $GRID_BROWSER_TIMEOUT,
   "timeout": $GRID_TIMEOUT,
   "debug": $GRID_DEBUG,
-  "proxy": "$GRID_PROXY",
   "registry": "com.zebrunner.mcloud.grid.MobileGridRegistry",
   "servlets": [
     "com.zebrunner.mcloud.grid.servlets.AllSessionsServlet",
