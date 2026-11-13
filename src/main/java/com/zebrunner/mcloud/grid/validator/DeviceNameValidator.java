@@ -31,7 +31,6 @@ public class DeviceNameValidator implements Validator {
             return false;
         }
 
-        //todo add trim
-        return Arrays.asList(expectedValue.split(",")).contains(actualValue);
+        return Arrays.stream(expectedValue.split(",")).map(String::trim).anyMatch(actualValue::equals);
     }
 }

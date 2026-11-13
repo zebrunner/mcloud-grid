@@ -92,7 +92,7 @@ matching devices: busy, down and ignored ones with the reason (e.g. `low battery
 | --- | --- |
 | `platformName` | `Android`, `iOS`, ... |
 | `appium:platformVersion` | Exact (`13`), range (`11-13`), minimum (`12+`) or list (`12,14`); `7` matches `7.0` |
-| `appium:deviceName`, `appium:udid` | One value or a comma separated list |
+| `appium:deviceName`, `appium:udid` | One value or a comma separated list (the spaces around the values are ignored) |
 | `zebrunner:deviceType` | `phone`, `tablet`, `tv`, `tvOS`, ...; `tvOS` devices get `platformName=tvOS` |
 | `zebrunner:STF_TOKEN` | Personal STF token: the device is reserved as that user and is not returned after the session; the hub does not pass it to Appium |
 | `zebrunner:STF_TIMEOUT` | Reservation timeout in STF for this session, s |

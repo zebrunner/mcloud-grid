@@ -82,6 +82,9 @@ public class ValidatorsTest {
                 {"a", "b", false},
                 {"a,b,c", "b", true},
                 {"a,b,c", "d", false},
+                {"a, b ,c", "b", true},
+                {" a", "a", true},
+                {"a, b", "a,", false},
         };
     }
 
@@ -145,6 +148,13 @@ public class ValidatorsTest {
         Map<String, Object> requestedCaps = requested == null ? caps() : caps("platformName", requested);
         Map<String, Object> nodeCaps = node == null ? caps() : caps("platformName", node);
         Assert.assertEquals(new MobilePlatformValidator().apply(nodeCaps, requestedCaps), Boolean.valueOf(expected));
+    }
+
+    @Test
+    public void mobilePlatformOfAnotherTypeIsComparedAsString() {
+        // a request with a number or a list used to fail the matching with ClassCastException
+        Assert.assertFalse(new MobilePlatformValidator().apply(caps("platformName", "ANDROID"), caps("platformName", 1)));
+        Assert.assertFalse(new MobilePlatformValidator().apply(caps("platformName", "ANDROID"), caps("platformName", java.util.List.of("iOS"))));
     }
 
     @Test
