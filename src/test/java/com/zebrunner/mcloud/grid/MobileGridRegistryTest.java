@@ -56,6 +56,7 @@ public class MobileGridRegistryTest {
         config.port = 0;
         config.timeout = 77;
         config.browserTimeout = 900;
+        config.cleanUpCycle = 3000;
         config.newSessionWaitTimeout = (int) WAIT.toMillis();
         config.throwOnCapabilityNotPresent = false;
         registry = new Hub(config).getRegistry();
@@ -144,6 +145,7 @@ public class MobileGridRegistryTest {
         RegistrationRequest request = GridFixtures.registrationRequest(url, GridFixtures.androidNodeCaps(udid));
         request.getConfiguration().timeout = 150;
         request.getConfiguration().browserTimeout = 0;
+        request.getConfiguration().cleanUpCycle = 5000;
         TestProxy proxy = new TestProxy(request, registry);
         registry.add(proxy);
         return proxy;
@@ -324,6 +326,7 @@ public class MobileGridRegistryTest {
 
         Assert.assertEquals(proxy.getConfig().timeout, Integer.valueOf(77));
         Assert.assertEquals(proxy.getConfig().browserTimeout, Integer.valueOf(900));
+        Assert.assertEquals(proxy.getConfig().cleanUpCycle, Integer.valueOf(3000));
     }
 
     @Test

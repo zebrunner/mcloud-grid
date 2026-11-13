@@ -57,8 +57,6 @@ ENV \
     GRID_TIMEOUT=150 \
     # Debug
     GRID_DEBUG=false \
-    # Proxy
-    GRID_PROXY=com.zebrunner.mcloud.grid.MobileRemoteProxy \
     # Capability matcher
     GRID_CAPABILITY_MATCHER=com.zebrunner.mcloud.grid.MobileCapabilityMatcher \
     # JVM heap of the hub; other JVM options can be added with JAVA_OPTS
