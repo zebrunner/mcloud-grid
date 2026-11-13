@@ -96,7 +96,7 @@ matching devices: busy, down and ignored ones with the reason (e.g. `low battery
 | `zebrunner:deviceType` | `phone`, `tablet`, `tv`, `tvOS`, ...; `tvOS` devices get `platformName=tvOS` |
 | `zebrunner:STF_TOKEN` | Personal STF token: the device is reserved as that user and is not returned after the session; the hub does not pass it to Appium |
 | `zebrunner:STF_TIMEOUT` | Reservation timeout in STF for this session, s |
-| `zebrunner:enableAdb` | Android: wait for the remote ADB connection of STF before the session |
+| `zebrunner:enableAdb` | Android: wait for the remote ADB connection of STF before the session; the hub starts the remote ADB (`remoteURL` of `zebrunner:slotCapabilities`) of every Android device, by the platform of its node, also for a request without `platformName` (e.g. by `appium:udid` only) |
 
 The node capabilities of the reserved device are passed to the session as `zebrunner:slotCapabilities`.
 

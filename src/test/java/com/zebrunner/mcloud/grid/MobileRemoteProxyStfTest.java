@@ -113,6 +113,22 @@ public class MobileRemoteProxyStfTest {
         Assert.assertEquals(slotCaps.get("appium:udid"), ANDROID_UDID);
     }
 
+    @SuppressWarnings("unchecked")
+    public void sessionRequestedByUdidOnlyGetsRemoteAdbOfAndroidDevice() {
+        stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect"))
+                .willReturn(okJson("{\"success\":true,\"remoteConnectUrl\":\"10.0.0.1:7401\"}")));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID));
+        Map<String, Object> requested = new HashMap<>();
+        requested.put("appium:udid", ANDROID_UDID);
+        requested.put("zebrunner:enableAdb", true);
+
+        Assert.assertNotNull(proxy.getNewSession(requested));
+
+        stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices/" + ANDROID_UDID + "/remoteConnect")));
+        Map<String, Object> slotCaps = (Map<String, Object>) requested.get("zebrunner:slotCapabilities");
+        Assert.assertEquals(slotCaps.get("remoteURL"), "10.0.0.1:7401");
+    }
+
     public void iosNodeUsesWdaStatusCheck() {
         MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
 

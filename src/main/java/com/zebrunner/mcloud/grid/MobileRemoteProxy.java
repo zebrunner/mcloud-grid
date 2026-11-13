@@ -342,7 +342,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
 
             if (STFClient.isSTFEnabled()) {
-                STFDevice device = STFClient.reserveSTFDevice(udid, requestedCapability, internalKey);
+                STFDevice device = STFClient.reserveSTFDevice(udid, platform, requestedCapability, internalKey);
                 if (device == null) {
                     return false;
                 }

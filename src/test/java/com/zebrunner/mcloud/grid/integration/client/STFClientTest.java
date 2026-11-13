@@ -95,7 +95,7 @@ public class STFClientTest {
     public void reservesFreeIosDevice() {
         stf.devices(device(UDID));
 
-        STFDevice device = STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION);
+        STFDevice device = STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION);
 
         Assert.assertNotNull(device);
         Assert.assertEquals(device.getSerial(), UDID);
@@ -108,15 +108,34 @@ public class STFClientTest {
     public void reservesFreeAndroidDeviceAndCallsRemoteConnect() {
         stf.devices(device(UDID));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("Android"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android"), SESSION));
         stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID + "/remoteConnect")));
+    }
+
+    public void androidDeviceRequestedWithoutPlatformNameGetsRemoteConnect() {
+        stf.devices(device(UDID));
+        // a request may name the device only: the platform is the one of the node
+        Map<String, Object> request = new HashMap<>(Map.of("appium:udid", UDID, "zebrunner:enableAdb", true));
+
+        STFDevice device = STFClient.reserveSTFDevice(UDID, Platform.ANDROID, request, SESSION);
+
+        Assert.assertNotNull(device);
+        Assert.assertEquals(device.getRemoteConnectUrl(), "10.0.0.1:7401");
+        stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID + "/remoteConnect")));
+    }
+
+    public void iosDeviceRequestedAsAndroidGetsNoRemoteConnect() {
+        stf.devices(device(UDID));
+
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("Android"), SESSION));
+        stf.server().verify(0, postRequestedFor(urlMatching(".*/remoteConnect")));
     }
 
     public void usesTokenAndTimeoutFromCapabilities() {
         stf.user("personal-token", "john");
         stf.devices(device(UDID));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID,
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS,
                 caps("iOS", "zebrunner:STF_TOKEN", "personal-token", "zebrunner:STF_TIMEOUT", "60"), SESSION));
         stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices"))
                 .withHeader("Authorization", equalTo("Bearer personal-token"))
@@ -127,7 +146,7 @@ public class STFClientTest {
         stf.devices(device(UDID));
         stf.rejectToken("wrong");
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS", "zebrunner:STF_TOKEN", "wrong"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS", "zebrunner:STF_TOKEN", "wrong"), SESSION));
         assertNoReservationRequest();
     }
 
@@ -153,7 +172,7 @@ public class STFClientTest {
         logger.addHandler(handler);
         try {
             stf.devices(device(UDID));
-            STFClient.reserveSTFDevice(UDID, caps("iOS", "zebrunner:STF_TOKEN", "secret-personal-token"), SESSION);
+            STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS", "zebrunner:STF_TOKEN", "secret-personal-token"), SESSION);
             stf.server().stubFor(com.github.tomakehurst.wiremock.client.WireMock.get("/api/v1/user").willReturn(aResponse().withStatus(401)));
             STFClient.disconnectAllDevices();
         } finally {
@@ -195,21 +214,21 @@ public class STFClientTest {
     public void unknownDeviceIsNotReserved() {
         stf.devices(device("another"));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertNoReservationRequest();
     }
 
     public void devicesEndpointFailureIsNotReserved() {
         stf.server().stubFor(com.github.tomakehurst.wiremock.client.WireMock.get("/api/v1/devices").willReturn(aResponse().withStatus(500)));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertNoReservationRequest();
     }
 
     public void deviceWithoutStatusIsIgnored() {
         stf.devices(device(UDID).status(null));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(10));
         assertNoReservationRequest();
     }
@@ -217,21 +236,21 @@ public class STFClientTest {
     public void unauthorizedDeviceIsIgnored() {
         stf.devices(device(UDID).status(2));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(10));
     }
 
     public void unhealthyDeviceIsIgnored() {
         stf.devices(device(UDID).status(7));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(1));
     }
 
     public void lowBatteryDeviceIsIgnoredForAnHour() {
         stf.devices(device(UDID).battery(14, 100, "charging"));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofHours(1));
         Assert.assertEquals(IgnoredDevices.get(UDID).get().getReason(), "low battery: 14% (charging), below 15%");
         assertNoReservationRequest();
@@ -240,7 +259,7 @@ public class STFClientTest {
     public void lowBatteryUsesScaleOfAndroid() {
         stf.devices(device(UDID).battery(7, 50, "discharging"));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android"), SESSION));
         assertIgnoredFor(Duration.ofHours(1));
         assertNoReservationRequest();
     }
@@ -248,27 +267,27 @@ public class STFClientTest {
     public void lowBatteryOfDeviceReservedByAnotherUserIgnoresItForAnHour() {
         stf.devices(device(UDID).owner("someone-else").battery(5, 100, "discharging"));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofHours(1));
     }
 
     public void deviceChargedToThresholdIsReserved() {
         stf.devices(device(UDID).battery(15, 100, "discharging"));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         Assert.assertFalse(IgnoredDevices.isIgnored(UDID));
     }
 
     public void deviceWithoutBatteryIsReserved() {
         stf.devices(device(UDID));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
     }
 
     public void lastBatteryOfAbsentDeviceIsNotChecked() {
         stf.devices(device(UDID).present(false).battery(3, 100, "discharging"));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(1));
         Assert.assertEquals(IgnoredDevices.get(UDID).get().getReason(), "device is not present or not ready in STF");
     }
@@ -299,7 +318,7 @@ public class STFClientTest {
     public void deviceReservedByAnotherUserIsIgnored() {
         stf.devices(device(UDID).owner("someone-else"));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(3));
         Assert.assertEquals(IgnoredDevices.get(UDID).get().getReason(), "device is reserved in STF by someone-else");
         assertNoReservationRequest();
@@ -308,21 +327,21 @@ public class STFClientTest {
     public void deviceAlreadyReservedBySameUserIsReused() {
         stf.devices(device(UDID).owner(BOT_USER));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertNoReservationRequest();
     }
 
     public void notReadyDeviceIsIgnored() {
         stf.devices(device(UDID).ready(false));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(1));
     }
 
     public void absentDeviceIsIgnored() {
         stf.devices(device(UDID).present(false));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(1));
     }
 
@@ -330,7 +349,7 @@ public class STFClientTest {
         stf.devices(device(UDID));
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(aResponse().withStatus(403)));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         assertIgnoredFor(Duration.ofMinutes(10));
     }
 
@@ -340,7 +359,7 @@ public class STFClientTest {
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
         stf.server().stubFor(put("/api/v1/devices/" + UDID).willReturn(okJson("{\"success\":true}")));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS", "zebrunner:STF_TOKEN", "personal-token"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS", "zebrunner:STF_TOKEN", "personal-token"), SESSION));
 
         // STF reads the update from the 'device' field; the operation needs an admin token, so the grid one is used
         stf.server().verify(putRequestedFor(urlEqualTo("/api/v1/devices/" + UDID))
@@ -353,7 +372,7 @@ public class STFClientTest {
         stf.devices(device(UDID));
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(aResponse().withStatus(403)));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         stf.server().verify(0, putRequestedFor(urlMatching("/api/v1/devices/.*")));
     }
 
@@ -361,7 +380,7 @@ public class STFClientTest {
         stf.devices(device(UDID));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(aResponse().withStatus(500)));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android"), SESSION));
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID)));
     }
 
@@ -369,7 +388,7 @@ public class STFClientTest {
         stf.devices(device(UDID));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(okJson("{\"success\":true}")));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android", "zebrunner:enableAdb", true), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android", "zebrunner:enableAdb", true), SESSION));
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID + "/remoteConnect")));
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID)));
     }
@@ -378,7 +397,7 @@ public class STFClientTest {
         stf.devices(device(UDID).owner(BOT_USER));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(aResponse().withStatus(500)));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android"), SESSION));
         stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID)));
     }
 
@@ -387,7 +406,7 @@ public class STFClientTest {
         stf.devices(device(UDID));
         stf.server().stubFor(post(urlMatching("/api/v1/user/devices/.*/remoteConnect")).willReturn(aResponse().withStatus(500)));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("Android", "zebrunner:STF_TOKEN", "personal-token"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android", "zebrunner:STF_TOKEN", "personal-token"), SESSION));
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID))
                 .withHeader("Authorization", equalTo("Bearer personal-token")));
     }
@@ -395,7 +414,7 @@ public class STFClientTest {
     public void enableAdbUsesRemoteConnectUrlOfRemoteConnect() {
         stf.devices(device(UDID));
 
-        STFDevice device = STFClient.reserveSTFDevice(UDID, caps("Android", "zebrunner:enableAdb", "true"), SESSION);
+        STFDevice device = STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android", "zebrunner:enableAdb", "true"), SESSION);
 
         Assert.assertNotNull(device);
         Assert.assertEquals(device.getRemoteConnectUrl(), "10.0.0.1:7401");
@@ -404,7 +423,7 @@ public class STFClientTest {
     public void reservationMakesMinimalStfRequests() {
         stf.devices(device(UDID));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("Android", "zebrunner:enableAdb", "true"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.ANDROID, caps("Android", "zebrunner:enableAdb", "true"), SESSION));
 
         // reservation runs while the hub matches all queued requests, one at a time
         stf.server().verify(1, getRequestedFor(urlEqualTo("/api/v1/devices/" + UDID)));
@@ -417,8 +436,8 @@ public class STFClientTest {
     public void userOfTokenIsRequestedOnceForOwnedDevices() {
         stf.devices(device(UDID).owner(BOT_USER));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
 
         stf.server().verify(1, getRequestedFor(urlEqualTo("/api/v1/user")));
     }
@@ -431,7 +450,7 @@ public class STFClientTest {
         release.start();
         Thread.sleep(200);
         long start = System.nanoTime();
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         long elapsedMs = (System.nanoTime() - start) / 1_000_000;
         release.join();
 
