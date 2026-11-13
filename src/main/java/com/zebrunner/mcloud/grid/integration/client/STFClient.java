@@ -527,17 +527,30 @@ public final class STFClient {
         return IS_STF_ENABLED;
     }
 
-    public static boolean isDevicePresentInSTF(String udid) {
+    /**
+     * STF binds a device to the enrolled node whose device container proved the registration of the device with the node
+     * token (the 'node' of the device), so a node may register only the devices STF has bound to it.
+     *
+     * @return why the node may not register the device, empty when the device is bound to the node in STF
+     */
+    public static Optional<String> checkDeviceOfNode(String udid, String nodeLabel) {
         if (!isSTFEnabled()) {
-            return true;
+            return Optional.empty();
         }
-        HttpClient.Response<DeviceResponse> device = getDevice(udid, DEFAULT_STF_TOKEN);
-        if (device.getStatus() != 200 || device.getObject() == null || device.getObject().getDevice() == null) {
-            // STF answers 500 instead of 404 for an unknown serial
-            LOGGER.warning(() -> String.format("[NODE REGISTRATION] Could not get the device '%s' from STF (HTTP %s), the node is not registered.",
-                    udid, device.getStatus()));
-            return false;
+        HttpClient.Response<DeviceResponse> response = getDevice(udid, DEFAULT_STF_TOKEN);
+        STFDevice device = response.getObject() == null ? null : response.getObject().getDevice();
+        // STF answers 500 instead of 404 for an unknown serial
+        if (response.getStatus() != 200 || device == null || !StringUtils.equals(device.getSerial(), udid)) {
+            return Optional.of(String.format("Could not find device with udid '%s' in STF (HTTP %s)", udid, response.getStatus()));
         }
-        return StringUtils.equals(device.getObject().getDevice().getSerial(), udid);
+        if (StringUtils.isBlank(device.getNode())) {
+            return Optional.of(String.format("Device with udid '%s' is not bound to a node in STF yet", udid));
+        }
+        if (!StringUtils.equals(device.getNode(), nodeLabel)) {
+            LOGGER.fine(() -> String.format("[NODE REGISTRATION] Device '%s' is bound to node '%s' in STF, node '%s' registers it.",
+                    udid, device.getNode(), nodeLabel));
+            return Optional.of(String.format("Device with udid '%s' is bound to another node in STF, not to '%s'", udid, nodeLabel));
+        }
+        return Optional.empty();
     }
 }

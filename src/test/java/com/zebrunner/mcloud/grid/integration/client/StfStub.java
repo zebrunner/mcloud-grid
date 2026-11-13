@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.integration.client;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import com.zebrunner.mcloud.grid.GridFixtures;
 
 import java.util.Arrays;
 import java.util.Locale;
@@ -107,6 +108,8 @@ public final class StfStub {
         private String owner;
         private String remoteConnectUrl;
         private String battery;
+        // the node STF bound the device to: the node of GridFixtures.NODE_TOKEN
+        private String node = GridFixtures.NODE_LABEL;
 
         private DeviceJson(String serial) {
             this.serial = serial;
@@ -137,6 +140,11 @@ public final class StfStub {
             return this;
         }
 
+        public DeviceJson node(String node) {
+            this.node = node;
+            return this;
+        }
+
         public DeviceJson battery(double level, double scale, String status) {
             this.battery = String.format(Locale.ROOT, "{\"level\":%s,\"scale\":%s,\"status\":\"%s\"}", level, scale, status);
             return this;
@@ -158,6 +166,9 @@ public final class StfStub {
             }
             if (remoteConnectUrl != null) {
                 json.append(",\"remoteConnectUrl\":\"").append(remoteConnectUrl).append('"');
+            }
+            if (node != null) {
+                json.append(",\"node\":\"").append(node).append('"');
             }
             return json.append('}').toString();
         }

@@ -244,11 +244,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         htmlRenderer = new ProxyHtmlRenderer(() -> this, udid);
 
         boolean knownDevice = registered && known instanceof MobileRemoteProxy && udid.equals(((MobileRemoteProxy) known).getUdid());
+        // a node registers only the devices STF bound to it: another node would get their sessions and remote ADB
         if (STFClient.isSTFEnabled() && !knownDevice) {
-            if (!STFClient.isDevicePresentInSTF(udid)) {
-                throw new GridException(String.format("Could not find device with udid '%s' in STF. Slot capabilities: %s",
-                        udid, slot.getCapabilities()));
-            }
+            STFClient.checkDeviceOfNode(udid, nodeToken.getLabel()).ifPresent(reason -> {
+                String message = String.format("Node %s ('%s'): %s, so it is not registered.", getRemoteHost(), nodeToken.getLabel(), reason);
+                warnAboutRejectedNode(String.valueOf(getRemoteHost()), message);
+                throw new GridException(message);
+            });
         }
     }
 

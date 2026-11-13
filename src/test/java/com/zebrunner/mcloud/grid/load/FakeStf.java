@@ -36,6 +36,8 @@ final class FakeStf implements AutoCloseable {
     private final long latencyMs;
     // serial -> owner name, "" when free
     private final Map<String, String> devices = new ConcurrentHashMap<>();
+    // serial -> label of the node the device is bound to
+    private final Map<String, String> deviceNodes = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> requests = new ConcurrentHashMap<>();
     // node token -> address of the node
     private final Map<String, String> nodes = new ConcurrentHashMap<>();
@@ -61,7 +63,11 @@ final class FakeStf implements AutoCloseable {
         return token;
     }
 
-    void addDevice(String serial) {
+    /**
+     * Adds a device bound to the node of the label, as STF binds the devices of an enrolled node.
+     */
+    void addDevice(String serial, String label) {
+        deviceNodes.put(serial, label);
         devices.put(serial, "");
     }
 
@@ -138,7 +144,7 @@ final class FakeStf implements AutoCloseable {
 
     private String device(String serial) {
         String owner = devices.getOrDefault(serial, "");
-        return "{\"serial\":\"" + serial + "\",\"present\":true,\"ready\":true,\"status\":3"
+        return "{\"serial\":\"" + serial + "\",\"present\":true,\"ready\":true,\"status\":3,\"node\":\"" + deviceNodes.get(serial) + "\""
                 + (owner.isEmpty() ? "" : ",\"owner\":{\"name\":\"" + owner + "\"}") + "}";
     }
 
