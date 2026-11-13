@@ -31,7 +31,9 @@ fi
 if [[ -n "${MVN_PASSTHROUGH_ENV_VARS:-}" ]]; then
   for var_name in ${MVN_PASSTHROUGH_ENV_VARS}; do
     if [[ -n "${!var_name+x}" ]]; then
-      docker_args+=(--env "${var_name}=${!var_name}")
+      # by name: docker takes the value from its environment, so it is not in the arguments (ps, logs)
+      export "${var_name?}"
+      docker_args+=(--env "$var_name")
     fi
   done
 fi
