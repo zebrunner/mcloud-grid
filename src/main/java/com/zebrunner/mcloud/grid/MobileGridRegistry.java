@@ -21,6 +21,7 @@
 package com.zebrunner.mcloud.grid;
 
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
+import com.zebrunner.mcloud.grid.util.LogLevels;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
 import org.openqa.grid.internal.ActiveTestSessions;
 import org.openqa.grid.internal.BaseGridRegistry;
@@ -113,17 +114,25 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     }
 
     /**
-     * Hub starts its registry before its server. Without STF, which verifies the node tokens, the hub starts but refuses
-     * every node (NodeAuthentication): the first start of MCloud runs before an admin of STF has an access token.
+     * Hub starts its registry before its server: MCLOUD_LOG_LEVEL and the log of the configuration come first, so the
+     * logs of the first registrations (also the rejected ones) have the level. Without STF, which verifies the node
+     * tokens, the hub starts but refuses every node (NodeAuthentication): the first start of MCloud runs before an admin
+     * of STF has an access token.
      */
     @Override
     public void start() {
+        LogLevels.configure(logLevel());
         checkNodeRegistration(isStfConfigured());
+        MobileRemoteProxy.logConfiguration();
         matcher.start();
     }
 
     protected boolean isStfConfigured() {
         return STFClient.isSTFEnabled();
+    }
+
+    protected String logLevel() {
+        return System.getenv("MCLOUD_LOG_LEVEL");
     }
 
     /**

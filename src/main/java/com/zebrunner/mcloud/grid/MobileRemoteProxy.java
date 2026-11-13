@@ -24,7 +24,6 @@ import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
-import com.zebrunner.mcloud.grid.util.LogLevels;
 import com.zebrunner.mcloud.grid.util.NodeReachability;
 import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import com.zebrunner.mcloud.grid.util.NodeToken;
@@ -87,24 +86,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return true;
         }
     };
-    private static final LazyInitializer<Boolean> INITIAL_GRID_CONFIGURATION_LOGS = new LazyInitializer<Boolean>() {
-        @Override
-        protected Boolean initialize() throws ConcurrentException {
-            LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
-            LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
-                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
-                            + "low battery check: %s; "
-                            + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
-                    STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
-                    CHECK_APPIUM_STATUS ? "on" : "off",
-                    CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
-                    NODE_ALLOWED_NETWORKS,
-                    MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
-                    STFClient.lowBatteryCheck(),
-                    UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
-            return true;
-        }
-    };
 
     // zebrunner/appium gives WebDriverAgent 3 s and a second attempt, adb 5 s: the hub waits longer for the status
     // check, otherwise a slow WDA ignores the device here while Appium answers it is ready
@@ -163,11 +144,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         nodeToken = accepted.getNodeToken();
         nodeHost = accepted.getHost();
         nodeTokenVerifiedAt = Instant.now();
-        try {
-            INITIAL_GRID_CONFIGURATION_LOGS.get();
-        } catch (Exception e) {
-            LOGGER.warning(() -> String.format("Could not provide grid configuration logs. Error message: %s", e.getMessage()));
-        }
         try {
             DISCONNECT_ALL_DEVICES.get();
         } catch (Exception e) {
@@ -250,6 +226,23 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                         udid, slot.getCapabilities()));
             }
         }
+    }
+
+    /**
+     * Logs the configuration of the devices and the nodes; MobileGridRegistry logs it when the hub starts.
+     */
+    static void logConfiguration() {
+        LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
+                        + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
+                        + "low battery check: %s; "
+                        + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
+                STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
+                CHECK_APPIUM_STATUS ? "on" : "off",
+                CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
+                NODE_ALLOWED_NETWORKS,
+                MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
+                STFClient.lowBatteryCheck(),
+                UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
     }
 
     public void beforeCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
