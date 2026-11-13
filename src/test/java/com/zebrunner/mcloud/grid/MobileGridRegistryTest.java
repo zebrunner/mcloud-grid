@@ -1,5 +1,6 @@
 package com.zebrunner.mcloud.grid;
 
+import com.zebrunner.mcloud.grid.util.LogLevels;
 import org.openqa.grid.common.RegistrationRequest;
 import org.openqa.grid.internal.ExternalSessionKey;
 import org.openqa.grid.internal.GridRegistry;
@@ -77,6 +78,16 @@ public class MobileGridRegistryTest {
         @Override
         protected boolean isStfConfigured() {
             return true;
+        }
+    }
+
+    /**
+     * The registry of a hub with MCLOUD_LOG_LEVEL=fine.
+     */
+    public static final class FineLogLevelRegistry extends MobileGridRegistry {
+        @Override
+        protected String logLevel() {
+            return "fine";
         }
     }
 
@@ -267,6 +278,43 @@ public class MobileGridRegistryTest {
 
         Assert.assertTrue(MobileGridRegistry.checkNodeRegistration(true));
         Assert.assertFalse(MobileGridRegistry.checkNodeRegistration(false));
+    }
+
+    @Test
+    public void logLevelAndConfigurationAreSetWhenTheHubStarts() {
+        GridHubConfiguration config = new GridHubConfiguration();
+        config.registry = FineLogLevelRegistry.class.getName();
+        config.port = 0;
+        List<String> messages = new CopyOnWriteArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                messages.add(record.getMessage());
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger grid = Logger.getLogger(LogLevels.ROOT_LOGGER);
+        Level level = grid.getLevel();
+        Logger proxyLogger = Logger.getLogger(MobileRemoteProxy.class.getName());
+        proxyLogger.addHandler(handler);
+        try {
+            // before any node registers: the logs of the first registrations, also the rejected ones, have the level
+            Hub hub = new Hub(config);
+            hub.getRegistry().stop();
+
+            Assert.assertEquals(grid.getLevel(), Level.FINE);
+            Assert.assertTrue(messages.stream().anyMatch(message -> message.startsWith("[CONFIGURATION] STF integration: disabled")), messages.toString());
+        } finally {
+            proxyLogger.removeHandler(handler);
+            grid.setLevel(level);
+        }
     }
 
     @Test
