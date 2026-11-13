@@ -32,8 +32,10 @@ The file `VERSION` is the release in work (bumped by hand after a release, CONVE
 docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
   -e GRID_TIMEOUT=60 -e GRID_BROWSER_TIMEOUT=60 \
   -e STF_URL=http://stf.example.com -e STF_TOKEN=<token> \
-  --name mcloud-grid zebrunner/mcloud-grid:latest
+  --name mcloud-grid public.ecr.aws/zebrunner/mcloud-grid:<tag>
 ```
+
+`<tag>` is a release (e.g. `2.6`) or a build of `develop` (`<VERSION>-develop-latest`, e.g. `3.1-develop-latest`, or `<VERSION>-develop-<sha>`), see [Build](#build); the image has no `latest` tag.
 
 The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF_URL` and `STF_TOKEN` (the access token of an STF admin) are required: the nodes register with their node tokens, which the hub verifies with STF (see [Node registration](#node-registration)); without them the hub starts, logs `STF_URL and STF_TOKEN are not set` (`SEVERE`) and refuses every node, as on the first start of MCloud before an admin of STF has an access token.
 
@@ -41,7 +43,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 
 ### Grid
 
-| Env var | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `GRID_NEW_SESSION_WAIT_TIMEOUT` | `600000` | How long a new session request waits in the queue, ms |
 | `GRID_TIMEOUT` | `150` | Client inactivity timeout of a session, s; it replaces the one of the nodes (`0` keeps the one of the nodes) |
@@ -67,7 +69,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 
 `STF_URL` and `STF_TOKEN` are required for the nodes: without them the hub starts but refuses every node.
 
-| Env var | Default | Meaning |
+| Variable | Default | Description |
 | --- | --- | --- |
 | `STF_URL` | | Required: STF address |
 | `STF_TOKEN` | | Required: access token of the STF admin that reserves devices for automation and verifies the node tokens of the nodes with the node registry of STF; a device that does not answer the reservation is also marked unhealthy in STF |
@@ -208,7 +210,7 @@ Requirements: docker, python 3 (for the linters), hadolint on macOS (`brew insta
 make check   # everything CI runs
 make lint    # yaml, GitHub workflows, Dockerfile, markdown, shell scripts, the text files, checkstyle, spotbugs
 make test    # unit and STF integration tests, coverage in target/site/jacoco
-make docker  # docker image checks: user, no start without STF, config generation, options, endpoints, node registration with a fake STF, graceful shutdown
+make docker  # docker image checks: user, the start without STF (every node refused), config generation, options, endpoints, node registration with a fake STF, graceful shutdown
 make load    # short load test of the image with fake Appium nodes and a fake STF
 ```
 
