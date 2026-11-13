@@ -58,7 +58,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
-| `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
+| `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set or `0`) |
 | `PLAYWRIGHT_ENABLED` | `false` | Run the Playwright sessions: the option of the farm, see [Playwright](#playwright) |
 | `PLAYWRIGHT_IDLE_TIMEOUT` | `120` | A side of a Playwright WebSocket that answers no ping for it is closed with the other side, s; see [Playwright](#playwright) |
 | `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
@@ -82,6 +82,8 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `STF_DEVICE_MANUALLY_RESERVED_TIMEOUT` | `180` | A device reserved in STF by another user is skipped for, s |
 | `STF_DEVICE_LOW_BATTERY_THRESHOLD` | `15` | A present and ready device charged below this level (%) in STF (Android and iOS) is skipped by automation; `0` disables the check |
 | `STF_DEVICE_LOW_BATTERY_IGNORE_TIMEOUT` | `3600` | A device with a low battery is skipped for, s; it is checked again by the next request after that |
+
+The `_TIMEOUT` variables in seconds of this table (but `STF_TIMEOUT`, a positive number) and `NODE_REACHABILITY_TIMEOUT`, `MAX_NEW_COMMAND_TIMEOUT`, `PLAYWRIGHT_IDLE_TIMEOUT` are whole numbers, `0` or more: an invalid or negative value is logged (`WARNING`) and the default is used.
 
 A request that leaves the queue without a device (`newSessionWaitTimeout` or a gone client) is logged as a warning with the
 matching devices: busy, down and ignored ones with the reason (e.g. `low battery: 12% (discharging), below 15%`).

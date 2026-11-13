@@ -17,7 +17,8 @@ public final class EnvUtils {
     }
 
     /**
-     * @return duration in seconds from the env var, or the default value (may be null) when it is not set or is not a number
+     * @return duration in seconds from the env var, or the default value (may be null) when it is not set, is not a number
+     * or is negative
      */
     public static Duration getDurationInSeconds(String name, Duration defaultValue) {
         return getDurationInSeconds(name, defaultValue, System::getenv);
@@ -49,12 +50,17 @@ public final class EnvUtils {
         if (StringUtils.isBlank(value)) {
             return defaultValue;
         }
+        long seconds;
         try {
-            return Duration.ofSeconds(Long.parseLong(value.trim()));
+            seconds = Long.parseLong(value.trim());
         } catch (NumberFormatException e) {
-            LOGGER.warning(() -> String.format("[CONFIGURATION] '%s' should be a number of seconds, but was '%s'. Default value will be used: %s.",
+            seconds = -1;
+        }
+        if (seconds < 0) {
+            LOGGER.warning(() -> String.format("[CONFIGURATION] '%s' should be a number of seconds (0 or more), but was '%s'. Default value will be used: %s.",
                     name, value, defaultValue == null ? "not set" : defaultValue.toSeconds() + " seconds"));
             return defaultValue;
         }
+        return Duration.ofSeconds(seconds);
     }
 }

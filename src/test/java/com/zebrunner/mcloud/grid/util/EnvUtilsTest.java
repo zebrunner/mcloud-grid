@@ -37,4 +37,12 @@ public class EnvUtilsTest {
         // used to fail the class initialization of the proxy with NumberFormatException
         Assert.assertEquals(read(Map.of("TIMEOUT", "10m")), DEFAULT);
     }
+
+    @Test
+    public void negativeValueIsDefault() {
+        // a negative timeout expires at once or fails the timers that use it
+        Assert.assertEquals(read(Map.of("TIMEOUT", "-5")), DEFAULT);
+        Assert.assertNull(EnvUtils.getDurationInSeconds("TIMEOUT", null, Map.of("TIMEOUT", "-1")::get));
+        Assert.assertEquals(read(Map.of("TIMEOUT", "0")), Duration.ZERO);
+    }
 }
