@@ -7,6 +7,7 @@ import org.openqa.selenium.remote.CapabilityType;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Map;
+import java.util.Objects;
 import java.util.logging.Logger;
 
 public class MobilePlatformValidator implements Validator {
@@ -18,7 +19,7 @@ public class MobilePlatformValidator implements Validator {
         Object provided = nodeCapabilities.get(CapabilityType.PLATFORM_NAME);
         // we cannot safely call toString method for Platform object. ANDROID, IOS and so on do not override this method,
         // so we try to get name as is.
-        if (anything(requested instanceof Platform ? ((Platform) requested).name() : (String) requested)) {
+        if (anything(requested instanceof Platform ? ((Platform) requested).name() : Objects.toString(requested, null))) {
             return true;
         }
 
