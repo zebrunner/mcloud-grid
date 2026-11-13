@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.integration.client;
 
 import com.github.tomakehurst.wiremock.http.Fault;
+import com.zebrunner.mcloud.grid.GridFixtures;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
 import com.zebrunner.mcloud.grid.models.stf.Battery;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -471,10 +473,15 @@ public class STFClientTest {
         stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/free")));
     }
 
-    public void devicePresenceCheck() {
-        stf.devices(device(UDID));
+    public void deviceOfNodeCheck() {
+        stf.devices(device(UDID), device("other-node-device").node("node-2"), device("unbound-device").node(null));
 
-        Assert.assertTrue(STFClient.isDevicePresentInSTF(UDID));
-        Assert.assertFalse(STFClient.isDevicePresentInSTF("unknown"));
+        Assert.assertEquals(STFClient.checkDeviceOfNode(UDID, GridFixtures.NODE_LABEL), Optional.empty());
+        Assert.assertEquals(STFClient.checkDeviceOfNode("unknown", GridFixtures.NODE_LABEL),
+                Optional.of("Could not find device with udid 'unknown' in STF (HTTP 500)"));
+        Assert.assertEquals(STFClient.checkDeviceOfNode("other-node-device", GridFixtures.NODE_LABEL),
+                Optional.of("Device with udid 'other-node-device' is bound to another node in STF, not to 'test-node'"));
+        Assert.assertEquals(STFClient.checkDeviceOfNode("unbound-device", GridFixtures.NODE_LABEL),
+                Optional.of("Device with udid 'unbound-device' is not bound to a node in STF yet"));
     }
 }
