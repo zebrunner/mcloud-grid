@@ -114,7 +114,7 @@ A node gets its node token `mcn1.<label>.<secret>` when it joins the farm with a
 - STF verifies the node token of every registered node again every 60 s, without the cache: a node whose token it rejects (`403`: the node is revoked, joined again with a new token, or its address is another one) is unregistered at once, its sessions end and their devices are returned in STF. While STF does not answer, the node is kept for up to 10 minutes since its last verification, then it is unregistered too. The logs name the node by its label, never by its token.
 - A rejected node gets the reason in the answer of `/grid/register` (zebrunner/appium logs it), and the hub logs it once in 10 minutes; see [Troubleshooting](#troubleshooting). The messages never contain a token.
 
-A node that registers again at the same address (e.g. after the hub restarted) is checked for its token only; a node with the id of a registered one at another address is checked as a new node.
+A node that registers again at the same address (e.g. after the hub restarted) is checked for its token only. The registry replaces a registered node with the same id and ends its sessions, so a node may take the id of a registered node only at the same host (checked as a new node); a node of another host with that id is rejected (`registers with the id '...' of the node ... at another host`): zebrunner/appium uses the URL of the node as its id.
 
 The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is in no log of Appium; the hub masks it, the registration token and any node token (`mcn1.<label>.*****`) in its own logs, e.g. the session requests and the registration requests Selenium logs with `-debug`.
 
