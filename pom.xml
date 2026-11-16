@@ -5,7 +5,8 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.zebrunner</groupId>
 	<artifactId>mcloud-grid</artifactId>
-	<version>1.0</version>
+	<!-- the release in work, the one of the file VERSION (PomVersionTest) -->
+	<version>3.1</version>
 	<packaging>jar</packaging>
 	<name>Zebrunner Device Farm (Selenium Grid)</name>
 	<properties>
@@ -70,7 +71,7 @@
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-server</artifactId>
-			<version>3.141.59</version>
+			<version>${selenium.version}</version>
 			<exclusions>
 				<exclusion>
 					<groupId>org.seleniumhq.selenium</groupId>
