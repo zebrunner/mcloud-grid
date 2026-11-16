@@ -4,7 +4,8 @@
 #   e.g. tests/load_local.sh -Dload.fakeNodes=40 -Dload.sessions=600 -Dload.concurrency=80
 # The hub uses an in-process fake STF of the test container (FAKE_STF_PORT, 18090 by default; latency:
 # -Dload.fakeStf.latencyMs=...), which enrolls the fake nodes and verifies their node tokens.
-# HUB_ENV="NAME=value ..." passes more env vars to the hub container.
+# HUB_ENV="NAME=value ..." passes more env vars to the hub container, DOCKER_BUILD_OPTS more options to the docker build
+# of the image.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -23,7 +24,8 @@ for variable in ${HUB_ENV:-}; do
   hub_env+=(--env "$variable")
 done
 
-docker build -q -t "$IMAGE" . > /dev/null
+read -ra build_opts <<< "${DOCKER_BUILD_OPTS:-}"
+docker build -q ${build_opts[@]+"${build_opts[@]}"} -t "$IMAGE" . > /dev/null
 docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
 docker rm -f "$TEST_CONTAINER" > /dev/null 2>&1 || true
 docker network create "$NETWORK" > /dev/null 2>&1 || true

@@ -3,7 +3,8 @@
 # config generation from env vars, options
 # passed to the JVM and the hub, hub status, node registration with node tokens verified by a fake STF and graceful
 # shutdown.
-# IMAGE overrides the tag of the built image.
+# IMAGE overrides the tag of the built image, DOCKER_BUILD_OPTS adds options to its docker build (CI: the builder and
+# its cache).
 source "$(dirname "$0")/lib.sh"
 require_cmd docker
 require_cmd python3
@@ -11,6 +12,7 @@ docker info > /dev/null 2>&1 || skip "requires a running docker daemon"
 cd "$REPO" || exit 1
 
 IMAGE="${IMAGE:-mcloud-grid:test}"
+read -ra BUILD_OPTS <<< "${DOCKER_BUILD_OPTS:-}"
 CONTAINER="mcloud-grid-test-$$"
 NO_STF_CONTAINER="${CONTAINER}-no-stf"
 STF_DOWN_CONTAINER="${CONTAINER}-stf-down"
@@ -93,7 +95,7 @@ PY
 }
 
 section "image"
-if ! docker build --progress=plain --tag "$IMAGE" . > "$WORK/docker-build.log" 2>&1; then
+if ! docker build --progress=plain ${BUILD_OPTS[@]+"${BUILD_OPTS[@]}"} --tag "$IMAGE" . > "$WORK/docker-build.log" 2>&1; then
   fail "image builds" "docker build failed" "$(tail -100 "$WORK/docker-build.log")"
   finish
 fi
