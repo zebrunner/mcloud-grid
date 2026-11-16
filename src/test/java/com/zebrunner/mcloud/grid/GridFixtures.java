@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Builds real (not mocked) Selenium Grid objects for proxy tests. The nodes register with {@link #NODE_TOKEN}, which the
@@ -28,8 +29,8 @@ public final class GridFixtures {
 
     private static final NodeTokenVerifier TEST_VERIFIER = new NodeTokenVerifier() {
         @Override
-        public StfNodes.Verification verify(NodeToken token, String host) {
-            return verifyNow(token, host);
+        public Optional<StfNodes.Verification> cached(NodeToken token, String host) {
+            return Optional.of(verifyNow(token, host));
         }
 
         @Override
