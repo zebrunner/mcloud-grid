@@ -20,7 +20,7 @@ RUN jdeps --ignore-missing-deps --multi-release 11 --print-module-deps \
 
 # The Ubuntu of the eclipse-temurin images with the Java runtime of the builder (Temurin 11, its own time zones and CA
 # certificates): curl of the healthcheck, pgrep; the UTF-8 locale of Ubuntu; the security fixes of Ubuntu
-FROM public.ecr.aws/docker/library/ubuntu:26.04@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c
+FROM public.ecr.aws/docker/library/ubuntu:26.04@sha256:d66b366dac61b575bee2aef07e9c26e8070096fbe84a3d4d3eb0da069b5d76db
 
 ENV JAVA_HOME=/opt/java/openjdk \
     LANG=C.UTF-8
