@@ -30,7 +30,8 @@ cleanup() {
 }
 
 # start_fake_stf: the STF API the hub uses, on a free port of this machine (written to $WORK/stf.port): the node
-# registry knows NODE_TOKEN for 192.0.2.3, every device is present; the requests are logged to $WORK/stf.log
+# registry knows NODE_TOKEN for 192.0.2.3, every device is present, udid-192.0.2.3 is bound to its node and the others
+# to another node; the requests are logged to $WORK/stf.log
 start_fake_stf() {
   STF_TOKEN="$STF_TOKEN" NODE_TOKEN="$NODE_TOKEN" python3 - "$WORK/stf.port" "$WORK/stf.log" << 'PY' &
 import json
@@ -66,7 +67,8 @@ class Stf(BaseHTTPRequestHandler):
             return self.answer(200, {"success": True, "devices": []})
         if self.command == "GET" and self.path.startswith("/api/v1/devices/"):
             serial = self.path.rsplit("/", 1)[1]
-            return self.answer(200, {"success": True, "device": {"serial": serial, "present": True, "ready": True, "status": 3}})
+            node = "docker-test" if serial == "udid-192.0.2.3" else "another-node"
+            return self.answer(200, {"success": True, "device": {"serial": serial, "present": True, "ready": True, "status": 3, "node": node}})
         return self.answer(404, {"success": False})
 
     do_GET = do_POST = do_PUT = do_DELETE = handle_request
@@ -183,15 +185,15 @@ check "grid console responds" "200" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
 
 section "node registration"
-# register <host> <proxy class> <token> [<container>]: the registration request of a node as the node config of zebrunner/appium,
-# prints the HTTP status
+# register <host> <proxy class> <token> [<container>] [<udid>]: the registration request of a node as the node config of
+# zebrunner/appium (the device udid-<host> by default), prints the HTTP status
 register() {
   local custom='{}'
   if [[ -n "$3" ]]; then
     custom="{\"registrationToken\": \"$3\"}"
   fi
   docker exec -i "${4:-$CONTAINER}" curl -s -o /dev/null -w '%{http_code}' -X POST --data-binary @- http://localhost:4444/grid/register << _EOF
-{"capabilities": [{"maxInstances": 1, "platformName": "ANDROID", "udid": "udid-$1", "deviceName": "Pixel"}],
+{"capabilities": [{"maxInstances": 1, "platformName": "ANDROID", "udid": "${5:-udid-$1}", "deviceName": "Pixel"}],
  "configuration": {"proxy": "$2", "url": "http://$1:4723/wd/hub", "host": "$1", "port": 4723, "id": "http://$1:4723",
    "maxSession": 1, "register": true, "custom": $custom}}
 _EOF
@@ -214,6 +216,8 @@ mobile=com.zebrunner.mcloud.grid.MobileRemoteProxy
 check "a node without a node token is rejected" "500" "$(register 192.0.2.1 "$mobile" "")"
 check "a node with a token that is not a node token is rejected" "500" "$(register 192.0.2.2 "$mobile" wrong-token)"
 check "a node with its node token at its address is accepted" "200" "$(register 192.0.2.3 "$mobile" "$NODE_TOKEN")"
+check "a node may not register the device of another node" "500" \
+  "$(register 192.0.2.3 "$mobile" "$NODE_TOKEN" "$CONTAINER" udid-192.0.2.9)"
 check "a node with an unknown node token is rejected" "500" "$(register 192.0.2.5 "$mobile" "$UNKNOWN_NODE_TOKEN")"
 check "a node token at another address is rejected" "500" "$(register 192.0.2.6 "$mobile" "$NODE_TOKEN")"
 check "a node token STF does not verify is rejected" "500" "$(register 192.0.2.7 "$mobile" "$NODE_TOKEN" "$STF_DOWN_CONTAINER")"
@@ -262,6 +266,7 @@ check_contains "a node without a node token is logged" "Node http://192.0.2.1:47
 check_contains "a token that is not a node token is logged" "Node http://192.0.2.2:4723 has a token that is not a node token" "$logs"
 check_contains "an unknown node token is logged" "Node http://192.0.2.5:4723 has an unknown or revoked node token, so it is not registered" "$logs"
 check_contains "a node token at another address is logged" "Node http://192.0.2.6:4723 has an unknown or revoked node token" "$logs"
+check_contains "the device of another node is logged" "Device with udid 'udid-192.0.2.9' is bound to another node in STF" "$logs"
 check_contains "the registration requests are in the debug log" "getting the following registration request" "$logs"
 check_not_contains "the node token is not in the log (debug included)" "$NODE_SECRET" "$logs"
 check_not_contains "the STF token is not in the log" "$STF_TOKEN" "$logs"
