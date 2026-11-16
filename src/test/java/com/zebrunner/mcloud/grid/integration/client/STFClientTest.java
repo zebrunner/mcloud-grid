@@ -375,7 +375,7 @@ public class STFClientTest {
         // STF answers when the device joined the group, up to 5 seconds later
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(okJson("{\"success\":true}").withFixedDelay(4000)));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
         Assert.assertFalse(IgnoredDevices.get(UDID).isPresent());
         stf.server().verify(0, putRequestedFor(urlMatching("/api/v1/devices/.*")));
     }
@@ -386,7 +386,7 @@ public class STFClientTest {
                 .withBody("{\"success\":false,\"description\":\"Device is not responding\"}")));
         stf.server().stubFor(put("/api/v1/devices/" + UDID).willReturn(okJson("{\"success\":true}")));
 
-        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
 
         stf.server().verify(putRequestedFor(urlEqualTo("/api/v1/devices/" + UDID))
                 .withRequestBody(equalToJson("{\"device\":{\"status\":\"unhealthy\"}}")));
