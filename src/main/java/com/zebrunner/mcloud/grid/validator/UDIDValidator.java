@@ -31,6 +31,6 @@ public class UDIDValidator implements Validator {
             return false;
         }
 
-        return Arrays.asList(expectedValue.split(",")).contains(actualValue);
+        return Arrays.stream(expectedValue.split(",")).map(String::trim).anyMatch(actualValue::equals);
     }
 }

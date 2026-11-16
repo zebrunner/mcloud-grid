@@ -270,8 +270,29 @@ public class MobileRemoteProxyStfTest {
     }
 
     public void nodeNotPresentInStfIsRejected() {
-        Assert.expectThrows(GridException.class,
+        GridException e = Assert.expectThrows(GridException.class,
                 () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps("not-in-stf")));
+        Assert.assertTrue(e.getMessage().contains("Could not find device with udid 'not-in-stf' in STF"), e.getMessage());
+    }
+
+    public void nodeCannotRegisterTheDeviceOfAnotherNode() {
+        stf.devices(device(ANDROID_UDID).node("node-2"));
+
+        GridException e = Assert.expectThrows(GridException.class,
+                () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID)));
+
+        Assert.assertEquals(e.getMessage(), "Node " + nodeUrl + " ('" + GridFixtures.NODE_LABEL + "'): Device with udid '" + ANDROID_UDID
+                + "' is bound to another node in STF, not to '" + GridFixtures.NODE_LABEL + "', so it is not registered.");
+        Assert.assertNull(registry.getProxyById(nodeUrl));
+    }
+
+    public void nodeCannotRegisterADeviceNotBoundToANode() {
+        stf.devices(device(ANDROID_UDID).node(null));
+
+        GridException e = Assert.expectThrows(GridException.class,
+                () -> GridFixtures.proxy(registry, nodeUrl, GridFixtures.androidNodeCaps(ANDROID_UDID)));
+
+        Assert.assertTrue(e.getMessage().contains("is not bound to a node in STF yet"), e.getMessage());
     }
 
     public void abandonedSessionReturnsDeviceToStf() {
@@ -433,6 +454,7 @@ public class MobileRemoteProxyStfTest {
 
         // another node sends its own token
         stf.enrolledNode(OTHER_NODE_TOKEN, "node-2", "localhost");
+        stf.devices(device(ANDROID_UDID), device(IOS_UDID).node("node-2"));
         MobileRemoteProxy other = new MobileRemoteProxy(GridFixtures.registrationRequest(nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID),
                 OTHER_NODE_TOKEN), registry);
         Assert.assertEquals(other.getNodeLabel(), "node-2");

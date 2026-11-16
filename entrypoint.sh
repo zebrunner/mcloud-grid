@@ -18,22 +18,72 @@
 ROOT=/opt/selenium
 CONF=$ROOT/config.json
 
-# log <message>: a JSON log line like the ones of the hub (JsonLogFormatter)
+# log <level> <message>: a JSON log line like the ones of the hub (JsonLogFormatter); the message may contain the values
+# of the configuration, so it is escaped
 log() {
-  printf '{"timestamp":"%s","level":"INFO","logger":"entrypoint","component":"mcloud-grid","category":"grid","message":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1"
+  local message="${2//\\/\\\\}"
+  message="${message//\"/\\\"}"
+  message="${message//[[:cntrl:]]/ }"
+  printf '{"timestamp":"%s","level":"%s","logger":"entrypoint","component":"mcloud-grid","category":"grid","message":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$message"
 }
 
-/opt/bin/generate_config > "$CONF"
+#### Configuration
 
-log "Starting Selenium hub"
+invalidConfig=false
+
+# checkNumber <name> <value> <minimum>: the value goes into config.json as a JSON number: a whole number (no leading
+# zeros, at most 9 digits) of at least the minimum
+checkNumber() {
+  if [[ ! "$2" =~ ^-?(0|[1-9][0-9]{0,8})$ ]] || (($2 < $3)); then
+    log "SEVERE" "$1 '$2' is not a whole number of at least $3."
+    invalidConfig=true
+  fi
+}
+
+# checkBoolean <name> <value>: the value goes into config.json as a JSON boolean
+checkBoolean() {
+  if [[ ! "$2" =~ ^(true|false)$ ]]; then
+    log "SEVERE" "$1 '$2' is not true or false."
+    invalidConfig=true
+  fi
+}
+
+# checkClassName <name> <value>: the value goes into config.json as the name of a Java class
+checkClassName() {
+  if [[ ! "$2" =~ ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_$]*)*$ ]]; then
+    log "SEVERE" "$1 '$2' is not the name of a Java class."
+    invalidConfig=true
+  fi
+}
+
+checkNumber GRID_NEW_SESSION_WAIT_TIMEOUT "$GRID_NEW_SESSION_WAIT_TIMEOUT" -1
+checkNumber GRID_TIMEOUT "$GRID_TIMEOUT" 0
+checkNumber GRID_BROWSER_TIMEOUT "$GRID_BROWSER_TIMEOUT" 0
+checkNumber GRID_CLEAN_UP_CYCLE "$GRID_CLEAN_UP_CYCLE" 1
+checkNumber GRID_JETTY_MAX_THREADS "$GRID_JETTY_MAX_THREADS" -1
+checkBoolean GRID_THROW_ON_CAPABILITY_NOT_PRESENT "$GRID_THROW_ON_CAPABILITY_NOT_PRESENT"
+checkBoolean GRID_DEBUG "$GRID_DEBUG"
+checkClassName GRID_CAPABILITY_MATCHER "$GRID_CAPABILITY_MATCHER"
+# a restart does not fix the configuration: exit 0 stops the restarts of the container
+if [[ "$invalidConfig" == true ]]; then
+  log "SEVERE" "The configuration is invalid, the hub is not started: fix the variables above (README.md#configuration) and start the container again."
+  exit 0
+fi
+
+if ! /opt/bin/generate_config > "$CONF"; then
+  log "SEVERE" "Could not write ${CONF}."
+  exit 1
+fi
+
+log "INFO" "Starting Selenium hub"
 
 # shutdown: stops the hub on SIGTERM and SIGINT
 shutdown() {
-  log "Shutting down hub"
+  log "INFO" "Shutting down hub"
   kill -s SIGTERM "$hubPid"
   wait "$hubPid"
-  log "shutdown complete"
+  log "INFO" "shutdown complete"
 }
 
 trap shutdown SIGTERM SIGINT

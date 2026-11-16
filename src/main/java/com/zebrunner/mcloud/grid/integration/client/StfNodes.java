@@ -83,15 +83,12 @@ public final class StfNodes implements NodeTokenVerifier {
     }
 
     /**
-     * @return the answer of STF about the token at the host, a cached one when STF answered it recently
+     * @return the answer of STF about the token at the host when STF answered it recently
      */
     @Override
-    public Verification verify(NodeToken token, String host) {
+    public Optional<Verification> cached(NodeToken token, String host) {
         CachedVerification cached = verifications.get(cacheKey(token, host));
-        if (cached != null && clock.get().isBefore(cached.until)) {
-            return cached.verification;
-        }
-        return verifyNow(token, host);
+        return cached != null && clock.get().isBefore(cached.until) ? Optional.of(cached.verification) : Optional.empty();
     }
 
     /**

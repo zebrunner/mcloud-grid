@@ -1,5 +1,6 @@
 #!/bin/bash
-# Checks of the docker image: build, unprivileged user, no start without STF, config generation from env vars, options
+# Checks of the docker image: build, unprivileged user, the start without STF, the validation of the configuration (exit 0),
+# config generation from env vars, options
 # passed to the JVM and the hub, hub status, node registration with node tokens verified by a fake STF and graceful
 # shutdown.
 # IMAGE overrides the tag of the built image.
@@ -13,6 +14,7 @@ IMAGE="${IMAGE:-mcloud-grid:test}"
 CONTAINER="mcloud-grid-test-$$"
 NO_STF_CONTAINER="${CONTAINER}-no-stf"
 STF_DOWN_CONTAINER="${CONTAINER}-stf-down"
+INVALID_CONTAINER="${CONTAINER}-invalid"
 STF_TOKEN="stf-admin-token-$$"
 # the node token of the node enrolled at 192.0.2.3 in the fake STF; its secret part is looked for in the logs
 NODE_SECRET="AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde"
@@ -23,14 +25,15 @@ STF_PID=""
 # called by the EXIT trap of lib.sh
 # shellcheck disable=SC2329
 cleanup() {
-  docker rm -f "$CONTAINER" "$NO_STF_CONTAINER" "$STF_DOWN_CONTAINER" > /dev/null 2>&1 || true
+  docker rm -f "$CONTAINER" "$NO_STF_CONTAINER" "$STF_DOWN_CONTAINER" "$INVALID_CONTAINER" > /dev/null 2>&1 || true
   if [[ -n "$STF_PID" ]]; then
     kill "$STF_PID" 2> /dev/null || true
   fi
 }
 
 # start_fake_stf: the STF API the hub uses, on a free port of this machine (written to $WORK/stf.port): the node
-# registry knows NODE_TOKEN for 192.0.2.3, every device is present; the requests are logged to $WORK/stf.log
+# registry knows NODE_TOKEN for 192.0.2.3, every device is present, udid-192.0.2.3 is bound to its node and the others
+# to another node; the requests are logged to $WORK/stf.log
 start_fake_stf() {
   STF_TOKEN="$STF_TOKEN" NODE_TOKEN="$NODE_TOKEN" python3 - "$WORK/stf.port" "$WORK/stf.log" << 'PY' &
 import json
@@ -66,7 +69,8 @@ class Stf(BaseHTTPRequestHandler):
             return self.answer(200, {"success": True, "devices": []})
         if self.command == "GET" and self.path.startswith("/api/v1/devices/"):
             serial = self.path.rsplit("/", 1)[1]
-            return self.answer(200, {"success": True, "device": {"serial": serial, "present": True, "ready": True, "status": 3}})
+            node = "docker-test" if serial == "udid-192.0.2.3" else "another-node"
+            return self.answer(200, {"success": True, "device": {"serial": serial, "present": True, "ready": True, "status": 3, "node": node}})
         return self.answer(404, {"success": False})
 
     do_GET = do_POST = do_PUT = do_DELETE = handle_request
@@ -109,6 +113,22 @@ wait_hub() {
   echo "$status"
 }
 
+section "configuration"
+# every invalid variable of config.json is logged, then the container exits with 0: a restart does not fix it
+docker run --name "$INVALID_CONTAINER" --env GRID_TIMEOUT=1h --env GRID_DEBUG= --env GRID_CLEAN_UP_CYCLE=0 \
+  --env GRID_NEW_SESSION_WAIT_TIMEOUT=0600000 --env 'GRID_CAPABILITY_MATCHER=a"b' "$IMAGE" > "$WORK/invalid.log" 2>&1
+check "an invalid configuration exits with 0" "0" "$?"
+logs="$(cat "$WORK/invalid.log")"
+check_contains "an invalid number is logged" "GRID_TIMEOUT '1h' is not a whole number of at least 0." "$logs"
+check_contains "an empty boolean is logged" "GRID_DEBUG '' is not true or false." "$logs"
+check_contains "a number below the minimum is logged" "GRID_CLEAN_UP_CYCLE '0' is not a whole number of at least 1." "$logs"
+check_contains "a number that is not a JSON number is logged" "GRID_NEW_SESSION_WAIT_TIMEOUT '0600000' is not a whole number" "$logs"
+check_contains "an invalid class name is logged" "GRID_CAPABILITY_MATCHER 'a\\\"b' is not the name of a Java class." "$logs"
+check_not_contains "the hub is not started with an invalid configuration" "Starting Selenium hub" "$logs"
+check "the log lines of the validation are JSON" "ok" \
+  "$(python3 -c 'import json, sys; [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]; print("ok")' "$WORK/invalid.log" 2>&1)"
+docker rm -f "$INVALID_CONTAINER" > /dev/null 2>&1
+
 section "STF"
 # without STF_URL and STF_TOKEN the hub starts (the first start of MCloud, before an access token of STF) and refuses every
 # node: no node token could be verified (see "node registration")
@@ -143,6 +163,7 @@ docker run --detach --name "$CONTAINER" \
   --env STF_TOKEN="$STF_TOKEN" \
   --env CHECK_NODE_REACHABILITY=false \
   --env GRID_TIMEOUT=77 \
+  --env GRID_CLEAN_UP_CYCLE=3000 \
   --env GRID_NEW_SESSION_WAIT_TIMEOUT=12345 \
   --env JAVA_HEAP_OPTS="-Xms64m -Xmx512m" \
   --env JAVA_OPTS="-Dmcloud.test=true" \
@@ -155,7 +176,8 @@ config="$(docker exec "$CONTAINER" cat /opt/selenium/config.json)"
 check_contains "config.json takes GRID_TIMEOUT" '"timeout": 77,' "$config"
 check_contains "config.json takes GRID_NEW_SESSION_WAIT_TIMEOUT" '"newSessionWaitTimeout": 12345,' "$config"
 check_contains "config.json takes the default GRID_BROWSER_TIMEOUT" '"browserTimeout": 900,' "$config"
-check_contains "config.json uses the mobile proxy" '"proxy": "com.zebrunner.mcloud.grid.MobileRemoteProxy"' "$config"
+check_contains "config.json takes GRID_CLEAN_UP_CYCLE" '"cleanUpCycle": 3000,' "$config"
+check_not_contains "config.json names no proxy: every node names its own" '"proxy"' "$config"
 check_contains "config.json uses the mobile capability matcher" '"capabilityMatcher": "com.zebrunner.mcloud.grid.MobileCapabilityMatcher"' "$config"
 check_contains "config.json uses the mobile registry" '"registry": "com.zebrunner.mcloud.grid.MobileGridRegistry"' "$config"
 check_contains "config.json turns the lifecycle servlet off" '"org.openqa.grid.web.servlet.LifecycleServlet"' "$config"
@@ -183,15 +205,15 @@ check "grid console responds" "200" \
   "$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' http://localhost:4444/grid/console)"
 
 section "node registration"
-# register <host> <proxy class> <token> [<container>]: the registration request of a node as the node config of zebrunner/appium,
-# prints the HTTP status
+# register <host> <proxy class> <token> [<container>] [<udid>]: the registration request of a node as the node config of
+# zebrunner/appium (the device udid-<host> by default), prints the HTTP status
 register() {
   local custom='{}'
   if [[ -n "$3" ]]; then
     custom="{\"registrationToken\": \"$3\"}"
   fi
   docker exec -i "${4:-$CONTAINER}" curl -s -o /dev/null -w '%{http_code}' -X POST --data-binary @- http://localhost:4444/grid/register << _EOF
-{"capabilities": [{"maxInstances": 1, "platformName": "ANDROID", "udid": "udid-$1", "deviceName": "Pixel"}],
+{"capabilities": [{"maxInstances": 1, "platformName": "ANDROID", "udid": "${5:-udid-$1}", "deviceName": "Pixel"}],
  "configuration": {"proxy": "$2", "url": "http://$1:4723/wd/hub", "host": "$1", "port": 4723, "id": "http://$1:4723",
    "maxSession": 1, "register": true, "custom": $custom}}
 _EOF
@@ -214,6 +236,8 @@ mobile=com.zebrunner.mcloud.grid.MobileRemoteProxy
 check "a node without a node token is rejected" "500" "$(register 192.0.2.1 "$mobile" "")"
 check "a node with a token that is not a node token is rejected" "500" "$(register 192.0.2.2 "$mobile" wrong-token)"
 check "a node with its node token at its address is accepted" "200" "$(register 192.0.2.3 "$mobile" "$NODE_TOKEN")"
+check "a node may not register the device of another node" "500" \
+  "$(register 192.0.2.3 "$mobile" "$NODE_TOKEN" "$CONTAINER" udid-192.0.2.9)"
 check "a node with an unknown node token is rejected" "500" "$(register 192.0.2.5 "$mobile" "$UNKNOWN_NODE_TOKEN")"
 check "a node token at another address is rejected" "500" "$(register 192.0.2.6 "$mobile" "$NODE_TOKEN")"
 check "a node token STF does not verify is rejected" "500" "$(register 192.0.2.7 "$mobile" "$NODE_TOKEN" "$STF_DOWN_CONTAINER")"
@@ -262,6 +286,7 @@ check_contains "a node without a node token is logged" "Node http://192.0.2.1:47
 check_contains "a token that is not a node token is logged" "Node http://192.0.2.2:4723 has a token that is not a node token" "$logs"
 check_contains "an unknown node token is logged" "Node http://192.0.2.5:4723 has an unknown or revoked node token, so it is not registered" "$logs"
 check_contains "a node token at another address is logged" "Node http://192.0.2.6:4723 has an unknown or revoked node token" "$logs"
+check_contains "the device of another node is logged" "Device with udid 'udid-192.0.2.9' is bound to another node in STF" "$logs"
 check_contains "the registration requests are in the debug log" "getting the following registration request" "$logs"
 check_not_contains "the node token is not in the log (debug included)" "$NODE_SECRET" "$logs"
 check_not_contains "the STF token is not in the log" "$STF_TOKEN" "$logs"

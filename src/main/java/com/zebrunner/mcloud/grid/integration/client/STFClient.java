@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -60,6 +61,11 @@ public final class STFClient {
     // a device charged below the threshold (%) is skipped by automation for the timeout; 0 disables the check
     private static final int LOW_BATTERY_THRESHOLD = EnvUtils.getInt("STF_DEVICE_LOW_BATTERY_THRESHOLD", 15);
     private static final Duration LOW_BATTERY_TIMEOUT = EnvUtils.getDurationInSeconds("STF_DEVICE_LOW_BATTERY_IGNORE_TIMEOUT", Duration.ofHours(1));
+
+    // STF answers the reservation, the return and remoteConnect after the device did, or 504 after 5 seconds
+    // (lib/units/api/controllers/user.ts of STF): the grid waits longer than that
+    static final Duration DEVICE_OPERATION_TIMEOUT = Duration.ofSeconds(10);
+    private static final int DEVICE_NOT_RESPONDING = 504;
 
     private static final Duration USER_CACHE_TIME = Duration.ofMinutes(5);
     private static final Map<String, CachedUser> USERS = new ConcurrentHashMap<>();
@@ -167,13 +173,16 @@ public final class STFClient {
             entity.put("timeout", TimeUnit.SECONDS.toMillis(stfTimeout));
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_PATH, STF_URL)
                     .withAuthorization(buildAuthToken(stfToken))
+                    .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                     .post(Void.class, entity);
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[%s][%s] STF did not reserve the device (HTTP %s), it is ignored for %s seconds.",
                         deviceUDID, sessionUUID, response.getStatus(), INVALID_STF_RESPONSE_TIMEOUT.toSeconds()));
                 IgnoredDevices.ignore(deviceUDID, INVALID_STF_RESPONSE_TIMEOUT, "STF did not reserve the device");
-                if (response.getStatus() == 0) {
+                if (response.getStatus() == 0 || response.getStatus() == DEVICE_NOT_RESPONDING) {
                     markUnhealthy(deviceUDID, sessionUUID);
+                    // the device may still join the group after the answer: it must not stay reserved by the grid
+                    returnLateReservation(deviceUDID, stfToken, sessionUUID);
                 }
                 return null;
             }
@@ -188,6 +197,7 @@ public final class STFClient {
             HttpClient.Response<RemoteConnectUserDevice> remoteConnect = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH,
                             STF_URL, deviceUDID)
                     .withAuthorization(buildAuthToken(stfToken))
+                    .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                     .post(RemoteConnectUserDevice.class, null);
 
             if (remoteConnect.getStatus() != 200) {
@@ -299,6 +309,15 @@ public final class STFClient {
     }
 
     /**
+     * Runs the action under the lock of the device that its reservation and its return in STF take.
+     */
+    public static <T> T withDeviceLock(String udid, Supplier<T> action) {
+        synchronized (deviceLock(udid)) {
+            return action.get();
+        }
+    }
+
+    /**
      * Forgets the cached STF users, for tests.
      */
     public static void clearCache() {
@@ -325,6 +344,7 @@ public final class STFClient {
             LOGGER.fine(() -> String.format("[%s][%s] Stopping remoteConnect of the device.", udid, sessionUUID));
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
                     .withAuthorization(buildAuthToken(stfToken))
+                    .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                     .delete(Void.class);
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[%s][%s] Could not stop remoteConnect of the device (HTTP %s).", udid, sessionUUID, response.getStatus()));
@@ -340,6 +360,7 @@ public final class STFClient {
 
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                 .withAuthorization(buildAuthToken(stfToken))
+                .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                 .delete(Void.class);
         if (response.getStatus() != 200) {
             LOGGER.warning(() -> String.format("[%s][%s] Could not return the device to STF (HTTP %s).", udid, sessionUUID, response.getStatus()));
@@ -375,6 +396,7 @@ public final class STFClient {
     public static int releaseDevice(String udid, Platform platform, String stfToken, String sessionUUID) {
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                 .withAuthorization(buildAuthToken(stfToken))
+                .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                 .delete(Void.class);
         if (response.getStatus() != 200) {
             LOGGER.warning(() -> String.format("[%s][%s] STF did not release the device with the given key (HTTP %s, key: %s).",
@@ -384,6 +406,7 @@ public final class STFClient {
         if (Platform.ANDROID.equals(platform)) {
             HttpClient.Response remoteConnect = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
                     .withAuthorization(buildAuthToken(stfToken))
+                    .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                     .delete(Void.class);
             if (remoteConnect.getStatus() != 200) {
                 // STF usually stops remoteConnect itself when the device is released
@@ -403,6 +426,7 @@ public final class STFClient {
         if (remoteConnected) {
             HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_REMOTE_CONNECT_PATH, STF_URL, udid)
                     .withAuthorization(buildAuthToken(stfToken))
+                    .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                     .delete(Void.class);
             if (response.getStatus() != 200) {
                 LOGGER.warning(() -> String.format("[%s][%s] Could not stop remoteConnect of the device (HTTP %s).", udid, sessionUUID, response.getStatus()));
@@ -410,9 +434,24 @@ public final class STFClient {
         }
         HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                 .withAuthorization(buildAuthToken(stfToken))
+                .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                 .delete(Void.class);
         if (response.getStatus() != 200) {
             LOGGER.warning(() -> String.format("[%s][%s] Could not return the device to STF (HTTP %s).", udid, sessionUUID, response.getStatus()));
+        }
+    }
+
+    /**
+     * Returns a device whose reservation STF did not confirm in time, in case the device completes it later; STF answers
+     * 403 or 404 when it did not.
+     */
+    private static void returnLateReservation(String udid, String stfToken, String sessionUUID) {
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
+                .withAuthorization(buildAuthToken(stfToken))
+                .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
+                .delete(Void.class);
+        if (response.getStatus() == 200) {
+            LOGGER.info(() -> String.format("[%s][%s] The late reservation of the device is returned to STF.", udid, sessionUUID));
         }
     }
 
@@ -452,6 +491,7 @@ public final class STFClient {
                 .forEach(udid -> {
                     HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_BY_ID_PATH, STF_URL, udid)
                             .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
+                            .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
                             .delete(Void.class);
                     if (response.getStatus() != 200) {
                         LOGGER.warning(() -> String.format("[STF] Could not return the device '%s' to STF (HTTP %s).", udid, response.getStatus()));
@@ -527,17 +567,30 @@ public final class STFClient {
         return IS_STF_ENABLED;
     }
 
-    public static boolean isDevicePresentInSTF(String udid) {
+    /**
+     * STF binds a device to the enrolled node whose device container proved the registration of the device with the node
+     * token (the 'node' of the device), so a node may register only the devices STF has bound to it.
+     *
+     * @return why the node may not register the device, empty when the device is bound to the node in STF
+     */
+    public static Optional<String> checkDeviceOfNode(String udid, String nodeLabel) {
         if (!isSTFEnabled()) {
-            return true;
+            return Optional.empty();
         }
-        HttpClient.Response<DeviceResponse> device = getDevice(udid, DEFAULT_STF_TOKEN);
-        if (device.getStatus() != 200 || device.getObject() == null || device.getObject().getDevice() == null) {
-            // STF answers 500 instead of 404 for an unknown serial
-            LOGGER.warning(() -> String.format("[NODE REGISTRATION] Could not get the device '%s' from STF (HTTP %s), the node is not registered.",
-                    udid, device.getStatus()));
-            return false;
+        HttpClient.Response<DeviceResponse> response = getDevice(udid, DEFAULT_STF_TOKEN);
+        STFDevice device = response.getObject() == null ? null : response.getObject().getDevice();
+        // STF answers 500 instead of 404 for an unknown serial
+        if (response.getStatus() != 200 || device == null || !StringUtils.equals(device.getSerial(), udid)) {
+            return Optional.of(String.format("Could not find device with udid '%s' in STF (HTTP %s)", udid, response.getStatus()));
         }
-        return StringUtils.equals(device.getObject().getDevice().getSerial(), udid);
+        if (StringUtils.isBlank(device.getNode())) {
+            return Optional.of(String.format("Device with udid '%s' is not bound to a node in STF yet", udid));
+        }
+        if (!StringUtils.equals(device.getNode(), nodeLabel)) {
+            LOGGER.fine(() -> String.format("[NODE REGISTRATION] Device '%s' is bound to node '%s' in STF, node '%s' registers it.",
+                    udid, device.getNode(), nodeLabel));
+            return Optional.of(String.format("Device with udid '%s' is bound to another node in STF, not to '%s'", udid, nodeLabel));
+        }
+        return Optional.empty();
     }
 }

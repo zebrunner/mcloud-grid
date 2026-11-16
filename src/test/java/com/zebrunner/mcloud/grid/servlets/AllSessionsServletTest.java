@@ -42,6 +42,33 @@ public class AllSessionsServletTest {
     }
 
     @Test
+    public void capabilitiesAreCopiedWhileBeforeSessionDoesNotChangeThem() throws Exception {
+        MobileRemoteProxy proxy = GridFixtures.proxy(GridFixtures.registry(), "http://node-1:4723", GridFixtures.androidNodeCaps("udid-1"));
+        Map<String, Object> requested = new HashMap<>();
+        requested.put("platformName", "Android");
+        TestSession session = proxy.getNewSession(requested);
+        GridRegistry registry = ServletStubs.stub(GridRegistry.class,
+                (method, args) -> "getActiveSessions".equals(method) ? Set.of(session) : null);
+        ServletStubs.Response response = new ServletStubs.Response();
+        Thread listing = new Thread(() -> {
+            try {
+                new AllSessionsServlet(registry).doGet(ServletStubs.request(), response.servletResponse);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+
+        // the session is listed while beforeSession changes its capabilities (HashMap: ConcurrentModificationException)
+        synchronized (session) {
+            listing.start();
+            listing.join(300);
+            Assert.assertTrue(listing.isAlive(), "the copy waits for the changes of beforeSession");
+        }
+        listing.join(5000);
+        Assert.assertEquals(response.calls.get("setStatus"), 200);
+    }
+
+    @Test
     public void secretsOfSessionsAreMasked() throws Exception {
         MobileRemoteProxy proxy = GridFixtures.proxy(GridFixtures.registry(), "http://node-1:4723", GridFixtures.androidNodeCaps("udid-1"));
         Map<String, Object> requested = new HashMap<>();

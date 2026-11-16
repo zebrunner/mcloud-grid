@@ -24,7 +24,6 @@ import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.EnvUtils;
 import com.zebrunner.mcloud.grid.util.HttpClient.Response;
 import com.zebrunner.mcloud.grid.util.HttpClientApache;
-import com.zebrunner.mcloud.grid.util.LogLevels;
 import com.zebrunner.mcloud.grid.util.NodeReachability;
 import com.zebrunner.mcloud.grid.util.NodeRegistrationToken;
 import com.zebrunner.mcloud.grid.util.NodeToken;
@@ -52,6 +51,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,30 +78,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private static final boolean CHECK_APPIUM_STATUS = Boolean.parseBoolean(System.getenv("CHECK_APPIUM_STATUS"));
     private static final String IS_MANUALLY_RESERVED = "IS_MANUALLY_RESERVED";
     private static final String STF_DISCONNECTED = "STF_DISCONNECTED";
+    /** {@link #terminateSession}: the session ended meanwhile, its device is returned in STF (or reserved by the next session). */
+    public static final int SESSION_ENDED = -1;
     private static final String STF_TOKEN = "STF_TOKEN";
     private static final String STARTED_LOGGED = "STARTED_LOGGED";
     private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
         @Override
         protected Object initialize() throws ConcurrentException {
             STFClient.disconnectAllDevices();
-            return true;
-        }
-    };
-    private static final LazyInitializer<Boolean> INITIAL_GRID_CONFIGURATION_LOGS = new LazyInitializer<Boolean>() {
-        @Override
-        protected Boolean initialize() throws ConcurrentException {
-            LogLevels.configure(System.getenv("MCLOUD_LOG_LEVEL"));
-            LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
-                            + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
-                            + "low battery check: %s; "
-                            + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
-                    STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
-                    CHECK_APPIUM_STATUS ? "on" : "off",
-                    CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
-                    NODE_ALLOWED_NETWORKS,
-                    MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
-                    STFClient.lowBatteryCheck(),
-                    UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
             return true;
         }
     };
@@ -118,8 +102,8 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // adb/wda timeout
     private static final Duration UNHEALTHY_MOBILE_TIMEOUT = EnvUtils.getDurationInSeconds("UNHEALTHY_MOBILE_TIMEOUT", Duration.ofMinutes(1));
 
-    // optional upper limit of the 'appium:newCommandTimeout' capability, not set = no limit
-    private static final Duration MAX_NEW_COMMAND_TIMEOUT = EnvUtils.getDurationInSeconds("MAX_NEW_COMMAND_TIMEOUT", null);
+    // optional upper limit of the 'appium:newCommandTimeout' capability, not set or 0 = no limit
+    private static final Duration MAX_NEW_COMMAND_TIMEOUT = newCommandTimeoutLimit(EnvUtils.getDurationInSeconds("MAX_NEW_COMMAND_TIMEOUT", null));
 
     // a node registered with an address the hub cannot reach is rejected, see #144
     private static final boolean CHECK_NODE_REACHABILITY = !"false".equalsIgnoreCase(System.getenv("CHECK_NODE_REACHABILITY"));
@@ -163,11 +147,6 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         nodeToken = accepted.getNodeToken();
         nodeHost = accepted.getHost();
         nodeTokenVerifiedAt = Instant.now();
-        try {
-            INITIAL_GRID_CONFIGURATION_LOGS.get();
-        } catch (Exception e) {
-            LOGGER.warning(() -> String.format("Could not provide grid configuration logs. Error message: %s", e.getMessage()));
-        }
         try {
             DISCONNECT_ALL_DEVICES.get();
         } catch (Exception e) {
@@ -251,12 +230,31 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         htmlRenderer = new ProxyHtmlRenderer(() -> this, udid);
 
         boolean knownDevice = registered && known instanceof MobileRemoteProxy && udid.equals(((MobileRemoteProxy) known).getUdid());
+        // a node registers only the devices STF bound to it: another node would get their sessions and remote ADB
         if (STFClient.isSTFEnabled() && !knownDevice) {
-            if (!STFClient.isDevicePresentInSTF(udid)) {
-                throw new GridException(String.format("Could not find device with udid '%s' in STF. Slot capabilities: %s",
-                        udid, slot.getCapabilities()));
-            }
+            STFClient.checkDeviceOfNode(udid, nodeToken.getLabel()).ifPresent(reason -> {
+                String message = String.format("Node %s ('%s'): %s, so it is not registered.", getRemoteHost(), nodeToken.getLabel(), reason);
+                warnAboutRejectedNode(String.valueOf(getRemoteHost()), message);
+                throw new GridException(message);
+            });
         }
+    }
+
+    /**
+     * Logs the configuration of the devices and the nodes; MobileGridRegistry logs it when the hub starts.
+     */
+    static void logConfiguration() {
+        LOGGER.info(() -> String.format("[CONFIGURATION] STF integration: %s; Appium status check (CHECK_APPIUM_STATUS): %s; "
+                        + "node reachability check: %s; nodes allowed from: %s; newCommandTimeout limit: %s; "
+                        + "low battery check: %s; "
+                        + "device is ignored after a failed Appium check for %ss, after a session timed out before start for %ss.",
+                STFClient.isSTFEnabled() ? "enabled (" + STFClient.getStfUrl() + ")" : "disabled (STF_URL and STF_TOKEN are not set)",
+                CHECK_APPIUM_STATUS ? "on" : "off",
+                CHECK_NODE_REACHABILITY ? "on (" + NODE_REACHABILITY_TIMEOUT.toSeconds() + "s)" : "off",
+                NODE_ALLOWED_NETWORKS,
+                MAX_NEW_COMMAND_TIMEOUT == null ? "none" : MAX_NEW_COMMAND_TIMEOUT.toSeconds() + "s",
+                STFClient.lowBatteryCheck(),
+                UNHEALTHY_MOBILE_TIMEOUT.toSeconds(), INACTIVITY_RELEASE_TIMEOUT.toSeconds()));
     }
 
     public void beforeCommand(TestSession session, HttpServletRequest request, HttpServletResponse response) {
@@ -394,19 +392,34 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         disconnectSTFDevice(session);
     }
 
+    /**
+     * The session is active (e.g. listed by AllSessionsServlet) when beforeSession changes its requested capabilities:
+     * the changes and {@link #requestedCapabilities(TestSession)} take the lock of the session.
+     */
     @Override
     public void beforeSession(TestSession session) {
         String internalKey = session.getInternalKey();
-        if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
-            //override platformName for the appium capabilities into tvOS
-            LOGGER.fine(() -> String.format("[%s][%s] tvOS device: 'platformName' of the session is tvOS.", udid, internalKey));
-            session.getRequestedCapabilities()
-                    .put(CapabilityType.PLATFORM_NAME, "tvOS");
+        synchronized (session) {
+            if (StringUtils.equalsIgnoreCase(deviceType, "tvos")) {
+                //override platformName for the appium capabilities into tvOS
+                LOGGER.fine(() -> String.format("[%s][%s] tvOS device: 'platformName' of the session is tvOS.", udid, internalKey));
+                session.getRequestedCapabilities()
+                        .put(CapabilityType.PLATFORM_NAME, "tvOS");
+            }
+            limitNewCommandTimeout(session.getRequestedCapabilities(), internalKey);
+            // the hub keeps the personal STF token of the session (STF_TOKEN of the session), Appium would log it
+            for (String name : new String[] {"zebrunner:" + STF_TOKEN, "appium:" + STF_TOKEN, STF_TOKEN}) {
+                session.getRequestedCapabilities().remove(name);
+            }
         }
-        limitNewCommandTimeout(session.getRequestedCapabilities(), internalKey);
-        // the hub keeps the personal STF token of the session (STF_TOKEN of the session), Appium would log it
-        for (String name : new String[] {"zebrunner:" + STF_TOKEN, "appium:" + STF_TOKEN, STF_TOKEN}) {
-            session.getRequestedCapabilities().remove(name);
+    }
+
+    /**
+     * @return a copy of the requested capabilities of the session, safe while beforeSession changes them
+     */
+    public static Map<String, Object> requestedCapabilities(TestSession session) {
+        synchronized (session) {
+            return new LinkedHashMap<>(session.getRequestedCapabilities());
         }
     }
 
@@ -555,6 +568,13 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     }
 
     /**
+     * @return the limit of 'newCommandTimeout', null (no limit) for 0: a limit of 0 would disable the timeout in Appium
+     */
+    static Duration newCommandTimeoutLimit(Duration configured) {
+        return configured == null || configured.isZero() ? null : configured;
+    }
+
+    /**
      * A big 'newCommandTimeout' keeps a device busy long after its client is gone, see #110.
      */
     private void limitNewCommandTimeout(Map<String, Object> capabilities, String internalKey) {
@@ -608,14 +628,22 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      * Returns the device to STF once per session: on inactivity timeout the grid calls both beforeRelease and afterSession.
      */
     private void disconnectSTFDevice(TestSession session) {
-        if (!STFClient.isSTFEnabled() || session.get(STF_DISCONNECTED) != null) {
+        if (!STFClient.isSTFEnabled()) {
             return;
         }
-        session.put(STF_DISCONNECTED, true);
-        String stfToken = Optional.ofNullable(session.get(STF_TOKEN))
-                .map(String::valueOf)
-                .orElse(STFClient.DEFAULT_STF_TOKEN);
-        STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), stfToken, session.getInternalKey());
+        // under the lock of the device: terminateSession must not release it after it is returned (and reserved again)
+        STFClient.withDeviceLock(udid, () -> {
+            if (session.get(STF_DISCONNECTED) != null) {
+                return null;
+            }
+            session.put(STF_DISCONNECTED, true);
+            String stfToken = Optional.ofNullable(session.get(STF_TOKEN))
+                    .map(String::valueOf)
+                    .orElse(STFClient.DEFAULT_STF_TOKEN);
+            STFClient.disconnectSTFDevice(udid, platform, Boolean.TRUE.equals(session.get(IS_MANUALLY_RESERVED)), stfToken,
+                    session.getInternalKey());
+            return null;
+        });
     }
 
     /**
@@ -624,16 +652,25 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
      * or for an STF admin, so a key of any other user is refused (403) and the session keeps running. Whether the key belongs
      * to an admin is not checked here, STF decides.
      *
-     * @return HTTP status of the STF release: 200 when the session is terminated
+     * @return HTTP status of the STF release: 200 when the session is terminated; {@link #SESSION_ENDED} when the session
+     *         ended meanwhile: its device is not released, it may be reserved by the next session already
      */
     public int terminateSession(TestSession session, String stfToken) {
         String internalKey = session.getInternalKey();
-        int status = STFClient.releaseDevice(udid, platform, stfToken, internalKey);
+        int status = STFClient.withDeviceLock(udid, () -> {
+            if (session.get(STF_DISCONNECTED) != null) {
+                return SESSION_ENDED;
+            }
+            int released = STFClient.releaseDevice(udid, platform, stfToken, internalKey);
+            if (released == 200) {
+                // the device is already released in STF, afterSession must not return it again with the grid token
+                session.put(STF_DISCONNECTED, true);
+            }
+            return released;
+        });
         if (status != 200) {
             return status;
         }
-        // the device is already released in STF, afterSession must not return it again with the grid token
-        session.put(STF_DISCONNECTED, true);
         if (session.getExternalKey() != null && !session.sendDeleteSessionRequest()) {
             LOGGER.warning(() -> String.format("[%s][%s] Node did not delete the Appium session %s, the device is released anyway.",
                     udid, internalKey, describeExternalSession(session)));

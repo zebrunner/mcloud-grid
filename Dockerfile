@@ -42,9 +42,29 @@ ENV \
     STF_URL="" \
     STF_TOKEN="" \
     STF_TIMEOUT=3600 \
+    # Device health, s (README.md#stf-and-device-health)
     CHECK_APPIUM_STATUS=false \
+    APPIUM_STATUS_TIMEOUT=10 \
+    UNHEALTHY_MOBILE_TIMEOUT=60 \
+    INACTIVITY_RELEASE_TIMEOUT=60 \
+    STF_DEVICE_INVALID_RESPONSE_IGNORE_TIMEOUT=600 \
+    STF_DEVICE_UNAUTHORIZED_IGNORE_TIMEOUT=600 \
+    STF_DEVICE_UNHEALTHY_IGNORE_TIMEOUT=60 \
+    STF_DEVICE_MANUALLY_RESERVED_TIMEOUT=180 \
+    # the battery level in %, 0 turns the check off
+    STF_DEVICE_LOW_BATTERY_THRESHOLD=15 \
+    STF_DEVICE_LOW_BATTERY_IGNORE_TIMEOUT=3600 \
+    # Node registration (README.md#node-registration): the networks are comma separated, empty = any
+    CHECK_NODE_REACHABILITY=true \
+    NODE_REACHABILITY_TIMEOUT=2 \
+    NODE_ALLOWED_NETWORKS="" \
+    # Upper limit of appium:newCommandTimeout, s; empty = no limit
+    MAX_NEW_COMMAND_TIMEOUT="" \
     # Playwright sessions (README.md#playwright), an option of the farm
     PLAYWRIGHT_ENABLED=false \
+    PLAYWRIGHT_IDLE_TIMEOUT=120 \
+    # Log level of the grid code (com.zebrunner)
+    MCLOUD_LOG_LEVEL=INFO \
     # Grid settings
     # As a boolean, maps to "throwOnCapabilityNotPresent"
     GRID_THROW_ON_CAPABILITY_NOT_PRESENT=true \
@@ -57,12 +77,12 @@ ENV \
     GRID_TIMEOUT=150 \
     # Debug
     GRID_DEBUG=false \
-    # Proxy
-    GRID_PROXY=com.zebrunner.mcloud.grid.MobileRemoteProxy \
     # Capability matcher
     GRID_CAPABILITY_MATCHER=com.zebrunner.mcloud.grid.MobileCapabilityMatcher \
-    # JVM heap of the hub; other JVM options can be added with JAVA_OPTS
-    JAVA_HEAP_OPTS="-Xms1G -Xmx4G"
+    # JVM heap of the hub, the other JVM options and the extra options of the hub
+    JAVA_HEAP_OPTS="-Xms1G -Xmx4G" \
+    JAVA_OPTS="" \
+    SE_OPTS=""
 
 # the hub writes its config.json on start, so /opt/selenium belongs to the unprivileged 'ubuntu' user of the base image
 # (COPY --chown: a chown -R of its own layer would copy the jar again)

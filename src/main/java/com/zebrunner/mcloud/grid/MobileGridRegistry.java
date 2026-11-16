@@ -21,6 +21,7 @@
 package com.zebrunner.mcloud.grid;
 
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
+import com.zebrunner.mcloud.grid.util.LogLevels;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
 import org.openqa.grid.internal.ActiveTestSessions;
 import org.openqa.grid.internal.BaseGridRegistry;
@@ -71,8 +72,10 @@ import java.util.logging.Logger;
  * <li>A node names the class of its proxy itself: only MobileRemoteProxy nodes are added, the others would skip
  * its checks (the node token, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
  * <li>A node does not replace a registered node of another host with its id.</li>
- * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) replace the ones of the nodes.</li>
+ * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT, GRID_CLEAN_UP_CYCLE) replace the ones of the nodes.</li>
  * <li>The device of a session of a lost node is returned in STF.</li>
+ * <li>A device is not claimed while it is being returned in STF (a session that ended, was abandoned or lost): the late
+ * return would end the reservation of the new session.</li>
  * <li>The end of a session releases only the slot that still holds it (a late termination does not end the next session
  * of the device), and a failed afterSession does not leave the device busy.</li>
  * </ul>
@@ -96,6 +99,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     private final Map<RequestHandler, TestSession> preparing = new IdentityHashMap<>();
     // under the lock: the devices that failed a request recently, until when they are skipped for it
     private final Map<RequestHandler, Map<RemoteProxy, Instant>> failedClaims = new IdentityHashMap<>();
+    // under the lock: the UDIDs of the devices being returned in STF, with the number of their returns; a device is not
+    // claimed before its return is done: the grid user reuses its own reservation, so the late return would end the new one
+    private final Map<String, Integer> returningDevices = new HashMap<>();
     private final Thread matcher = new Thread(this::match, "Matcher thread");
     private final ExecutorService preparation = Executors.newFixedThreadPool(PREPARATION_THREADS, new DaemonThreads("Device preparation"));
     // under the lock: a change of the queue, the devices or the sessions the matcher has not seen yet
@@ -114,17 +120,25 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     }
 
     /**
-     * Hub starts its registry before its server. Without STF, which verifies the node tokens, the hub starts but refuses
-     * every node (NodeAuthentication): the first start of MCloud runs before an admin of STF has an access token.
+     * Hub starts its registry before its server: MCLOUD_LOG_LEVEL and the log of the configuration come first, so the
+     * logs of the first registrations (also the rejected ones) have the level. Without STF, which verifies the node
+     * tokens, the hub starts but refuses every node (NodeAuthentication): the first start of MCloud runs before an admin
+     * of STF has an access token.
      */
     @Override
     public void start() {
+        LogLevels.configure(logLevel());
         checkNodeRegistration(isStfConfigured());
+        MobileRemoteProxy.logConfiguration();
         matcher.start();
     }
 
     protected boolean isStfConfigured() {
         return STFClient.isSTFEnabled();
+    }
+
+    protected String logLevel() {
+        return System.getenv("MCLOUD_LOG_LEVEL");
     }
 
     /**
@@ -228,10 +242,11 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     }
 
     /**
-     * A node of zebrunner/appium sends 'timeout' 150 and 'browserTimeout' 0 (a command without a time limit, a hung
-     * one keeps its device forever): the values of the hub config (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) are the ones of the sessions.
-     * A 'timeout' 0 of the hub keeps the one of the node: the cleanup thread of the node is started by its own value, it
-     * would end every session at once.
+     * A node of zebrunner/appium sends 'timeout' 150, 'browserTimeout' 0 (a command without a time limit, a hung
+     * one keeps its device forever) and 'cleanUpCycle' 5000: the values of the hub config (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT,
+     * GRID_CLEAN_UP_CYCLE) are the ones of the sessions. A 'timeout' 0 of the hub keeps the one of the node: the cleanup
+     * thread of the node is started by its own value, it would end every session at once; the thread reads 'cleanUpCycle'
+     * before every check.
      */
     private void applyHubTimeouts(RemoteProxy proxy) {
         GridHubConfiguration hubConfiguration = getHub() == null ? null : getHub().getConfiguration();
@@ -240,6 +255,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         }
         if (hubConfiguration != null && hubConfiguration.browserTimeout != null) {
             proxy.getConfig().browserTimeout = hubConfiguration.browserTimeout;
+        }
+        if (hubConfiguration != null && hubConfiguration.cleanUpCycle != null && hubConfiguration.cleanUpCycle > 0) {
+            proxy.getConfig().cleanUpCycle = hubConfiguration.cleanUpCycle;
         }
     }
 
@@ -295,7 +313,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             testSlot.doFinishRelease();
             if (prepared && testSlot.getProxy() instanceof MobileRemoteProxy) {
                 MobileRemoteProxy proxy = (MobileRemoteProxy) testSlot.getProxy();
-                runQuietly(() -> proxy.releaseLostSession(session, reason));
+                // the node of the device may register again at once: its new proxy waits for the return
+                startReturn(proxy);
+                returnInBackground(proxy, () -> proxy.releaseLostSession(session, reason));
             }
             fireStateChanged();
         } finally {
@@ -325,6 +345,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             if (!testSlot.startReleaseProcess()) {
                 return;
             }
+            // afterSession returns the device; the slot stays busy meanwhile, a new proxy of the device (the node registered
+            // again) waits too
+            startReturn(testSlot.getProxy());
         } finally {
             lock.unlock();
         }
@@ -336,6 +359,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         try {
             testSlot.finishReleaseProcess();
             release(internalKey, reason);
+            finishReturn(testSlot.getProxy());
         } finally {
             lock.unlock();
         }
@@ -493,7 +517,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             Map<String, Object> capabilities = handler.getRequest().getDesiredCapabilities();
             Map<RemoteProxy, Instant> failed = failedClaims.getOrDefault(handler, Map.of());
             for (RemoteProxy proxy : proxies.getSorted()) {
-                if (failed.containsKey(proxy)) {
+                if (failed.containsKey(proxy) || isReturning(proxy)) {
                     continue;
                 }
                 TestSession session;
@@ -535,6 +559,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
 
     private void finish(Claim claim, boolean prepared) {
         boolean bound = false;
+        boolean abandoned = false;
         lock.lock();
         try {
             preparing.remove(claim.handler);
@@ -548,6 +573,11 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
                 claim.handler.bindSession(claim.session);
                 bound = true;
             } else {
+                // the device is returned below, without the lock: it is not claimed again before that
+                abandoned = prepared && claim.proxy instanceof MobileRemoteProxy;
+                if (abandoned) {
+                    startReturn(claim.proxy);
+                }
                 if (slotKept) {
                     claim.session.getSlot().doFinishRelease();
                 }
@@ -560,17 +590,60 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         } finally {
             lock.unlock();
         }
-        if (prepared && !bound && claim.proxy instanceof MobileRemoteProxy) {
-            ((MobileRemoteProxy) claim.proxy).abandon(claim.session);
+        if (abandoned) {
+            try {
+                ((MobileRemoteProxy) claim.proxy).abandon(claim.session);
+            } finally {
+                finishReturn(claim.proxy);
+            }
         }
     }
 
-    private void runQuietly(Runnable task) {
+    /**
+     * Runs the return of the device of the proxy (started by {@link #startReturn}) in a thread of the preparation.
+     */
+    private void returnInBackground(MobileRemoteProxy proxy, Runnable task) {
         try {
-            preparation.execute(task);
+            preparation.execute(() -> {
+                try {
+                    task.run();
+                } finally {
+                    finishReturn(proxy);
+                }
+            });
         } catch (RuntimeException e) {
             LOGGER.fine(() -> "The registry is stopped, the task is not run: " + e);
+            finishReturn(proxy);
         }
+    }
+
+    /**
+     * Under the lock: the device of the proxy is being returned in STF, it is not claimed until {@link #finishReturn}.
+     */
+    private void startReturn(RemoteProxy proxy) {
+        if (proxy instanceof MobileRemoteProxy) {
+            returningDevices.merge(((MobileRemoteProxy) proxy).getUdid(), 1, Integer::sum);
+        }
+    }
+
+    /**
+     * A return of the device of the proxy is done, the device may be claimed again.
+     */
+    private void finishReturn(RemoteProxy proxy) {
+        if (!(proxy instanceof MobileRemoteProxy)) {
+            return;
+        }
+        lock.lock();
+        try {
+            returningDevices.computeIfPresent(((MobileRemoteProxy) proxy).getUdid(), (udid, returns) -> returns > 1 ? returns - 1 : null);
+            fireStateChanged();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private boolean isReturning(RemoteProxy proxy) {
+        return proxy instanceof MobileRemoteProxy && returningDevices.containsKey(((MobileRemoteProxy) proxy).getUdid());
     }
 
     @Override

@@ -20,4 +20,23 @@ public class LogLevelsTest {
         Assert.assertEquals(root.getLevel(), before);
         Assert.assertTrue(root.getUseParentHandlers());
     }
+
+    @Test
+    public void validLevelSetsTheLevelOfTheGridLoggers() {
+        Logger root = Logger.getLogger(LogLevels.ROOT_LOGGER);
+        Level before = root.getLevel();
+        try {
+            LogLevels.configure(" fine ");
+
+            Assert.assertEquals(root.getLevel(), Level.FINE);
+            Assert.assertTrue(Logger.getLogger("com.zebrunner.mcloud.grid.MobileRemoteProxy").isLoggable(Level.FINE));
+            Assert.assertTrue(root.getUseParentHandlers());
+
+            // an invalid level keeps the configured one
+            LogLevels.configure("LOUD");
+            Assert.assertEquals(root.getLevel(), Level.FINE);
+        } finally {
+            root.setLevel(before);
+        }
+    }
 }

@@ -46,11 +46,11 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `GRID_NEW_SESSION_WAIT_TIMEOUT` | `600000` | How long a new session request waits in the queue, ms |
 | `GRID_TIMEOUT` | `150` | Client inactivity timeout of a session, s; it replaces the one of the nodes (`0` keeps the one of the nodes) |
 | `GRID_BROWSER_TIMEOUT` | `900` | Timeout of a command on the node, s (0 = none); it replaces the one of the nodes (zebrunner/appium sends `0`): a hung command fails after it and the device is released, instead of staying busy until the restart of the hub |
-| `GRID_CLEAN_UP_CYCLE` | `5000` | How often the hub checks timed out sessions, ms |
+| `GRID_CLEAN_UP_CYCLE` | `5000` | How often the hub checks timed out sessions, ms; it replaces the one of the nodes (zebrunner/appium sends `5000`) |
 | `GRID_THROW_ON_CAPABILITY_NOT_PRESENT` | `true` | Reject requests no registered device can serve; see [Queueing](#queueing) |
 | `GRID_JETTY_MAX_THREADS` | `-1` | Jetty threads of the hub (-1 = default) |
 | `GRID_DEBUG` | `false` | Debug logging of the hub |
-| `GRID_PROXY`, `GRID_CAPABILITY_MATCHER` | mobile proxy and matcher | Classes of the node proxy and capability matcher; a node names the class of its proxy itself, the hub registers only `MobileRemoteProxy` (and its subclasses), see [Node registration](#node-registration) |
+| `GRID_CAPABILITY_MATCHER` | `com.zebrunner.mcloud.grid.MobileCapabilityMatcher` | Class of the capability matcher; the class of the proxy is named by every node itself, the hub registers only `MobileRemoteProxy` (and its subclasses), see [Node registration](#node-registration); `GRID_PROXY` of the older images is ignored |
 | `JAVA_HEAP_OPTS` | `-Xms1G -Xmx4G` | JVM heap of the hub |
 | `JAVA_OPTS` | | Other JVM options |
 | `JAVA_HOME`, `PATH`, `LANG` | `/opt/java/openjdk`, its `bin` first, `C.UTF-8` | The Java runtime of the image (Temurin 11, the modules of the hub only) and the UTF-8 locale |
@@ -58,10 +58,12 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `CHECK_NODE_REACHABILITY` | `true` | Reject the registration of a node the hub cannot connect to |
 | `NODE_REACHABILITY_TIMEOUT` | `2` | Connection timeout of that check, s |
 | `NODE_ALLOWED_NETWORKS` | | Comma separated CIDR ranges or IPs nodes may register from, e.g. `10.0.0.0/8, 192.168.1.15`; the address a node registers with is checked; not set = any node (an invalid value rejects every node) |
-| `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set) |
+| `MAX_NEW_COMMAND_TIMEOUT` | | Upper limit of `appium:newCommandTimeout`, s; bigger and disabled (`0`) values are limited (no limit when not set or `0`) |
 | `PLAYWRIGHT_ENABLED` | `false` | Run the Playwright sessions: the option of the farm, see [Playwright](#playwright) |
 | `PLAYWRIGHT_IDLE_TIMEOUT` | `120` | A side of a Playwright WebSocket that answers no ping for it is closed with the other side, s; see [Playwright](#playwright) |
-| `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are |
+| `MCLOUD_LOG_LEVEL` | `INFO` | Log level of the grid code, `FINE` for details; Selenium logs stay as they are. It is set when the hub starts, with the `[CONFIGURATION]` log of the settings, before the first node registers |
+
+The variables of the hub config (`GRID_*`) are validated before the hub starts, see [Exit codes and health](#exit-codes-and-health): the numbers are whole numbers (`GRID_NEW_SESSION_WAIT_TIMEOUT` and `GRID_JETTY_MAX_THREADS` at least `-1`, `GRID_TIMEOUT` and `GRID_BROWSER_TIMEOUT` at least `0`, `GRID_CLEAN_UP_CYCLE` at least `1`), the booleans `true` or `false`.
 
 ### STF and device health
 
@@ -70,7 +72,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | Env var | Default | Meaning |
 | --- | --- | --- |
 | `STF_URL` | | Required: STF address |
-| `STF_TOKEN` | | Required: access token of the STF admin that reserves devices for automation and verifies the node tokens of the nodes with the node registry of STF; a device that does not answer the reservation is also marked unhealthy in STF |
+| `STF_TOKEN` | | Required: access token of the STF admin that reserves devices for automation and verifies the node tokens of the nodes with the node registry of STF; a device that does not answer the reservation (STF answers `504` after 5 s, the hub waits 10 s for the reservation, the return and remoteConnect, 3 s for the other requests) is also marked unhealthy in STF and returned in case its reservation completes later |
 | `STF_TIMEOUT` | `3600` | Reservation timeout of a device in STF, s |
 | `CHECK_APPIUM_STATUS` | `false` | Check `/status-adb` (Android) or `/status-wda` (iOS) of the node before a session |
 | `APPIUM_STATUS_TIMEOUT` | `10` | How long the hub waits for the Appium status check, s; zebrunner/appium gives WebDriverAgent 3 s and a second attempt, adb 5 s |
@@ -83,6 +85,8 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | `STF_DEVICE_LOW_BATTERY_THRESHOLD` | `15` | A present and ready device charged below this level (%) in STF (Android and iOS) is skipped by automation; `0` disables the check |
 | `STF_DEVICE_LOW_BATTERY_IGNORE_TIMEOUT` | `3600` | A device with a low battery is skipped for, s; it is checked again by the next request after that |
 
+The `_TIMEOUT` variables in seconds of this table (but `STF_TIMEOUT`, a positive number) and `NODE_REACHABILITY_TIMEOUT`, `MAX_NEW_COMMAND_TIMEOUT`, `PLAYWRIGHT_IDLE_TIMEOUT` are whole numbers, `0` or more: an invalid or negative value is logged (`WARNING`) and the default is used.
+
 A request that leaves the queue without a device (`newSessionWaitTimeout` or a gone client) is logged as a warning with the
 matching devices: busy, down and ignored ones with the reason (e.g. `low battery: 12% (discharging), below 15%`).
 
@@ -92,7 +96,7 @@ matching devices: busy, down and ignored ones with the reason (e.g. `low battery
 | --- | --- |
 | `platformName` | `Android`, `iOS`, ... |
 | `appium:platformVersion` | Exact (`13`), range (`11-13`), minimum (`12+`) or list (`12,14`); `7` matches `7.0` |
-| `appium:deviceName`, `appium:udid` | One value or a comma separated list |
+| `appium:deviceName`, `appium:udid` | One value or a comma separated list (the spaces around the values are ignored) |
 | `zebrunner:deviceType` | `phone`, `tablet`, `tv`, `tvOS`, ...; `tvOS` devices get `platformName=tvOS` |
 | `zebrunner:STF_TOKEN` | Personal STF token: the device is reserved as that user and is not returned after the session; the hub does not pass it to Appium |
 | `zebrunner:STF_TIMEOUT` | Reservation timeout in STF for this session, s |
@@ -106,9 +110,9 @@ A node registers with the hub through `/grid/register`, which answers anyone who
 
 - its proxy is `MobileRemoteProxy` (the registry of the hub config, `MobileGridRegistry`, rejects the others): a node with another class would skip the checks below;
 - it sends its node token in `custom` of its configuration (`"custom": {"registrationToken": "<node token>"}`), which [zebrunner/appium](https://github.com/zebrunner/appium) does with its `NODE_REGISTRATION_TOKEN` (`MCLOUD_NODE_TOKEN` of [mcloud-agent](https://github.com/zebrunner/mcloud-agent)), and STF verifies the token for the address of the node; the hub takes the token out of the configuration it keeps, so the console, `/grid/api/proxy` and the logs do not show it;
-- its address is in `NODE_ALLOWED_NETWORKS` (checked before the request to STF) and reachable (`CHECK_NODE_REACHABILITY`), and its device is in STF.
+- its address is in `NODE_ALLOWED_NETWORKS` (checked before the request to STF) and reachable (`CHECK_NODE_REACHABILITY`), and STF has its device bound to the node of the token (`node` of the device in STF: STF binds a device to the enrolled node whose device container proved its registration with the node token), so a node cannot register the device of another node to get its sessions and its remote ADB address.
 
-A node gets its node token `mcn1.<label>.<secret>` when it joins the farm with an invite of the admin (`./zebrunner.sh node-invite <label> <address>` of [mcloud](https://github.com/zebrunner/mcloud) on the server, `./zebrunner.sh join` of mcloud-agent on the node): STF keeps the node (its label and the address of the invite) in its node registry, and only the SHA-256 of the token. The hub accepts a node token only when STF verifies it for the host of the node URL: `POST /api/v1/nodes/verify` with the token and the host, authorized by `STF_TOKEN`, answers `200` only for an active node whose registered address is that host. The answers of STF (`200` and `403`) are cached for 30 s by the SHA-256 of the token and the host, so the retries of a rejected node do not load STF.
+A node gets its node token `mcn1.<label>.<secret>` when it joins the farm with an invite of the admin (`./zebrunner.sh node-invite <label> <address>` of [mcloud](https://github.com/zebrunner/mcloud) on the server, `./zebrunner.sh join` of mcloud-agent on the node): STF keeps the node (its label and the address of the invite) in its node registry, and only the SHA-256 of the token. The hub accepts a node token only when STF verifies it for the host of the node URL: `POST /api/v1/nodes/verify` with the token and the host, authorized by `STF_TOKEN`, answers `200` only for an active node whose registered address is that host. The answers of STF (`200` and `403`) are cached for 30 s by the SHA-256 of the token and the host, so the retries of a rejected node do not load STF. The tokens STF did not answer about recently are verified within a limit: 10 node tokens of a host (of the node URL; its nodes share one) and 1000 of all the hosts in 30 s. Beyond it a node is rejected before the check of `NODE_ALLOWED_NETWORKS` and the request to STF and registers again later, so requests with ever new tokens do not make the hub resolve their host and ask STF every time.
 
 - The hub sends the node token of a node only to that node, in the header `X-MCloud-Node-Token` of its requests (the commands of the sessions, the status polling, the Appium status checks); zebrunner/appium answers only such requests and the ones of its own container. So the Appium of a device is used through the hub only, which reserves the device in STF.
 - STF verifies the node token of every registered node again every 60 s, without the cache: a node whose token it rejects (`403`: the node is revoked, joined again with a new token, or its address is another one) is unregistered at once, its sessions end and their devices are returned in STF. While STF does not answer, the node is kept for up to 10 minutes since its last verification, then it is unregistered too. The logs name the node by its label, never by its token.
@@ -122,7 +126,7 @@ The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is i
 
 ### Matching
 
-The hub matches the queued requests to the devices in the order of the queue: it claims a free matching device for a request, then prepares it (the Appium status check of `CHECK_APPIUM_STATUS`, the reservation in STF) without the lock of the registry, the devices of several requests in parallel. A slow STF or node delays only its request, not the queueing, the end of the sessions and the registration of the nodes. A device that fails a request (not ready, not reserved in STF) is skipped by this request for 10 s, the request gets the next device at once. A device prepared for a request that is gone meanwhile (timed out) or on a node lost meanwhile is returned in STF.
+The hub matches the queued requests to the devices in the order of the queue: it claims a free matching device for a request, then prepares it (the Appium status check of `CHECK_APPIUM_STATUS`, the reservation in STF) without the lock of the registry, the devices of several requests in parallel. A slow STF or node delays only its request, not the queueing, the end of the sessions and the registration of the nodes. A device that fails a request (not ready, not reserved in STF) is skipped by this request for 10 s, the request gets the next device at once. A device prepared for a request that is gone meanwhile (timed out) or on a node lost meanwhile is returned in STF. A device is not claimed while it is being returned in STF (its session ended, was abandoned, or its node was lost or registered again): the grid user reuses its own reservation of a device, so the late return would end the reservation of the next session.
 
 When the hub loses a node (it is down for `unregisterIfStillDownAfter` of the node, or registers again) its sessions end and their devices are returned in STF. An invalid `zebrunner:STF_TIMEOUT` (not a whole number of seconds) is logged and the default timeout is used.
 
@@ -158,7 +162,7 @@ A Playwright session is an Appium session of the `Playwright` automation of [zeb
 curl -X POST -H "Authorization: Bearer <STF access token>" "http://grid:4444/grid/admin/TerminateSessionServlet?udid=emulator-5554"
 ```
 
-The hub releases the device in STF with the given key first and terminates the session only when STF allows it. STF releases a device for the user it is reserved by or for an STF admin. Devices are reserved by the grid user (`STF_TOKEN`), so the key of a regular STF user may not work (`403`, the session keeps running) unless the session was started with that user's `zebrunner:STF_TOKEN`; an STF admin key works.
+The hub releases the device in STF with the given key first and terminates the session only when STF allows it. STF releases a device for the user it is reserved by or for an STF admin. Devices are reserved by the grid user (`STF_TOKEN`), so the key of a regular STF user may not work (`403`, the session keeps running) unless the session was started with that user's `zebrunner:STF_TOKEN`; an STF admin key works. A session that ends meanwhile is not released again (`404`): its device may be reserved by the next session already.
 
 The servlets are registered in the hub config by `generate_config`. `com.zebrunner.mcloud.grid.servlets.ProxyInfo` (registration requests of the nodes) is not registered by default.
 
@@ -192,13 +196,21 @@ The node gets the reason in the answer of `/grid/register` (the log of the appiu
 | `has a node token, but STF could not verify it (STF did not answer)` | The hub does not reach `STF_URL`: check the address, the STF containers and the network between them. A registered node is kept for 10 minutes without the answers of STF. |
 | `has a node token, but STF could not verify it (HTTP 401)` or `(HTTP 404)` | `STF_TOKEN` of the hub is not the token of an STF admin (`401`), or STF has no node registry (`404`): update STF and set the admin token. The hub logs these once in 10 minutes. |
 | `is not in NODE_ALLOWED_NETWORKS`, `is not reachable from the hub` | The address of the node is outside `NODE_ALLOWED_NETWORKS`, or the hub cannot connect to it. |
-| `Could not find device with udid '...' in STF` | The device of the node is not in STF yet; it registers once STF has it. |
+| `Could not find device with udid '...' in STF` or `is not bound to a node in STF yet` | The device of the node is not in STF yet, or STF has not bound it to the node yet; it registers once STF has it. A device that stays unbound was rejected by STF (`Rejected the registration of device` in the log of the STF processor): check `STF_NODE_TOKEN` and `STF_PROVIDER_HOST` of the device container with `./zebrunner.sh doctor` of mcloud-agent. |
+| `is bound to another node in STF` | The UDID of the node is a device of another node in STF: the node registers a device of another host (a wrong `DEVICE_UDID`, or a device moved to another host without the restart of the device container there). |
 
 A registered node that disappears with `[NODE TOKEN] STF does not accept the node token of node ... any more` was revoked, joined again or moved: join it again.
 
 ### No node registers
 
 `STF_URL and STF_TOKEN are not set` in the log of the start (`SEVERE`) and `STF_URL and STF_TOKEN of the hub are not set` for every node: set both and restart the hub, it verifies the node tokens with STF.
+
+## Exit codes and health
+
+- The entrypoint validates the variables of the hub config (`GRID_*`) first: every invalid one is logged (`SEVERE`, e.g. `GRID_TIMEOUT '1h' is not a whole number of at least 0.`), then the container exits with `0`, so a restart policy does not restart it: a restart does not fix the configuration. Fix the variables and start the container again.
+- `1`: `/opt/selenium/config.json` could not be written, a restart may fix it.
+- Otherwise the container runs the hub until it stops: `docker stop` stops it gracefully (`shutdown complete` in the log).
+- The healthcheck of the image is `GET /wd/hub/status` of the hub every 30 s (timeout 5 s, 3 retries, start period 30 s).
 
 ## Development
 
