@@ -71,7 +71,7 @@ import java.util.logging.Logger;
  * removed another one).</li>
  * <li>A node names the class of its proxy itself: only MobileRemoteProxy nodes are added, the others would skip
  * its checks (the node token, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
- * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) replace the ones of the nodes.</li>
+ * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT, GRID_CLEAN_UP_CYCLE) replace the ones of the nodes.</li>
  * <li>The device of a session of a lost node is returned in STF.</li>
  * <li>A device is not claimed while it is being returned in STF (a session that ended, was abandoned or lost): the late
  * return would end the reservation of the new session.</li>
@@ -228,10 +228,11 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     }
 
     /**
-     * A node of zebrunner/appium sends 'timeout' 150 and 'browserTimeout' 0 (a command without a time limit, a hung
-     * one keeps its device forever): the values of the hub config (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) are the ones of the sessions.
-     * A 'timeout' 0 of the hub keeps the one of the node: the cleanup thread of the node is started by its own value, it
-     * would end every session at once.
+     * A node of zebrunner/appium sends 'timeout' 150, 'browserTimeout' 0 (a command without a time limit, a hung
+     * one keeps its device forever) and 'cleanUpCycle' 5000: the values of the hub config (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT,
+     * GRID_CLEAN_UP_CYCLE) are the ones of the sessions. A 'timeout' 0 of the hub keeps the one of the node: the cleanup
+     * thread of the node is started by its own value, it would end every session at once; the thread reads 'cleanUpCycle'
+     * before every check.
      */
     private void applyHubTimeouts(RemoteProxy proxy) {
         GridHubConfiguration hubConfiguration = getHub() == null ? null : getHub().getConfiguration();
@@ -240,6 +241,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         }
         if (hubConfiguration != null && hubConfiguration.browserTimeout != null) {
             proxy.getConfig().browserTimeout = hubConfiguration.browserTimeout;
+        }
+        if (hubConfiguration != null && hubConfiguration.cleanUpCycle != null && hubConfiguration.cleanUpCycle > 0) {
+            proxy.getConfig().cleanUpCycle = hubConfiguration.cleanUpCycle;
         }
     }
 
