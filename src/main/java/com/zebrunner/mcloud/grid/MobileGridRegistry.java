@@ -72,6 +72,8 @@ import java.util.logging.Logger;
  * its checks (the node token, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
  * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT) replace the ones of the nodes.</li>
  * <li>The device of a session of a lost node is returned in STF.</li>
+ * <li>A device is not claimed while it is being returned in STF (a session that ended, was abandoned or lost): the late
+ * return would end the reservation of the new session.</li>
  * <li>The end of a session releases only the slot that still holds it (a late termination does not end the next session
  * of the device), and a failed afterSession does not leave the device busy.</li>
  * </ul>
@@ -95,6 +97,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
     private final Map<RequestHandler, TestSession> preparing = new IdentityHashMap<>();
     // under the lock: the devices that failed a request recently, until when they are skipped for it
     private final Map<RequestHandler, Map<RemoteProxy, Instant>> failedClaims = new IdentityHashMap<>();
+    // under the lock: the UDIDs of the devices being returned in STF, with the number of their returns; a device is not
+    // claimed before its return is done: the grid user reuses its own reservation, so the late return would end the new one
+    private final Map<String, Integer> returningDevices = new HashMap<>();
     private final Thread matcher = new Thread(this::match, "Matcher thread");
     private final ExecutorService preparation = Executors.newFixedThreadPool(PREPARATION_THREADS, new DaemonThreads("Device preparation"));
     // under the lock: a change of the queue, the devices or the sessions the matcher has not seen yet
@@ -281,7 +286,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             testSlot.doFinishRelease();
             if (prepared && testSlot.getProxy() instanceof MobileRemoteProxy) {
                 MobileRemoteProxy proxy = (MobileRemoteProxy) testSlot.getProxy();
-                runQuietly(() -> proxy.releaseLostSession(session, reason));
+                // the node of the device may register again at once: its new proxy waits for the return
+                startReturn(proxy);
+                returnInBackground(proxy, () -> proxy.releaseLostSession(session, reason));
             }
             fireStateChanged();
         } finally {
@@ -311,6 +318,9 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             if (!testSlot.startReleaseProcess()) {
                 return;
             }
+            // afterSession returns the device; the slot stays busy meanwhile, a new proxy of the device (the node registered
+            // again) waits too
+            startReturn(testSlot.getProxy());
         } finally {
             lock.unlock();
         }
@@ -322,6 +332,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         try {
             testSlot.finishReleaseProcess();
             release(internalKey, reason);
+            finishReturn(testSlot.getProxy());
         } finally {
             lock.unlock();
         }
@@ -479,7 +490,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             Map<String, Object> capabilities = handler.getRequest().getDesiredCapabilities();
             Map<RemoteProxy, Instant> failed = failedClaims.getOrDefault(handler, Map.of());
             for (RemoteProxy proxy : proxies.getSorted()) {
-                if (failed.containsKey(proxy)) {
+                if (failed.containsKey(proxy) || isReturning(proxy)) {
                     continue;
                 }
                 TestSession session;
@@ -521,6 +532,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
 
     private void finish(Claim claim, boolean prepared) {
         boolean bound = false;
+        boolean abandoned = false;
         lock.lock();
         try {
             preparing.remove(claim.handler);
@@ -534,6 +546,11 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
                 claim.handler.bindSession(claim.session);
                 bound = true;
             } else {
+                // the device is returned below, without the lock: it is not claimed again before that
+                abandoned = prepared && claim.proxy instanceof MobileRemoteProxy;
+                if (abandoned) {
+                    startReturn(claim.proxy);
+                }
                 if (slotKept) {
                     claim.session.getSlot().doFinishRelease();
                 }
@@ -546,17 +563,60 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         } finally {
             lock.unlock();
         }
-        if (prepared && !bound && claim.proxy instanceof MobileRemoteProxy) {
-            ((MobileRemoteProxy) claim.proxy).abandon(claim.session);
+        if (abandoned) {
+            try {
+                ((MobileRemoteProxy) claim.proxy).abandon(claim.session);
+            } finally {
+                finishReturn(claim.proxy);
+            }
         }
     }
 
-    private void runQuietly(Runnable task) {
+    /**
+     * Runs the return of the device of the proxy (started by {@link #startReturn}) in a thread of the preparation.
+     */
+    private void returnInBackground(MobileRemoteProxy proxy, Runnable task) {
         try {
-            preparation.execute(task);
+            preparation.execute(() -> {
+                try {
+                    task.run();
+                } finally {
+                    finishReturn(proxy);
+                }
+            });
         } catch (RuntimeException e) {
             LOGGER.fine(() -> "The registry is stopped, the task is not run: " + e);
+            finishReturn(proxy);
         }
+    }
+
+    /**
+     * Under the lock: the device of the proxy is being returned in STF, it is not claimed until {@link #finishReturn}.
+     */
+    private void startReturn(RemoteProxy proxy) {
+        if (proxy instanceof MobileRemoteProxy) {
+            returningDevices.merge(((MobileRemoteProxy) proxy).getUdid(), 1, Integer::sum);
+        }
+    }
+
+    /**
+     * A return of the device of the proxy is done, the device may be claimed again.
+     */
+    private void finishReturn(RemoteProxy proxy) {
+        if (!(proxy instanceof MobileRemoteProxy)) {
+            return;
+        }
+        lock.lock();
+        try {
+            returningDevices.computeIfPresent(((MobileRemoteProxy) proxy).getUdid(), (udid, returns) -> returns > 1 ? returns - 1 : null);
+            fireStateChanged();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private boolean isReturning(RemoteProxy proxy) {
+        return proxy instanceof MobileRemoteProxy && returningDevices.containsKey(((MobileRemoteProxy) proxy).getUdid());
     }
 
     @Override
