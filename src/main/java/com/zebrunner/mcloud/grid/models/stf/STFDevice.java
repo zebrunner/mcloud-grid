@@ -45,6 +45,8 @@ public class STFDevice {
     private String manufacturer;
     private String model;
     private Network network;
+    // the label of the enrolled node STF bound the device to, null when it is not bound
+    private String node;
     private Object operator;
     private STFUser owner;
     private Phone phone;
@@ -89,6 +91,7 @@ public class STFDevice {
                 ", manufacturer='" + manufacturer + '\'' +
                 ", model='" + model + '\'' +
                 ", network=" + network +
+                ", node='" + node + '\'' +
                 ", operator=" + operator +
                 ", owner=" + owner +
                 ", phone=" + phone +

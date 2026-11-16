@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.integration.client;
 
 import com.github.tomakehurst.wiremock.http.Fault;
+import com.zebrunner.mcloud.grid.GridFixtures;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
 import com.zebrunner.mcloud.grid.models.stf.Battery;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -368,6 +370,31 @@ public class STFClientTest {
         assertIgnoredFor(Duration.ofMinutes(10));
     }
 
+    public void reservationAnsweredAfterTheDefaultTimeoutSucceeds() {
+        stf.devices(device(UDID));
+        // STF answers when the device joined the group, up to 5 seconds later
+        stf.server().stubFor(post("/api/v1/user/devices").willReturn(okJson("{\"success\":true}").withFixedDelay(4000)));
+
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+        Assert.assertFalse(IgnoredDevices.get(UDID).isPresent());
+        stf.server().verify(0, putRequestedFor(urlMatching("/api/v1/devices/.*")));
+    }
+
+    public void deviceNotRespondingToReservationIsMarkedUnhealthyAndReturned() {
+        stf.devices(device(UDID));
+        stf.server().stubFor(post("/api/v1/user/devices").willReturn(aResponse().withStatus(504)
+                .withBody("{\"success\":false,\"description\":\"Device is not responding\"}")));
+        stf.server().stubFor(put("/api/v1/devices/" + UDID).willReturn(okJson("{\"success\":true}")));
+
+        Assert.assertNull(STFClient.reserveSTFDevice(UDID, caps("iOS"), SESSION));
+
+        stf.server().verify(putRequestedFor(urlEqualTo("/api/v1/devices/" + UDID))
+                .withRequestBody(equalToJson("{\"device\":{\"status\":\"unhealthy\"}}")));
+        // the device may join the group after the answer of STF
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + UDID)));
+        assertIgnoredFor(Duration.ofMinutes(10));
+    }
+
     public void rejectedReservationDoesNotMarkDeviceUnhealthy() {
         stf.devices(device(UDID));
         stf.server().stubFor(post("/api/v1/user/devices").willReturn(aResponse().withStatus(403)));
@@ -490,10 +517,15 @@ public class STFClientTest {
         stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/free")));
     }
 
-    public void devicePresenceCheck() {
-        stf.devices(device(UDID));
+    public void deviceOfNodeCheck() {
+        stf.devices(device(UDID), device("other-node-device").node("node-2"), device("unbound-device").node(null));
 
-        Assert.assertTrue(STFClient.isDevicePresentInSTF(UDID));
-        Assert.assertFalse(STFClient.isDevicePresentInSTF("unknown"));
+        Assert.assertEquals(STFClient.checkDeviceOfNode(UDID, GridFixtures.NODE_LABEL), Optional.empty());
+        Assert.assertEquals(STFClient.checkDeviceOfNode("unknown", GridFixtures.NODE_LABEL),
+                Optional.of("Could not find device with udid 'unknown' in STF (HTTP 500)"));
+        Assert.assertEquals(STFClient.checkDeviceOfNode("other-node-device", GridFixtures.NODE_LABEL),
+                Optional.of("Device with udid 'other-node-device' is bound to another node in STF, not to 'test-node'"));
+        Assert.assertEquals(STFClient.checkDeviceOfNode("unbound-device", GridFixtures.NODE_LABEL),
+                Optional.of("Device with udid 'unbound-device' is not bound to a node in STF yet"));
     }
 }
