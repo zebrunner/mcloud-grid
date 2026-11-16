@@ -226,7 +226,7 @@ make docker  # docker image checks: user, the start without STF (every node refu
 make load    # short load test of the image with fake Appium nodes and a fake STF
 ```
 
-`tests/lint.sh` and `tests/docker_test.sh` write JUnit XML into `$JUNIT_DIR` when it is set, maven writes it into `target/surefire-reports`. Tests with STF enabled (TestNG group `stf`) run in their own JVM against a WireMock STF stub. Load tests against real grids are described in [LOAD_TESTING.md](LOAD_TESTING.md). CI (`.github/workflows/ci.yml`) runs the same checks on pushes and pull requests: jobs `lint`, `tests` and `docker` (the image checks and a load test with fake Appium nodes and a fake STF); dependabot proposes updates weekly.
+`tests/lint.sh` and `tests/docker_test.sh` write JUnit XML into `$JUNIT_DIR` when it is set, maven writes it into `target/surefire-reports`. Tests with STF enabled (TestNG group `stf`) run in their own JVM against a WireMock STF stub. Load tests against real grids are described in [LOAD_TESTING.md](LOAD_TESTING.md). CI (`.github/workflows/ci.yml`) runs the same checks on pushes and pull requests: jobs `lint`, `tests` and `docker` (the image checks and a load test with fake Appium nodes and a fake STF; its builds of the image keep their layers, also the Maven dependencies of the build stage, in the cache of GitHub Actions through `DOCKER_BUILD_OPTS` of `tests/docker_test.sh` and `tests/load_local.sh`); dependabot proposes updates weekly.
 
 The conventions of the style, the formatting and the tooling of this repository are in [CONVENTIONS.md](CONVENTIONS.md), the same in all the MCloud repositories.
 

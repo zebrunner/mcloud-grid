@@ -69,14 +69,27 @@ jobs:
           distribution: temurin
           java-version: "11"
           cache: maven
+      # the builds of the image keep their layers in the cache of GitHub Actions (type=gha): the Maven dependencies of
+      # pom.xml (dependency:go-offline) and the packages are built again only when they change; the builder needs the
+      # runtime of the cache, the image is loaded into docker for the tests
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        id: buildx
+        with:
+          use: false
+      - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
       - name: Docker image checks
         run: tests/docker_test.sh
         env:
           JUNIT_DIR: ${{ runner.temp }}/junit
+          DOCKER_BUILD_OPTS: >-
+            --builder ${{ steps.buildx.outputs.name }} --load --cache-from type=gha --cache-to type=gha,mode=max
       # Only the local disposable hub is exercised; real grids require an explicit manual run.
       - name: Load test of the image with fake Appium nodes
         id: load_test
         run: tests/load_local.sh -Dload.fakeNodes=10 -Dload.sessions=200 -Dload.concurrency=20 -Dload.maxErrorRate=0
+        env:
+          # the image of the checks above, from the cache of the builder
+          DOCKER_BUILD_OPTS: --builder ${{ steps.buildx.outputs.name }} --load
       # one report per path: the action pairs report_paths with check_name items
       - name: Docker image report
         if: ${{ !cancelled() }}
