@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.servlets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zebrunner.mcloud.grid.MobileRemoteProxy;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
 import org.openqa.grid.internal.GridRegistry;
@@ -57,7 +58,7 @@ public class AllSessionsServlet extends RegistryBasedServlet {
      * Requested capabilities with the platform and device of the slot the session runs on, without vendor prefixes.
      */
     private static Map<String, Object> flattenCapabilities(TestSession session) {
-        Map<String, Object> merged = new LinkedHashMap<>(session.getRequestedCapabilities());
+        Map<String, Object> merged = MobileRemoteProxy.requestedCapabilities(session);
         Map<String, Object> device = session.getSlot().getCapabilities();
         if (device.get(CapabilityType.PLATFORM_NAME) != null) {
             merged.put(CapabilityType.PLATFORM_NAME, device.get(CapabilityType.PLATFORM_NAME));
