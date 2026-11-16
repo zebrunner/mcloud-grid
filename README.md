@@ -158,7 +158,7 @@ A Playwright session is an Appium session of the `Playwright` automation of [zeb
 curl -X POST -H "Authorization: Bearer <STF access token>" "http://grid:4444/grid/admin/TerminateSessionServlet?udid=emulator-5554"
 ```
 
-The hub releases the device in STF with the given key first and terminates the session only when STF allows it. STF releases a device for the user it is reserved by or for an STF admin. Devices are reserved by the grid user (`STF_TOKEN`), so the key of a regular STF user may not work (`403`, the session keeps running) unless the session was started with that user's `zebrunner:STF_TOKEN`; an STF admin key works.
+The hub releases the device in STF with the given key first and terminates the session only when STF allows it. STF releases a device for the user it is reserved by or for an STF admin. Devices are reserved by the grid user (`STF_TOKEN`), so the key of a regular STF user may not work (`403`, the session keeps running) unless the session was started with that user's `zebrunner:STF_TOKEN`; an STF admin key works. A session that ends meanwhile is not released again (`404`): its device may be reserved by the next session already.
 
 The servlets are registered in the hub config by `generate_config`. `com.zebrunner.mcloud.grid.servlets.ProxyInfo` (registration requests of the nodes) is not registered by default.
 
