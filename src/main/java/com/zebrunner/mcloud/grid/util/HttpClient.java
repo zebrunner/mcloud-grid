@@ -35,6 +35,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -49,12 +50,14 @@ public final class HttpClient {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
+    private static final RequestConfig DEFAULT_CONFIG = RequestConfig.custom()
+            .setConnectTimeout(3000)
+            .setConnectionRequestTimeout(3000)
+            .setSocketTimeout(3000)
+            .build();
+
     private static final CloseableHttpClient CLIENT = HttpClients.custom()
-            .setDefaultRequestConfig(RequestConfig.custom()
-                    .setConnectTimeout(3000)
-                    .setConnectionRequestTimeout(3000)
-                    .setSocketTimeout(3000)
-                    .build())
+            .setDefaultRequestConfig(DEFAULT_CONFIG)
             .setConnectionManager(connectionManager())
             .evictIdleConnections(30, TimeUnit.SECONDS)
             // no retries: a slow STF must not block new session requests longer than the timeouts above
@@ -82,6 +85,7 @@ public final class HttpClient {
     public static final class Executor {
         private final String url;
         private String authorization;
+        private RequestConfig config;
 
         private Executor(String url) {
             this.url = url;
@@ -89,6 +93,15 @@ public final class HttpClient {
 
         public Executor withAuthorization(String authToken) {
             this.authorization = authToken;
+            return this;
+        }
+
+        /**
+         * @param timeout the time to wait for the answer instead of the default 3 seconds, for the requests STF answers
+         *                only after the device did (it waits up to 5 seconds for it)
+         */
+        public Executor withSocketTimeout(Duration timeout) {
+            this.config = RequestConfig.copy(DEFAULT_CONFIG).setSocketTimeout((int) timeout.toMillis()).build();
             return this;
         }
 
@@ -112,6 +125,9 @@ public final class HttpClient {
             Response<R> rs = new Response<>();
             try {
                 HttpRequestBase request = method.apply(url);
+                if (config != null) {
+                    request.setConfig(config);
+                }
                 request.setHeader(HttpHeaders.ACCEPT, ContentType.APPLICATION_JSON.getMimeType());
                 if (StringUtils.isNotEmpty(authorization)) {
                     request.setHeader(HttpHeaders.AUTHORIZATION, authorization);

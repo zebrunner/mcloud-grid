@@ -70,7 +70,7 @@ The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF
 | Env var | Default | Meaning |
 | --- | --- | --- |
 | `STF_URL` | | Required: STF address |
-| `STF_TOKEN` | | Required: access token of the STF admin that reserves devices for automation and verifies the node tokens of the nodes with the node registry of STF; a device that does not answer the reservation is also marked unhealthy in STF |
+| `STF_TOKEN` | | Required: access token of the STF admin that reserves devices for automation and verifies the node tokens of the nodes with the node registry of STF; a device that does not answer the reservation (STF answers `504` after 5 s, the hub waits 10 s for the reservation, the return and remoteConnect, 3 s for the other requests) is also marked unhealthy in STF and returned in case its reservation completes later |
 | `STF_TIMEOUT` | `3600` | Reservation timeout of a device in STF, s |
 | `CHECK_APPIUM_STATUS` | `false` | Check `/status-adb` (Android) or `/status-wda` (iOS) of the node before a session |
 | `APPIUM_STATUS_TIMEOUT` | `10` | How long the hub waits for the Appium status check, s; zebrunner/appium gives WebDriverAgent 3 s and a second attempt, adb 5 s |
