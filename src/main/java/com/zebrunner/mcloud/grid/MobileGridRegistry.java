@@ -71,6 +71,7 @@ import java.util.logging.Logger;
  * removed another one).</li>
  * <li>A node names the class of its proxy itself: only MobileRemoteProxy nodes are added, the others would skip
  * its checks (the node token, NODE_ALLOWED_NETWORKS, the reachability, STF).</li>
+ * <li>A node does not replace a registered node of another host with its id.</li>
  * <li>The timeouts of the hub (GRID_TIMEOUT, GRID_BROWSER_TIMEOUT, GRID_CLEAN_UP_CYCLE) replace the ones of the nodes.</li>
  * <li>The device of a session of a lost node is returned in STF.</li>
  * <li>A device is not claimed while it is being returned in STF (a session that ended, was abandoned or lost): the late
@@ -179,17 +180,19 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             MobileRemoteProxy.warnAboutRejectedNode(String.valueOf(proxy.getRemoteHost()), String.format(
                     "Node %s registers with the proxy %s, only %s is accepted, so it is not registered.",
                     proxy.getRemoteHost(), proxy.getClass().getName(), MobileRemoteProxy.class.getName()));
-            // the cleanup thread of the proxy is already started; DefaultRemoteProxy then fails to stop the polling it has not started
-            try {
-                proxy.teardown();
-            } catch (RuntimeException e) {
-                LOGGER.finest(() -> "Teardown of the rejected proxy: " + e);
-            }
+            teardownQuietly(proxy);
             return;
         }
-        LOGGER.info("Registered a node " + proxy);
         lock.lock();
         try {
+            // a node of another host would end the sessions of the registered node and take its place
+            RemoteProxy registered = proxies.getProxyById(proxy.getId());
+            if (registered instanceof MobileRemoteProxy && !((MobileRemoteProxy) registered).isAtHostOf((MobileRemoteProxy) proxy)) {
+                MobileRemoteProxy.warnAboutRejectedNode(String.valueOf(proxy.getRemoteHost()), MobileRemoteProxy.idOfAnotherNode(proxy, registered));
+                teardownQuietly(proxy);
+                return;
+            }
+            LOGGER.info("Registered a node " + proxy);
             removeIfPresent(proxy);
             if (registeringProxies.contains(proxy)) {
                 LOGGER.warning(String.format("Proxy '%s' is already queued for registration.", proxy));
@@ -224,6 +227,17 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             }
         } finally {
             lock.unlock();
+        }
+    }
+
+    /**
+     * The cleanup thread of a rejected proxy is already started; DefaultRemoteProxy then fails to stop the polling it has not started.
+     */
+    private static void teardownQuietly(RemoteProxy proxy) {
+        try {
+            proxy.teardown();
+        } catch (RuntimeException e) {
+            LOGGER.finest(() -> "Teardown of the rejected proxy: " + e);
         }
     }
 
