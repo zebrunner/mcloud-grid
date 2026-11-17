@@ -352,25 +352,18 @@ public class STFClientTest {
         stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices")).withHeader("Authorization", equalTo("Bearer user-token")));
     }
 
-    public void startOfTheHubReturnsTheReservationsOfTheGrid() {
+    public void startOfTheHubReturnsTheReservationsOfTheGridUserOnly() {
         stf.devices(device("grid").owner(BOT_USER), device("john-api").owner("john").usage("automation"), device("mary-ui").owner("mary"));
 
-        // without the users the grid user reserves every device
-        STFClient.disconnectAllDevices();
-        stf.server().verify(1, deleteRequestedFor(urlMatching("/api/v1/user/devices/.*")));
-        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/grid")));
-
-        // with them the reservations of the API of every user are the ones of the grid, a reservation of the UI is kept
-        stf.server().resetRequests();
+        // also with the users: a reservation of the API of a user may be of another client of STF
         GridFixtures.useHubAuth(GridFixtures.HUB_SECRET);
         try {
             STFClient.disconnectAllDevices();
         } finally {
             GridFixtures.useHubAuth(null);
         }
-        stf.server().verify(2, deleteRequestedFor(urlMatching("/api/v1/user/devices/.*")).withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN)));
+        stf.server().verify(1, deleteRequestedFor(urlMatching("/api/v1/user/devices/.*")));
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/grid")));
-        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/john-api")));
     }
 
     public void notReadyDeviceIsIgnored() {

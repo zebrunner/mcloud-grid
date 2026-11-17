@@ -15,7 +15,6 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.integration.client;
 
-import com.zebrunner.mcloud.grid.HubAuth;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
 import com.zebrunner.mcloud.grid.models.stf.Battery;
@@ -476,7 +475,7 @@ public final class STFClient {
         if (!STFClient.isSTFEnabled()) {
             return;
         }
-        LOGGER.info("[STF] Returning the devices left reserved by the grid (e.g. by a previous run of the hub).");
+        LOGGER.info("[STF] Returning the devices left reserved by the grid user (e.g. by a previous run of the hub).");
         HttpClient.Response<User> user = HttpClient.uri(Path.STF_USER_PATH, STF_URL)
                 .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                 .get(User.class);
@@ -497,15 +496,13 @@ public final class STFClient {
             return;
         }
 
-        // with the authentication of the users the grid reserves the devices with the tokens of the users: the reservations of the
-        // API ("automation") are returned too
-        boolean usersReserve = HubAuth.get().isEnabled();
+        // with the authentication of the users the reservations of the sessions are the ones of their users: they are not told from
+        // the reservations of other clients of the API, so they expire in STF (and a session of their user returns them)
         devices.getObject()
                 .getDevices()
                 .stream()
                 .filter(d -> d.getOwner() != null)
-                .filter(d -> StringUtils.equals(d.getOwner().getName(), user.getObject().getUser().getName())
-                        || usersReserve && AUTOMATION_USAGE.equals(d.getUsage()))
+                .filter(d -> StringUtils.equals(d.getOwner().getName(), user.getObject().getUser().getName()))
                 .map(STFDevice::getSerial)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toList())
@@ -517,7 +514,7 @@ public final class STFClient {
                     if (response.getStatus() != 200) {
                         LOGGER.warning(() -> String.format("[STF] Could not return the device '%s' to STF (HTTP %s).", udid, response.getStatus()));
                     } else {
-                        LOGGER.info(() -> String.format("[STF] Device '%s' left reserved by the grid is returned to STF.", udid));
+                        LOGGER.info(() -> String.format("[STF] Device '%s' left reserved by the grid user is returned to STF.", udid));
                     }
                 });
     }
