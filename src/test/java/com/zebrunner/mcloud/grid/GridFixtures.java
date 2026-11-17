@@ -62,6 +62,16 @@ public final class GridFixtures {
         MobileRemoteProxy.useNodeAuthentication(NodeAuthentication.fromEnv());
     }
 
+    /** GRID_AUTH_SECRET of the tests of the authentication of the users. */
+    public static final String HUB_SECRET = "0123456789abcdef0123456789abcdef-secret";
+
+    /**
+     * Turns the authentication of the users (HubAuth) on with {@link #HUB_SECRET}, or off with null.
+     */
+    public static void useHubAuth(String secret) {
+        HubAuth.use(HubAuth.fromEnv(secret));
+    }
+
     public static GridRegistry registry() {
         GridHubConfiguration config = new GridHubConfiguration();
         config.capabilityMatcher = new MobileCapabilityMatcher();

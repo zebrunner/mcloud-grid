@@ -76,6 +76,7 @@ The variables of the hub config (`GRID_*`) are validated before the hub starts, 
 | `STF_URL` | | Required: STF address |
 | `STF_TOKEN` | | Required: access token of the STF admin that reserves devices for automation and verifies the node tokens of the nodes with the node registry of STF; a device that does not answer the reservation (STF answers `504` after 5 s, the hub waits 10 s for the reservation, the return and remoteConnect, 3 s for the other requests) is also marked unhealthy in STF and returned in case its reservation completes later |
 | `STF_TIMEOUT` | `3600` | Reservation timeout of a device in STF, s |
+| `GRID_AUTH_SECRET` | | The secret of stf-proxy of MCloud, at least 32 characters without whitespace: turns on the [authentication of the users](#authentication-of-the-users), the hub then takes the requests of the users of stf-proxy only; not set = anyone who reaches the hub uses it (logged as a warning) |
 | `CHECK_APPIUM_STATUS` | `false` | Check `/status-adb` (Android) or `/status-wda` (iOS) of the node before a session |
 | `APPIUM_STATUS_TIMEOUT` | `10` | How long the hub waits for the Appium status check, s; zebrunner/appium gives WebDriverAgent 3 s and a second attempt, adb 5 s |
 | `UNHEALTHY_MOBILE_TIMEOUT` | `60` | A device failing the Appium status check is skipped for, s |
@@ -100,7 +101,7 @@ matching devices: busy, down and ignored ones with the reason (e.g. `low battery
 | `appium:platformVersion` | Exact (`13`), range (`11-13`), minimum (`12+`) or list (`12,14`); `7` matches `7.0` |
 | `appium:deviceName`, `appium:udid` | One value or a comma separated list (the spaces around the values are ignored) |
 | `zebrunner:deviceType` | `phone`, `tablet`, `tv`, `tvOS`, ...; `tvOS` devices get `platformName=tvOS` |
-| `zebrunner:STF_TOKEN` | Personal STF token: the device is reserved as that user and is not returned after the session; the hub does not pass it to Appium |
+| `zebrunner:STF_TOKEN` | Personal STF token: the device is reserved as that user and is not returned after the session; the hub does not pass it to Appium. With the [authentication of the users](#authentication-of-the-users) the token of the URL of the hub is used, the capability is refused when it is another token |
 | `zebrunner:STF_TIMEOUT` | Reservation timeout in STF for this session, s |
 | `zebrunner:enableAdb` | Android: wait for the remote ADB connection of STF before the session; the hub starts the remote ADB (`remoteURL` of `zebrunner:slotCapabilities`) of every Android device, by the platform of its node, also for a request without `platformName` (e.g. by `appium:udid` only) |
 
@@ -125,6 +126,23 @@ A node that registers again at the same address (e.g. after the hub restarted) i
 The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is in no log of Appium; the hub masks it, the registration token and any node token (`mcn1.<label>.*****`) in its own logs, e.g. the session requests and the registration requests Selenium logs with `-debug`.
 
 `/lifecycle-manager` of Selenium, which shuts the hub down for anyone, is turned off in the hub config (`withoutServlets`).
+
+### Authentication of the users
+
+With `GRID_AUTH_SECRET` the hub takes the requests of the users of [MCloud](https://github.com/zebrunner/mcloud) only: stf-proxy asks STF about every request of the grid (`GET /api/v1/zebrunner/hub-auth`, see [ZEBRUNNER.md of STF](https://github.com/zebrunner/stf/blob/develop/ZEBRUNNER.md#grid-authentication)) and passes the user STF answered on in `X-MCloud-User` (the email), `X-MCloud-Admin` and `X-MCloud-Token` (the STF access token of the request), with the secret in `X-MCloud-Auth`. The hub trusts these headers with the secret only (compared in constant time). A test gives its STF access token in the URL of the hub: `https://<user>:<token>@<host>/mcloud/wd/hub`, `<user>` is any name without `@` (the clients of Selenium, Appium and WebdriverIO send it as `Authorization: Basic`).
+
+| Routes | Who |
+| --- | --- |
+| `/wd/hub/status`, `/status` (the healthcheck), `/grid/register`, `/grid/api/proxy` (the nodes, which have their node tokens) | anyone |
+| `/wd/hub/*`, `/grid/console`, `/grid/resources`, `/grid/admin/DevicesServlet`, `/grid/admin/AllSessionsServlet`, `/grid/admin/TerminateSessionServlet`, `/grid/admin/PlaywrightServlet` | a user |
+| the others: `/grid/admin/MetricsServlet`, `/grid/api/hub`, `/grid/api/sessions`, ... | an admin of STF |
+
+- A request without the user of stf-proxy is answered `401`, a user on an admin route `403`, both with a WebDriver error the clients show.
+- A session belongs to the user of its request: a command or the Playwright WebSocket of the session of another user is answered `404` (`invalid session id`), as an unknown session; an admin uses any session. The devices (`DevicesServlet`, the console) show the email of the user of a session to everyone, its id, its last command and its capabilities (`AllSessionsServlet`) to its user and the admins only.
+- The device of a session is reserved in STF with the token of its user, so the groups and the permissions of STF apply to the user; the hub needs the token for a session (`A session needs the STF access token of its user`). A device the user had reserved in STF before the session (in the UI) stays reserved after it; a reservation through the API (`usage: automation`, e.g. one of a hub that stopped) is returned after the session. The hub returns the reservations of the grid user only when it starts: the ones of the users of a hub that stopped are not told from the ones of other clients of STF, they expire in STF (`STF_TIMEOUT`).
+- `TerminateSessionServlet` releases the device with the token of the request: a user terminates the own sessions, an admin any.
+- The nodes never get `Authorization`, `Cookie` or the `X-MCloud-*` headers of a request: the hub copies the headers of a command to the node of its session.
+- The hub of Selenium 3 has no setting for a filter: the main class of the image, `com.zebrunner.mcloud.grid.HubLauncher`, adds `HubAuthFilter` to the Jetty context of the hub once it is started, and stops the hub when it cannot. Until then the registry refuses the new sessions without a user.
 
 ### Matching
 
@@ -164,7 +182,7 @@ A Playwright session is an Appium session of the `Playwright` automation of [zeb
 curl -X POST -H "Authorization: Bearer <STF access token>" "http://grid:4444/grid/admin/TerminateSessionServlet?udid=emulator-5554"
 ```
 
-The hub releases the device in STF with the given key first and terminates the session only when STF allows it. STF releases a device for the user it is reserved by or for an STF admin. Devices are reserved by the grid user (`STF_TOKEN`), so the key of a regular STF user may not work (`403`, the session keeps running) unless the session was started with that user's `zebrunner:STF_TOKEN`; an STF admin key works. A session that ends meanwhile is not released again (`404`): its device may be reserved by the next session already.
+The hub releases the device in STF with the given key first and terminates the session only when STF allows it. STF releases a device for the user it is reserved by or for an STF admin. Devices are reserved by the grid user (`STF_TOKEN`), so the key of a regular STF user may not work (`403`, the session keeps running) unless the session was started with that user's `zebrunner:STF_TOKEN`; an STF admin key works. With the [authentication of the users](#authentication-of-the-users) the key is the token of the request (`/mcloud/grid/admin/TerminateSessionServlet` of MCloud with `Authorization: Bearer <token>`), and the devices are reserved by the users of the sessions: a user terminates the own sessions. A session that ends meanwhile is not released again (`404`): its device may be reserved by the next session already.
 
 The servlets are registered in the hub config by `generate_config`. `com.zebrunner.mcloud.grid.servlets.ProxyInfo` (registration requests of the nodes) is not registered by default.
 
@@ -210,7 +228,8 @@ A registered node that disappears with `[NODE TOKEN] STF does not accept the nod
 ## Exit codes and health
 
 - The entrypoint validates the variables of the hub config (`GRID_*`) first: every invalid one is logged (`SEVERE`, e.g. `GRID_TIMEOUT '1h' is not a whole number of at least 0.`), then the container exits with `0`, so a restart policy does not restart it: a restart does not fix the configuration. Fix the variables and start the container again.
-- `1`: `/opt/selenium/config.json` could not be written, a restart may fix it.
+- `GRID_AUTH_SECRET` is validated with them: empty, or at least 32 characters without whitespace (the log tells its length, never the secret).
+- `1`: `/opt/selenium/config.json` could not be written, a restart may fix it; or the authentication of the users could not be added to the started hub (`[AUTHENTICATION] ... the hub is stopped.`): the hub does not run without it.
 - Otherwise the container runs the hub until it stops: `docker stop` stops it gracefully (`shutdown complete` in the log).
 - The healthcheck of the image is `GET /wd/hub/status` of the hub every 30 s (timeout 5 s, 3 retries, start period 30 s).
 

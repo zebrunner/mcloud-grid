@@ -327,10 +327,43 @@ public class STFClientTest {
     }
 
     public void deviceAlreadyReservedBySameUserIsReused() {
-        stf.devices(device(UDID).owner(BOT_USER));
+        stf.devices(device(UDID).owner(BOT_USER).usage("automation"));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
+        STFDevice device = STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION);
+        Assert.assertNotNull(device);
+        Assert.assertTrue(device.isReservedBefore());
+        Assert.assertEquals(device.getUsage(), "automation");
         assertNoReservationRequest();
+    }
+
+    public void deviceReservedByTheCallIsNotReservedBefore() {
+        stf.devices(device(UDID));
+
+        STFDevice device = STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION);
+        Assert.assertNotNull(device);
+        Assert.assertFalse(device.isReservedBefore());
+    }
+
+    public void reservesWithTheGivenTokenOfTheUser() {
+        stf.user("user-token", "john");
+        stf.devices(device(UDID));
+
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), "user-token", SESSION));
+        stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices")).withHeader("Authorization", equalTo("Bearer user-token")));
+    }
+
+    public void startOfTheHubReturnsTheReservationsOfTheGridUserOnly() {
+        stf.devices(device("grid").owner(BOT_USER), device("john-api").owner("john").usage("automation"), device("mary-ui").owner("mary"));
+
+        // also with the users: a reservation of the API of a user may be of another client of STF
+        GridFixtures.useHubAuth(GridFixtures.HUB_SECRET);
+        try {
+            STFClient.disconnectAllDevices();
+        } finally {
+            GridFixtures.useHubAuth(null);
+        }
+        stf.server().verify(1, deleteRequestedFor(urlMatching("/api/v1/user/devices/.*")));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/grid")));
     }
 
     public void notReadyDeviceIsIgnored() {

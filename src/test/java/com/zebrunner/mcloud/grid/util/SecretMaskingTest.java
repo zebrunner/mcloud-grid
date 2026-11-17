@@ -90,6 +90,9 @@ public class SecretMaskingTest {
         Assert.assertEquals(SecretMasking.maskLogMessage("authorization: Basic dXNlcjpwYXNz"), "authorization: Basic *****");
         Assert.assertEquals(SecretMasking.maskLogMessage("http-outgoing-1 >> X-MCloud-Node-Token: s3cret"),
                 "http-outgoing-1 >> X-MCloud-Node-Token: *****");
+        // the headers of stf-proxy for the hub (HubAuth) in the debug logs of Jetty
+        Assert.assertEquals(SecretMasking.maskLogMessage("X-MCloud-Token: user-token\nX-MCloud-Auth: s3cret\nX-MCloud-User: john@example.com"),
+                "X-MCloud-Token: *****\nX-MCloud-Auth: *****\nX-MCloud-User: john@example.com");
         Assert.assertEquals(SecretMasking.maskLogMessage("the Authorization header is required"), "the Authorization header is required");
     }
 }

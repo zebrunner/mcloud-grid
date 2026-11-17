@@ -26,10 +26,10 @@ public final class SecretMasking {
     // the registration token of a node and the STF token of a session in a log message: JSON (the registration request
     // Selenium logs with -debug), a map or the capabilities of a session request (Capabilities {zebrunner:STF_TOKEN: ...})
     private static final Pattern LOG_SECRET = Pattern.compile("((?:" + NodeRegistrationToken.CUSTOM_KEY + "|STF_TOKEN)\"?\\s*[:=]\\s*\"?)[^\",}\\s]+");
-    // the value of a secret header in the debug logs of the HTTP clients (org.apache.http.headers, org.apache.http.wire):
-    // the STF token of the hub, the node token of a node
+    // the value of a secret header in the debug logs of the HTTP clients (org.apache.http.headers, org.apache.http.wire) and
+    // of Jetty: the STF token of the hub or of a user, the node token of a node, the secret of stf-proxy (HubAuth)
     private static final Pattern SECRET_HEADER = Pattern.compile(
-            "(?i)((?:authorization|" + NodeRegistrationToken.HEADER + "):\\s*(?:(?:bearer|basic)\\s+)?)[^\\s\"\\[\\],]+");
+            "(?i)((?:authorization|" + NodeRegistrationToken.HEADER + "|x-mcloud-token|x-mcloud-auth):\\s*(?:(?:bearer|basic)\\s+)?)[^\\s\"\\[\\],]+");
     // a node token anywhere in a log message keeps its label only
     private static final Pattern NODE_TOKEN = Pattern.compile("(\\bmcn1\\.[a-z0-9-]{1,40}\\.)[A-Za-z0-9_-]+");
 
@@ -81,7 +81,7 @@ public final class SecretMasking {
 
     /**
      * @return the log message with the registration tokens, the node tokens, the STF tokens and the values of the
-     * Authorization and X-MCloud-Node-Token headers masked
+     * Authorization, X-MCloud-Node-Token, X-MCloud-Token and X-MCloud-Auth headers masked
      */
     public static String maskLogMessage(String message) {
         if (message == null) {
@@ -92,7 +92,8 @@ public final class SecretMasking {
             masked = LOG_SECRET.matcher(masked).replaceAll("$1" + MASK);
         }
         String lower = masked.toLowerCase(Locale.ROOT);
-        if (lower.contains("authorization") || lower.contains(NodeRegistrationToken.HEADER.toLowerCase(Locale.ROOT))) {
+        if (lower.contains("authorization") || lower.contains(NodeRegistrationToken.HEADER.toLowerCase(Locale.ROOT))
+                || lower.contains("x-mcloud-token") || lower.contains("x-mcloud-auth")) {
             masked = SECRET_HEADER.matcher(masked).replaceAll("$1" + MASK);
         }
         if (masked.contains(NodeToken.PREFIX)) {

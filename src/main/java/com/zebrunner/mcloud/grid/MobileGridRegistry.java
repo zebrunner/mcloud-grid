@@ -21,8 +21,10 @@
 package com.zebrunner.mcloud.grid;
 
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
+import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.LogLevels;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
+import org.openqa.grid.common.exception.GridException;
 import org.openqa.grid.internal.ActiveTestSessions;
 import org.openqa.grid.internal.BaseGridRegistry;
 import org.openqa.grid.internal.ExternalSessionKey;
@@ -40,6 +42,7 @@ import org.openqa.grid.web.Hub;
 import org.openqa.grid.web.servlet.handler.RequestHandler;
 import org.openqa.selenium.remote.DesiredCapabilities;
 
+import javax.servlet.ServletRequest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -130,6 +134,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         LogLevels.configure(logLevel());
         checkNodeRegistration(isStfConfigured());
         MobileRemoteProxy.logConfiguration();
+        HubAuth.logConfiguration();
         matcher.start();
     }
 
@@ -386,6 +391,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
 
     @Override
     public void addNewSessionRequest(RequestHandler handler) {
+        verifyUser(handler.getRequest(), handler.getRequest().getDesiredCapabilities(), HubAuth.get().isEnabled(), isStfConfigured());
         // a Playwright session while the option is off is refused before the queue, as a device the grid does not have
         PlaywrightSessions.verifyAllowed(handler.getRequest().getDesiredCapabilities());
         lock.lock();
@@ -395,6 +401,29 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
             fireStateChanged();
         } finally {
             lock.unlock();
+        }
+    }
+
+    /**
+     * With the authentication of the users a session belongs to the user of its request (HubAuthFilter), and its device
+     * is reserved in STF with the token of the user: a request without them is refused (e.g. one of the start of the hub,
+     * before its filter is added), as a capability 'zebrunner:STF_TOKEN' of another token.
+     */
+    static void verifyUser(ServletRequest request, Map<String, Object> capabilities, boolean authEnabled, boolean stfEnabled) {
+        if (!authEnabled) {
+            return;
+        }
+        HubAuth.Identity identity = HubAuth.identity(request)
+                .orElseThrow(() -> new GridException("The hub takes the sessions of the users of MCloud only: the STF access token in the URL "
+                        + "of the hub, https://<user>:<token>@<host>/mcloud/wd/hub"));
+        if (stfEnabled && identity.getToken() == null) {
+            throw new GridException("A session needs the STF access token of its user: the token in the URL of the hub, "
+                    + "https://<user>:<token>@<host>/mcloud/wd/hub");
+        }
+        Optional<String> requested = CapabilityUtils.getZebrunnerCapability(capabilities, "STF_TOKEN").map(String::valueOf);
+        if (requested.isPresent() && !requested.get().equals(identity.getToken())) {
+            throw new GridException("The capability 'zebrunner:STF_TOKEN' is not the access token of the URL of the hub: the device is "
+                    + "reserved with the token of the URL, remove the capability.");
         }
     }
 
@@ -534,6 +563,7 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
                     continue;
                 }
                 if (session != null) {
+                    HubAuth.bind(handler.getRequest(), session);
                     preparing.put(handler, session);
                     claims.add(new Claim(handler, proxy, session));
                     break;
