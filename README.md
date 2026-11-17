@@ -129,7 +129,7 @@ The hub does not pass `zebrunner:STF_TOKEN` of a session to the node, so it is i
 
 ### Authentication of the users
 
-With `GRID_AUTH_SECRET` the hub takes the requests of the users of [MCloud](https://github.com/zebrunner/mcloud) only: stf-proxy asks STF about every request of the grid (`GET /api/v1/zebrunner/hub-auth`, see [ZEBRUNNER.md of STF](https://github.com/zebrunner/stf/blob/develop/ZEBRUNNER.md#grid-authentication)) and passes the user STF answered on in `X-MCloud-User` (the email), `X-MCloud-Admin` and `X-MCloud-Token` (the STF access token of the request), with the secret in `X-MCloud-Auth`. The hub trusts these headers with the secret only (compared in constant time). A test gives its STF access token in the URL of the hub: `https://<email>:<token>@<host>/mcloud/wd/hub` (the clients of Selenium, Appium and WebdriverIO send it as `Authorization: Basic`).
+With `GRID_AUTH_SECRET` the hub takes the requests of the users of [MCloud](https://github.com/zebrunner/mcloud) only: stf-proxy asks STF about every request of the grid (`GET /api/v1/zebrunner/hub-auth`, see [ZEBRUNNER.md of STF](https://github.com/zebrunner/stf/blob/develop/ZEBRUNNER.md#grid-authentication)) and passes the user STF answered on in `X-MCloud-User` (the email), `X-MCloud-Admin` and `X-MCloud-Token` (the STF access token of the request), with the secret in `X-MCloud-Auth`. The hub trusts these headers with the secret only (compared in constant time). A test gives its STF access token in the URL of the hub: `https://<user>:<token>@<host>/mcloud/wd/hub`, `<user>` is any name without `@` (the clients of Selenium, Appium and WebdriverIO send it as `Authorization: Basic`).
 
 | Routes | Who |
 | --- | --- |

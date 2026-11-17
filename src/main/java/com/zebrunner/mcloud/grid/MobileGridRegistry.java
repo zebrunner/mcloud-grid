@@ -415,10 +415,10 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         }
         HubAuth.Identity identity = HubAuth.identity(request)
                 .orElseThrow(() -> new GridException("The hub takes the sessions of the users of MCloud only: the STF access token in the URL "
-                        + "of the hub, https://<email>:<token>@<host>/mcloud/wd/hub"));
+                        + "of the hub, https://<user>:<token>@<host>/mcloud/wd/hub"));
         if (stfEnabled && identity.getToken() == null) {
             throw new GridException("A session needs the STF access token of its user: the token in the URL of the hub, "
-                    + "https://<email>:<token>@<host>/mcloud/wd/hub");
+                    + "https://<user>:<token>@<host>/mcloud/wd/hub");
         }
         Optional<String> requested = CapabilityUtils.getZebrunnerCapability(capabilities, "STF_TOKEN").map(String::valueOf);
         if (requested.isPresent() && !requested.get().equals(identity.getToken())) {

@@ -134,7 +134,7 @@ public class HubAuthFilterTest {
     public void refusesARequestWithoutTheUserOfStfProxy() throws Exception {
         HttpResponse<String> anonymous = send("POST", "/wd/hub/session", "{\"capabilities\":{\"alwaysMatch\":{\"platformName\":\"Android\"}}}");
         Assert.assertEquals(anonymous.statusCode(), 401);
-        Assert.assertTrue(anonymous.body().contains("https://<email>:<token>@<host>/mcloud/wd/hub"), anonymous.body());
+        Assert.assertTrue(anonymous.body().contains("https://<user>:<token>@<host>/mcloud/wd/hub"), anonymous.body());
 
         // the headers of a user without the secret: a client that reached the hub without stf-proxy
         String[] forged = {HubAuth.SECRET_HEADER, "not-the-secret-not-the-secret-not-the", HubAuth.USER_HEADER, ADMIN, HubAuth.ADMIN_HEADER, "true"};

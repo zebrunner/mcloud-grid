@@ -109,7 +109,7 @@ public final class HubAuthFilter implements Filter {
                         request.getRemoteAddr()));
                 refuse(response, HttpServletResponse.SC_UNAUTHORIZED, "unknown error",
                         "The hub takes the requests of the users of MCloud: the STF access token in the URL of the hub, "
-                                + "https://<email>:<token>@<host>/mcloud/wd/hub");
+                                + "https://<user>:<token>@<host>/mcloud/wd/hub");
                 return;
             }
             if (access == HubAuth.Access.ADMIN && !identity.get().isAdmin()) {
