@@ -133,7 +133,7 @@ With `GRID_AUTH_SECRET` the hub takes the requests of the users of [MCloud](http
 
 | Routes | Who |
 | --- | --- |
-| `/wd/hub/status`, `/status` (the healthcheck), `/grid/register`, `/grid/api/proxy` (the nodes, which have their node tokens) | anyone |
+| `/wd/hub/status`, `/status`, `/grid/register`, `/grid/api/proxy` (the nodes, which have their node tokens, and the healthcheck) | anyone |
 | `/wd/hub/*`, `/grid/console`, `/grid/resources`, `/grid/admin/DevicesServlet`, `/grid/admin/AllSessionsServlet`, `/grid/admin/TerminateSessionServlet`, `/grid/admin/PlaywrightServlet` | a user |
 | the others: `/grid/admin/MetricsServlet`, `/grid/api/hub`, `/grid/api/sessions`, ... | an admin of STF |
 
@@ -147,6 +147,8 @@ With `GRID_AUTH_SECRET` the hub takes the requests of the users of [MCloud](http
 ### Matching
 
 The hub matches the queued requests to the devices in the order of the queue: it claims a free matching device for a request, then prepares it (the Appium status check of `CHECK_APPIUM_STATUS`, the reservation in STF) without the lock of the registry, the devices of several requests in parallel. A slow STF or node delays only its request, not the queueing, the end of the sessions and the registration of the nodes. A device that fails a request (not ready, not reserved in STF) is skipped by this request for 10 s, the request gets the next device at once. A device prepared for a request that is gone meanwhile (timed out) or on a node lost meanwhile is returned in STF. A device is not claimed while it is being returned in STF (its session ended, was abandoned, or its node was lost or registered again): the grid user reuses its own reservation of a device, so the late return would end the reservation of the next session.
+
+The hub asks every node for its status (`/wd/hub/status` of the node) every `nodePolling` of the node: it waits 2 s for the connection and `nodeStatusCheckTimeout` of the node for the answer (in whole seconds, at least 1 s; Selenium 3 took the milliseconds of it as seconds). A node that fails `downPollingLimit` times in a row is down (it gets no new session) and is lost when it is still down after `unregisterIfStillDownAfter`: with the node config of zebrunner/appium (`nodePolling` 5000, `nodeStatusCheckTimeout` 5000, `downPollingLimit` 3, `unregisterIfStillDownAfter` 3000 ms) a node that is gone is lost in about 30 s, a node that does not answer (frozen) in about 40 s. The console and `/wd/hub/status` ask every node the same way.
 
 When the hub loses a node (it is down for `unregisterIfStillDownAfter` of the node, or registers again) its sessions end and their devices are returned in STF. An invalid `zebrunner:STF_TIMEOUT` (not a whole number of seconds) is logged and the default timeout is used.
 
@@ -174,7 +176,7 @@ A Playwright session is an Appium session of the `Playwright` automation of [zeb
 | `/grid/admin/PlaywrightServlet/<session id>` | The WebSocket of a Playwright session, see [Playwright](#playwright) |
 | `/grid/admin/MetricsServlet` | Prometheus metrics: `mcloud_grid_devices{platform,status}`, `mcloud_grid_sessions`, `mcloud_grid_new_session_requests` (the queue) |
 | `POST /grid/admin/TerminateSessionServlet?udid=<udid>` or `?sessionId=<id>` | Terminates the session of a device and releases it in STF, see below |
-| `/wd/hub/status` | Hub status, also the healthcheck of the image |
+| `/wd/hub/status` | Hub status: `ready` while a node with a free device answers its status (the hub asks every node, see [Matching](#matching)) |
 
 ### Terminating a session
 
@@ -231,7 +233,7 @@ A registered node that disappears with `[NODE TOKEN] STF does not accept the nod
 - `GRID_AUTH_SECRET` is validated with them: empty, or at least 32 characters without whitespace (the log tells its length, never the secret).
 - `1`: `/opt/selenium/config.json` could not be written, a restart may fix it; or the authentication of the users could not be added to the started hub (`[AUTHENTICATION] ... the hub is stopped.`): the hub does not run without it.
 - Otherwise the container runs the hub until it stops: `docker stop` stops it gracefully (`shutdown complete` in the log).
-- The healthcheck of the image is `GET /wd/hub/status` of the hub every 30 s (timeout 5 s, 3 retries, start period 30 s).
+- The healthcheck of the image is `GET /grid/api/proxy` of the hub (the node API of Selenium, which answers without asking the nodes, unlike `/wd/hub/status`) every 30 s (timeout 5 s, 3 retries, start period 30 s).
 
 ## Development
 

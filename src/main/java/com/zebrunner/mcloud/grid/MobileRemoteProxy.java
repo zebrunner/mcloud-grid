@@ -42,8 +42,12 @@ import org.openqa.grid.internal.TestSession;
 import org.openqa.grid.internal.TestSlot;
 import org.openqa.grid.internal.utils.HtmlRenderer;
 import org.openqa.grid.selenium.proxy.DefaultRemoteProxy;
+import org.openqa.selenium.json.Json;
 import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.http.HttpClient;
+import org.openqa.selenium.remote.http.HttpMethod;
+import org.openqa.selenium.remote.http.HttpRequest;
+import org.openqa.selenium.remote.http.HttpResponse;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -54,6 +58,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -113,6 +118,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     // nodes may register only from these networks, empty = from anywhere
     private static final AllowedNetworks NODE_ALLOWED_NETWORKS = AllowedNetworks.fromEnv("NODE_ALLOWED_NETWORKS", System.getenv("NODE_ALLOWED_NETWORKS"));
     private static final Duration NODE_REACHABILITY_TIMEOUT = EnvUtils.getDurationInSeconds("NODE_REACHABILITY_TIMEOUT", Duration.ofSeconds(2));
+    // the status of a node (getProxyStatus): the connection, the answer without nodeStatusCheckTimeout of the node
+    static final Duration STATUS_CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration DEFAULT_STATUS_READ_TIMEOUT = Duration.ofSeconds(5);
     // the node tokens verified by STF; without STF_URL and STF_TOKEN every node is refused
     private static volatile NodeAuthentication nodeAuthentication = NodeAuthentication.fromEnv();
     // STF verifies the node token of a registered node again and again: a revoked node is unregistered
@@ -465,6 +473,54 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     private HttpClient authenticate(HttpClient client) {
         // null only while the constructor of Selenium runs
         return nodeCredential == null ? client : nodeCredential.authenticate(client);
+    }
+
+    /**
+     * The status of the node for the polling of the node, the console and {@code /wd/hub/status}: Selenium 3.141.59
+     * passes nodeStatusCheckTimeout of the node (ms) to {@link #getHttpClient(URL, int, int)}, which takes seconds, so
+     * a node that does not answer held the request for up to 5000 s. The hub waits {@link #STATUS_CONNECT_TIMEOUT} for
+     * the connection and nodeStatusCheckTimeout for the answer, see {@link #statusReadTimeout(Integer)}; the commands of
+     * the sessions keep their timeouts. The rest is the logic of Selenium.
+     */
+    @Override
+    public Map<String, Object> getProxyStatus() {
+        String url = getRemoteHost().toExternalForm() + "/wd/hub/status";
+        Duration read = statusReadTimeout(getConfig().nodeStatusCheckTimeout);
+        Duration connect = read.compareTo(STATUS_CONNECT_TIMEOUT) < 0 ? read : STATUS_CONNECT_TIMEOUT;
+        HttpClient client = getHttpClient(getRemoteHost(), (int) connect.getSeconds(), (int) read.getSeconds());
+        String existingName = Thread.currentThread().getName();
+        try {
+            Thread.currentThread().setName("Probing status of " + url);
+            HttpResponse response = client.execute(new HttpRequest(HttpMethod.GET, url));
+            int code = response.getStatus();
+            if (code == 200) {
+                try {
+                    return new Json().toType(response.getContentString(), Json.MAP_TYPE);
+                } catch (Exception e) {
+                    // the node does not have to answer anything but 200
+                    return new TreeMap<>();
+                }
+            } else if (code == 404) {
+                return new TreeMap<>();
+            }
+            throw new GridException("server response code : " + code);
+        } catch (Exception e) {
+            throw new GridException(e.getMessage(), e);
+        } finally {
+            Thread.currentThread().setName(existingName);
+        }
+    }
+
+    /**
+     * @param nodeStatusCheckTimeout nodeStatusCheckTimeout of the node, ms
+     * @return the time the hub waits for the status of the node: nodeStatusCheckTimeout in whole seconds (rounded up, at
+     *         least 1 s, 5 s without it), as the client of Selenium takes seconds
+     */
+    static Duration statusReadTimeout(Integer nodeStatusCheckTimeout) {
+        if (nodeStatusCheckTimeout == null) {
+            return DEFAULT_STATUS_READ_TIMEOUT;
+        }
+        return Duration.ofSeconds(Math.max(1, (nodeStatusCheckTimeout + 999L) / 1000));
     }
 
     /**
