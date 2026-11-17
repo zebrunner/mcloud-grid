@@ -366,6 +366,13 @@ public class STFClientTest {
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/grid")));
     }
 
+    public void keepalivePeriodIsAThirdOfTheTimeoutWithinLimits() {
+        // STF_TIMEOUT of the stf execution: 3600 s
+        Assert.assertEquals(STFClient.keepalivePeriod(caps("iOS")), Duration.ofMinutes(5));
+        Assert.assertEquals(STFClient.keepalivePeriod(caps("iOS", "zebrunner:STF_TIMEOUT", "300")), Duration.ofSeconds(100));
+        Assert.assertEquals(STFClient.keepalivePeriod(caps("iOS", "zebrunner:STF_TIMEOUT", "60")), Duration.ofSeconds(30));
+    }
+
     public void notReadyDeviceIsIgnored() {
         stf.devices(device(UDID).ready(false));
 
