@@ -64,8 +64,13 @@ public class STFDevice {
     private String statusChangedAt;
     private Double status;
     private Boolean using;
+    // "automation" for a reservation through the API (the grid), null for one of the UI
+    private String usage;
     private String version;
     private String deviceType = "phone";
+    // set by the grid: the user of the token had the device reserved before the session
+    @JsonIgnore
+    private boolean reservedBefore;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<>();
 
@@ -98,6 +103,7 @@ public class STFDevice {
                 ", platform='" + platform + '\'' +
                 ", presenceChangedAt='" + presenceChangedAt + '\'' +
                 ", present=" + present +
+                ", usage='" + usage + '\'' +
                 ", product='" + product + '\'' +
                 ", provider=" + provider +
                 ", ready=" + ready +

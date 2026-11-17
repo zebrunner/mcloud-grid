@@ -347,16 +347,14 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
 
             if (STFClient.isSTFEnabled()) {
-                STFDevice device = STFClient.reserveSTFDevice(udid, platform, requestedCapability, internalKey);
+                String stfToken = stfToken(session);
+                STFDevice device = STFClient.reserveSTFDevice(udid, platform, requestedCapability, stfToken, internalKey);
                 if (device == null) {
                     return false;
                 }
                 reserved = true;
-                String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapability, "STF_TOKEN")
-                        .map(String::valueOf)
-                        .orElse(STFClient.DEFAULT_STF_TOKEN);
                 session.put(STF_TOKEN, stfToken);
-                session.put(IS_MANUALLY_RESERVED, !StringUtils.equals(stfToken, STFClient.DEFAULT_STF_TOKEN));
+                session.put(IS_MANUALLY_RESERVED, keepsReservation(session, stfToken, device));
 
                 Map<String, Object> slotCapabilities = getSlotCapabilities(testslot, deviceType, device);
                 LOGGER.fine(() -> String.format("[%s][%s] 'zebrunner:slotCapabilities' of the session: %s", udid, internalKey, slotCapabilities));
@@ -372,6 +370,32 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             }
             return false;
         }
+    }
+
+    /**
+     * @return the STF token the device of the session is reserved with: the one of its user (HubAuth), otherwise the
+     *         capability 'zebrunner:STF_TOKEN' or STF_TOKEN of the grid
+     */
+    static String stfToken(TestSession session) {
+        Object user = session.get(HubAuth.TOKEN);
+        if (user != null) {
+            return String.valueOf(user);
+        }
+        return CapabilityUtils.getZebrunnerCapability(session.getRequestedCapabilities(), "STF_TOKEN")
+                .map(String::valueOf)
+                .orElse(STFClient.DEFAULT_STF_TOKEN);
+    }
+
+    /**
+     * Whether the device stays reserved in STF after the session. With the users of HubAuth: when the user had reserved it
+     * in STF before the session (not through the API, e.g. a device of a hub that stopped), so a user runs the tests on the
+     * device of the UI. Without them: when the session gave a personal 'zebrunner:STF_TOKEN'.
+     */
+    static boolean keepsReservation(TestSession session, String stfToken, STFDevice device) {
+        if (session.get(HubAuth.TOKEN) == null) {
+            return !StringUtils.equals(stfToken, STFClient.DEFAULT_STF_TOKEN);
+        }
+        return device.isReservedBefore() && !STFClient.AUTOMATION_USAGE.equals(device.getUsage());
     }
 
     /**

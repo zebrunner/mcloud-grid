@@ -106,6 +106,7 @@ public final class StfStub {
         private boolean present = true;
         private boolean ready = true;
         private String owner;
+        private String usage;
         private String remoteConnectUrl;
         private String battery;
         // the node STF bound the device to: the node of GridFixtures.NODE_TOKEN
@@ -135,6 +136,14 @@ public final class StfStub {
             return this;
         }
 
+        /**
+         * @param usage "automation" for a reservation through the API
+         */
+        public DeviceJson usage(String usage) {
+            this.usage = usage;
+            return this;
+        }
+
         public DeviceJson remoteConnectUrl(String remoteConnectUrl) {
             this.remoteConnectUrl = remoteConnectUrl;
             return this;
@@ -160,6 +169,9 @@ public final class StfStub {
             }
             if (owner != null) {
                 json.append(",\"owner\":{\"name\":\"").append(owner).append("\",\"email\":\"").append(owner).append("@example.com\"}");
+            }
+            if (usage != null) {
+                json.append(",\"usage\":\"").append(usage).append('"');
             }
             if (battery != null) {
                 json.append(",\"battery\":").append(battery);

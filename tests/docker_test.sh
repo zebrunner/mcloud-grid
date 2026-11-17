@@ -1,8 +1,8 @@
 #!/bin/bash
 # Checks of the docker image: build, unprivileged user, the start without STF, the validation of the configuration (exit 0),
 # config generation from env vars, options
-# passed to the JVM and the hub, hub status, node registration with node tokens verified by a fake STF and graceful
-# shutdown.
+# passed to the JVM and the hub, hub status, the authentication of the users (GRID_AUTH_SECRET), node registration with
+# node tokens verified by a fake STF and graceful shutdown.
 # IMAGE overrides the tag of the built image, DOCKER_BUILD_OPTS adds options to its docker build (CI: the builder and
 # its cache).
 source "$(dirname "$0")/lib.sh"
@@ -17,7 +17,10 @@ CONTAINER="mcloud-grid-test-$$"
 NO_STF_CONTAINER="${CONTAINER}-no-stf"
 STF_DOWN_CONTAINER="${CONTAINER}-stf-down"
 INVALID_CONTAINER="${CONTAINER}-invalid"
+AUTH_CONTAINER="${CONTAINER}-auth"
 STF_TOKEN="stf-admin-token-$$"
+# GRID_AUTH_SECRET of the hub with the authentication of the users; it is looked for in the logs
+AUTH_SECRET="grid-auth-secret-of-the-docker-test-$$"
 # the node token of the node enrolled at 192.0.2.3 in the fake STF; its secret part is looked for in the logs
 NODE_SECRET="AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde"
 NODE_TOKEN="mcn1.docker-test.${NODE_SECRET}"
@@ -27,7 +30,7 @@ STF_PID=""
 # called by the EXIT trap of lib.sh
 # shellcheck disable=SC2329
 cleanup() {
-  docker rm -f "$CONTAINER" "$NO_STF_CONTAINER" "$STF_DOWN_CONTAINER" "$INVALID_CONTAINER" > /dev/null 2>&1 || true
+  docker rm -f "$CONTAINER" "$NO_STF_CONTAINER" "$STF_DOWN_CONTAINER" "$INVALID_CONTAINER" "$AUTH_CONTAINER" > /dev/null 2>&1 || true
   if [[ -n "$STF_PID" ]]; then
     kill "$STF_PID" 2> /dev/null || true
   fi
@@ -130,6 +133,37 @@ check_not_contains "the hub is not started with an invalid configuration" "Start
 check "the log lines of the validation are JSON" "ok" \
   "$(python3 -c 'import json, sys; [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]; print("ok")' "$WORK/invalid.log" 2>&1)"
 docker rm -f "$INVALID_CONTAINER" > /dev/null 2>&1
+docker run --name "$INVALID_CONTAINER" --env GRID_AUTH_SECRET=short-secret "$IMAGE" > "$WORK/invalid-secret.log" 2>&1
+check "a short GRID_AUTH_SECRET exits with 0" "0" "$?"
+logs="$(cat "$WORK/invalid-secret.log")"
+check_contains "a short GRID_AUTH_SECRET is logged by its length" "GRID_AUTH_SECRET has 12 characters or whitespace" "$logs"
+check_not_contains "the secret is not logged" "short-secret" "$logs"
+docker rm -f "$INVALID_CONTAINER" > /dev/null 2>&1
+
+section "authentication of the users"
+docker run --detach --name "$AUTH_CONTAINER" --env GRID_AUTH_SECRET="$AUTH_SECRET" --env JAVA_HEAP_OPTS="-Xms64m -Xmx512m" "$IMAGE" > /dev/null
+check "the hub status answers without a user (the healthcheck)" "200" "$(wait_hub "$AUTH_CONTAINER")"
+# auth_code <path> [<curl options>...]: the HTTP status of the hub of the authentication of the users
+auth_code() {
+  docker exec "$AUTH_CONTAINER" curl -s -o /dev/null -w '%{http_code}' "${@:2}" "http://localhost:4444${1}"
+}
+user_headers=(-H "X-MCloud-Auth: ${AUTH_SECRET}" -H "X-MCloud-User: john@example.com" -H "X-MCloud-Admin: false" -H "X-MCloud-Token: t")
+admin_headers=(-H "X-MCloud-Auth: ${AUTH_SECRET}" -H "X-MCloud-User: admin@example.com" -H "X-MCloud-Admin: true")
+check "a session without a user is refused" "401" \
+  "$(auth_code /wd/hub/session -H 'Content-Type: application/json' -d '{"capabilities":{"alwaysMatch":{"platformName":"Android"}}}')"
+check "the console without a user is refused" "401" "$(auth_code /grid/console)"
+check "the headers of a user without the secret are refused" "401" \
+  "$(auth_code /grid/console -H 'X-MCloud-Auth: not-the-secret' -H 'X-MCloud-User: admin@example.com' -H 'X-MCloud-Admin: true')"
+check "the console answers a user" "200" "$(auth_code /grid/console "${user_headers[@]}")"
+check "the API of the hub is refused to a user" "403" "$(auth_code /grid/api/hub "${user_headers[@]}")"
+check "the API of the hub answers an admin" "200" "$(auth_code /grid/api/hub "${admin_headers[@]}")"
+check_not_contains "/grid/register takes the nodes without a user (their node tokens are checked)" "users of MCloud" \
+  "$(docker exec "$AUTH_CONTAINER" curl -s -H 'Content-Type: application/json' \
+    -d '{"class":"org.openqa.grid.common.RegistrationRequest","configuration":{}}' http://localhost:4444/grid/register)"
+logs="$(docker logs "$AUTH_CONTAINER" 2>&1)"
+check_contains "the authentication is added to the hub" "The hub lets in the users of stf-proxy only." "$logs"
+check_not_contains "GRID_AUTH_SECRET is not logged" "$AUTH_SECRET" "$logs"
+docker rm -f "$AUTH_CONTAINER" > /dev/null 2>&1
 
 section "STF"
 # without STF_URL and STF_TOKEN the hub starts (the first start of MCloud, before an access token of STF) and refuses every
@@ -292,6 +326,7 @@ check_contains "the device of another node is logged" "Device with udid 'udid-19
 check_contains "the registration requests are in the debug log" "getting the following registration request" "$logs"
 check_not_contains "the node token is not in the log (debug included)" "$NODE_SECRET" "$logs"
 check_not_contains "the STF token is not in the log" "$STF_TOKEN" "$logs"
+check_contains "a hub without GRID_AUTH_SECRET warns that anyone uses it" "Authentication of the users: off (GRID_AUTH_SECRET is not set)" "$logs"
 
 docker logs "$CONTAINER" > "$WORK/docker.log" 2>&1
 check "all Docker log lines are JSON (including Selenium debug and entrypoint)" "ok" \

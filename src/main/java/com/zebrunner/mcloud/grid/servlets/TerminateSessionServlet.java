@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.servlets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zebrunner.mcloud.grid.HubAuth;
 import com.zebrunner.mcloud.grid.MobileRemoteProxy;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
 import org.apache.commons.lang3.StringUtils;
@@ -21,8 +22,10 @@ import java.util.Map;
  * session id&gt;) with the header 'Authorization: Bearer &lt;STF access token&gt;'.
  * <p>
  * The key is checked by STF: the device is released with it first, and STF allows that only for the user the device is
- * reserved by or for an STF admin. Devices are reserved by the grid user (STF_TOKEN), so the key of a regular STF user
- * usually does not work (403) unless the session was started with that user's 'STF_TOKEN' capability; an admin key does.
+ * reserved by or for an STF admin. With the authentication of the users (HubAuth) the key is the token stf-proxy let the
+ * request in with, and the devices are reserved by the users of the sessions: a user terminates the own sessions, an admin
+ * any. Without it the devices are reserved by the grid user (STF_TOKEN), so the key of a regular STF user usually does not
+ * work (403) unless the session was started with that user's 'STF_TOKEN' capability; an admin key does.
  * Without STF integration there is nothing to check the key against, so the servlet is not available.
  */
 public class TerminateSessionServlet extends RegistryBasedServlet {
@@ -44,8 +47,11 @@ public class TerminateSessionServlet extends RegistryBasedServlet {
                     "Terminating sessions needs the STF integration (STF_URL and STF_TOKEN): the key is checked by STF.", null, null);
             return;
         }
-        String token = parseToken(req.getHeader("Authorization"));
-        if (token.isEmpty()) {
+        // with the authentication of the users the token of the user stf-proxy let in, the Authorization header otherwise
+        String token = HubAuth.identity(req)
+                .map(HubAuth.Identity::getToken)
+                .orElseGet(() -> parseToken(req.getHeader("Authorization")));
+        if (StringUtils.isEmpty(token)) {
             respond(resp, HttpServletResponse.SC_UNAUTHORIZED, false, "The header 'Authorization: Bearer <STF access token>' is required.", null, null);
             return;
         }

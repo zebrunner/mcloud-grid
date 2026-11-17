@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.servlets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zebrunner.mcloud.grid.HubAuth;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.MobileRemoteProxy;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
@@ -27,8 +28,10 @@ import java.util.Optional;
  * Devices of the grid and what they are doing: GET /grid/admin/DevicesServlet returns
  * {"value": [{"udid", "deviceName", "platformName", "platformVersion", "deviceType", "node",
  * "status": "free|busy|ignored|down", "ignored": {"reason", "until", "secondsLeft"},
- * "session": {"id", "internalId", "startedAt", "inactivitySeconds", "lastCommand"}}]}.
- * "ignored" is set while the device is excluded from automation, "session" while it runs one.
+ * "session": {"user", "id", "internalId", "startedAt", "inactivitySeconds", "lastCommand"}}]}.
+ * "ignored" is set while the device is excluded from automation, "session" while it runs one. With the authentication of
+ * the users (HubAuth) "user" is the email of the user of the session, and a user sees only "user" of the sessions of
+ * the others.
  */
 public class DevicesServlet extends RegistryBasedServlet {
     private static final long serialVersionUID = 1L;
@@ -98,8 +101,14 @@ public class DevicesServlet extends RegistryBasedServlet {
             return info;
         }).orElse(null));
 
-        if (session != null) {
+        if (session != null && !HubAuth.maySee(session)) {
+            // a session of another user: whose it is, not its id or its commands
             Map<String, Object> info = new LinkedHashMap<>();
+            info.put("user", HubAuth.owner(session));
+            device.put("session", info);
+        } else if (session != null) {
+            Map<String, Object> info = new LinkedHashMap<>();
+            info.put("user", HubAuth.owner(session));
             info.put("id", session.getExternalKey() == null ? null : session.getExternalKey().getKey());
             info.put("internalId", session.getInternalKey());
             info.put("startedAt", slot.getLastSessionStart() > 0 ? Instant.ofEpochMilli(slot.getLastSessionStart()).toString() : null);

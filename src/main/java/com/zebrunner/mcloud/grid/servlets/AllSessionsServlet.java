@@ -1,6 +1,7 @@
 package com.zebrunner.mcloud.grid.servlets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zebrunner.mcloud.grid.HubAuth;
 import com.zebrunner.mcloud.grid.MobileRemoteProxy;
 import com.zebrunner.mcloud.grid.util.CapabilityUtils;
 import com.zebrunner.mcloud.grid.util.SecretMasking;
@@ -39,6 +40,10 @@ public class AllSessionsServlet extends RegistryBasedServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         List<Map<String, Object>> sessions = new ArrayList<>();
         for (TestSession session : getRegistry().getActiveSessions()) {
+            // a user sees the own sessions only (HubAuth), an admin all of them
+            if (!HubAuth.maySee(session)) {
+                continue;
+            }
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("id", session.getExternalKey() != null
                     ? session.getExternalKey().getKey()

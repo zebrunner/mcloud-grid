@@ -42,6 +42,8 @@ ENV \
     STF_URL="" \
     STF_TOKEN="" \
     STF_TIMEOUT=3600 \
+    # Authentication of the users (README.md#authentication-of-the-users): the secret of stf-proxy, empty = off
+    GRID_AUTH_SECRET="" \
     # Device health, s (README.md#stf-and-device-health)
     CHECK_APPIUM_STATUS=false \
     APPIUM_STATUS_TIMEOUT=10 \

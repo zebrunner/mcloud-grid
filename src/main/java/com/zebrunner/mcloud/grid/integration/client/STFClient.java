@@ -15,6 +15,7 @@
  *******************************************************************************/
 package com.zebrunner.mcloud.grid.integration.client;
 
+import com.zebrunner.mcloud.grid.HubAuth;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.Platform;
 import com.zebrunner.mcloud.grid.models.stf.Battery;
@@ -70,6 +71,8 @@ public final class STFClient {
     private static final Duration USER_CACHE_TIME = Duration.ofMinutes(5);
     private static final Map<String, CachedUser> USERS = new ConcurrentHashMap<>();
     private static final Map<String, Object> DEVICE_LOCKS = new ConcurrentHashMap<>();
+    /** The usage of the devices STF reserved through its API. */
+    public static final String AUTOMATION_USAGE = "automation";
 
     private STFClient() {
         //do nothing
@@ -84,17 +87,29 @@ public final class STFClient {
      * @return the reserved device, null if it is not reserved
      */
     public static STFDevice reserveSTFDevice(String deviceUDID, Platform platform, Map<String, Object> requestedCapabilities, String sessionUUID) {
-        synchronized (deviceLock(deviceUDID)) {
-            return reserve(deviceUDID, platform, requestedCapabilities, sessionUUID);
-        }
-    }
-
-    private static STFDevice reserve(String deviceUDID, Platform platform, Map<String, Object> requestedCapabilities, String sessionUUID) {
-        LOGGER.fine(() -> String.format("[%s][%s] Reserving the device in STF.", deviceUDID, sessionUUID));
-
         String stfToken = CapabilityUtils.getZebrunnerCapability(requestedCapabilities, "STF_TOKEN")
                 .map(String::valueOf)
                 .orElse(DEFAULT_STF_TOKEN);
+        return reserveSTFDevice(deviceUDID, platform, requestedCapabilities, stfToken, sessionUUID);
+    }
+
+    /**
+     * Reserves the device in STF with the token of the user of the session, see {@link #reserveSTFDevice(String, Platform, Map, String)}.
+     *
+     * @return the reserved device ({@link STFDevice#isReservedBefore()} when the user had reserved it already), null if it is not
+     *         reserved
+     */
+    public static STFDevice reserveSTFDevice(String deviceUDID, Platform platform, Map<String, Object> requestedCapabilities, String stfToken,
+            String sessionUUID) {
+        synchronized (deviceLock(deviceUDID)) {
+            return reserve(deviceUDID, platform, requestedCapabilities, stfToken, sessionUUID);
+        }
+    }
+
+    private static STFDevice reserve(String deviceUDID, Platform platform, Map<String, Object> requestedCapabilities, String stfToken,
+            String sessionUUID) {
+        LOGGER.fine(() -> String.format("[%s][%s] Reserving the device in STF.", deviceUDID, sessionUUID));
+
         int stfTimeout = stfTimeoutSeconds(requestedCapabilities, DEFAULT_STF_TIMEOUT);
 
         HttpClient.Response<DeviceResponse> deviceResponse = getDevice(deviceUDID, stfToken);
@@ -166,7 +181,8 @@ public final class STFClient {
             if (!available) {
                 return notReady(deviceUDID, sessionUUID);
             }
-            LOGGER.info(() -> String.format("[%s][%s] Device is already reserved in STF by the grid user %s, the reservation is reused.",
+            stfDevice.setReservedBefore(true);
+            LOGGER.info(() -> String.format("[%s][%s] Device is already reserved in STF by the user %s of the session, the reservation is reused.",
                     deviceUDID, sessionUUID, owner));
         } else if (available) {
             Map<String, Object> entity = new HashMap<>();
@@ -353,8 +369,8 @@ public final class STFClient {
         }
 
         if (isReservedManually) {
-            LOGGER.info(() -> String.format("[%s][%s] Device stays reserved in STF: it was reserved with a personal STF token.",
-                    udid, sessionUUID));
+            LOGGER.info(() -> String.format("[%s][%s] Device stays reserved in STF for the user of the session (a personal STF token, "
+                    + "or the user reserved it before the session).", udid, sessionUUID));
             return;
         }
         LOGGER.fine(() -> String.format("[%s][%s] Returning the device to STF.", udid, sessionUUID));
@@ -460,7 +476,7 @@ public final class STFClient {
         if (!STFClient.isSTFEnabled()) {
             return;
         }
-        LOGGER.info("[STF] Returning the devices left reserved by the grid user (e.g. by a previous run of the hub).");
+        LOGGER.info("[STF] Returning the devices left reserved by the grid (e.g. by a previous run of the hub).");
         HttpClient.Response<User> user = HttpClient.uri(Path.STF_USER_PATH, STF_URL)
                 .withAuthorization(buildAuthToken(DEFAULT_STF_TOKEN))
                 .get(User.class);
@@ -481,11 +497,15 @@ public final class STFClient {
             return;
         }
 
+        // with the authentication of the users the grid reserves the devices with the tokens of the users: the reservations of the
+        // API ("automation") are returned too
+        boolean usersReserve = HubAuth.get().isEnabled();
         devices.getObject()
                 .getDevices()
                 .stream()
                 .filter(d -> d.getOwner() != null)
-                .filter(d -> StringUtils.equals(d.getOwner().getName(), user.getObject().getUser().getName()))
+                .filter(d -> StringUtils.equals(d.getOwner().getName(), user.getObject().getUser().getName())
+                        || usersReserve && AUTOMATION_USAGE.equals(d.getUsage()))
                 .map(STFDevice::getSerial)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toList())
@@ -497,7 +517,7 @@ public final class STFClient {
                     if (response.getStatus() != 200) {
                         LOGGER.warning(() -> String.format("[STF] Could not return the device '%s' to STF (HTTP %s).", udid, response.getStatus()));
                     } else {
-                        LOGGER.info(() -> String.format("[STF] Device '%s' left reserved by the grid user is returned to STF.", udid));
+                        LOGGER.info(() -> String.format("[STF] Device '%s' left reserved by the grid is returned to STF.", udid));
                     }
                 });
     }

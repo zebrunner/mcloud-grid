@@ -57,6 +57,16 @@ checkClassName() {
   fi
 }
 
+# checkSecret <name> <value>: an empty value or at least 32 characters without whitespace, the secret of stf-proxy is
+# not logged
+checkSecret() {
+  if [[ -n "$2" && (${#2} -lt 32 || "$2" =~ [[:space:]]) ]]; then
+    log "SEVERE" "$1 has ${#2} characters or whitespace: it is empty (no authentication of the users) or at least 32 characters without whitespace."
+    invalidConfig=true
+  fi
+}
+
+checkSecret GRID_AUTH_SECRET "$GRID_AUTH_SECRET"
 checkNumber GRID_NEW_SESSION_WAIT_TIMEOUT "$GRID_NEW_SESSION_WAIT_TIMEOUT" -1
 checkNumber GRID_TIMEOUT "$GRID_TIMEOUT" 0
 checkNumber GRID_BROWSER_TIMEOUT "$GRID_BROWSER_TIMEOUT" 0
@@ -91,7 +101,7 @@ trap shutdown SIGTERM SIGINT
 # JAVA_HEAP_OPTS, JAVA_OPTS and SE_OPTS hold several space-separated options, so they are intentionally unquoted
 # shellcheck disable=SC2086
 java ${JAVA_HEAP_OPTS:--Xms1G -Xmx4G} ${JAVA_OPTS} -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv6Stack=false -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.util.logging.config.file=/opt/selenium/logger.properties -cp /opt/selenium/mcloud-grid-jar-with-dependencies.jar \
-  org.openqa.grid.selenium.GridLauncherV3 \
+  com.zebrunner.mcloud.grid.HubLauncher \
   -role hub \
   -hubConfig "$CONF" \
   ${SE_OPTS} &

@@ -3,6 +3,7 @@ package com.zebrunner.mcloud.grid.servlets;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zebrunner.mcloud.grid.GridFixtures;
+import com.zebrunner.mcloud.grid.HubAuth;
 import com.zebrunner.mcloud.grid.IgnoredDevices;
 import com.zebrunner.mcloud.grid.MobileRemoteProxy;
 import com.zebrunner.mcloud.grid.integration.client.STFClient;
@@ -16,6 +17,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -107,6 +109,26 @@ public class TerminateSessionServletStfTest {
         awaitSlotReleased();
         // afterSession must not return the device again with the grid token
         stf.server().verify(0, deleteRequestedFor(urlEqualTo(DEVICE_PATH)).withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN)));
+    }
+
+    public void terminatesSessionWithTheTokenOfTheUserOfStfProxy() throws Exception {
+        // HubAuthFilter hides the Authorization header and gives the token of the user
+        HubAuth.Identity identity = new HubAuth.Identity("john@example.com", false, "user-key");
+        HttpServletRequest request = ServletStubs.stub(HttpServletRequest.class, (method, args) -> {
+            if ("getAttribute".equals(method) && HubAuth.IDENTITY_ATTRIBUTE.equals(args[0])) {
+                return identity;
+            }
+            if ("getParameter".equals(method) && "udid".equals(args[0])) {
+                return UDID;
+            }
+            return null;
+        });
+        ServletStubs.Response response = new ServletStubs.Response();
+        new TerminateSessionServlet(registry).doPost(request, response.servletResponse);
+
+        Assert.assertEquals(response.calls.get("setStatus"), 200, response.body());
+        stf.server().verify(deleteRequestedFor(urlEqualTo(DEVICE_PATH)).withHeader("Authorization", equalTo("Bearer user-key")));
+        awaitSlotReleased();
     }
 
     public void sessionThatEndedIsNotReleasedAgain() {

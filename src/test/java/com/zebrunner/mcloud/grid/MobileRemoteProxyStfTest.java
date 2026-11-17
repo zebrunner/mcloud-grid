@@ -448,6 +448,54 @@ public class MobileRemoteProxyStfTest {
         stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + IOS_UDID)));
     }
 
+    /**
+     * The session of a user of HubAuth: its device is reserved with the token of the user.
+     */
+    private TestSession userSession(MobileRemoteProxy proxy, Map<String, Object> requested, String token) {
+        TestSession session = proxy.claim(requested);
+        Assert.assertNotNull(session);
+        session.put(HubAuth.OWNER, "john@example.com");
+        session.put(HubAuth.TOKEN, token);
+        Assert.assertTrue(proxy.prepare(session));
+        return session;
+    }
+
+    public void deviceIsReservedAndReturnedWithTheTokenOfTheUser() {
+        stf.user("john-token", "john");
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        TestSession session = userSession(proxy, request("iOS"), "john-token");
+
+        stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices")).withHeader("Authorization", equalTo("Bearer john-token")));
+        stf.server().verify(0, postRequestedFor(urlEqualTo("/api/v1/user/devices")).withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN)));
+        proxy.afterSession(session);
+
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + IOS_UDID)).withHeader("Authorization", equalTo("Bearer john-token")));
+    }
+
+    public void deviceTheUserReservedBeforeTheSessionStaysReserved() {
+        stf.user("john-token", "john");
+        stf.devices(device(IOS_UDID).owner("john"));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        TestSession session = userSession(proxy, request("iOS"), "john-token");
+
+        stf.server().verify(0, postRequestedFor(urlEqualTo("/api/v1/user/devices")));
+        proxy.afterSession(session);
+
+        stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + IOS_UDID)));
+    }
+
+    public void deviceLeftReservedThroughTheApiIsReturned() {
+        // e.g. the reservation of a session of a hub that stopped
+        stf.user("john-token", "john");
+        stf.devices(device(IOS_UDID).owner("john").usage("automation"));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        TestSession session = userSession(proxy, request("iOS"), "john-token");
+
+        proxy.afterSession(session);
+
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + IOS_UDID)).withHeader("Authorization", equalTo("Bearer john-token")));
+    }
+
     private MobileRemoteProxy nodeTokenProxy(Map<String, Object> capabilities) {
         return new MobileRemoteProxy(GridFixtures.registrationRequest(nodeUrl, capabilities, NODE_TOKEN), registry);
     }

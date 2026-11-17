@@ -327,10 +327,50 @@ public class STFClientTest {
     }
 
     public void deviceAlreadyReservedBySameUserIsReused() {
-        stf.devices(device(UDID).owner(BOT_USER));
+        stf.devices(device(UDID).owner(BOT_USER).usage("automation"));
 
-        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION));
+        STFDevice device = STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION);
+        Assert.assertNotNull(device);
+        Assert.assertTrue(device.isReservedBefore());
+        Assert.assertEquals(device.getUsage(), "automation");
         assertNoReservationRequest();
+    }
+
+    public void deviceReservedByTheCallIsNotReservedBefore() {
+        stf.devices(device(UDID));
+
+        STFDevice device = STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), SESSION);
+        Assert.assertNotNull(device);
+        Assert.assertFalse(device.isReservedBefore());
+    }
+
+    public void reservesWithTheGivenTokenOfTheUser() {
+        stf.user("user-token", "john");
+        stf.devices(device(UDID));
+
+        Assert.assertNotNull(STFClient.reserveSTFDevice(UDID, Platform.IOS, caps("iOS"), "user-token", SESSION));
+        stf.server().verify(postRequestedFor(urlEqualTo("/api/v1/user/devices")).withHeader("Authorization", equalTo("Bearer user-token")));
+    }
+
+    public void startOfTheHubReturnsTheReservationsOfTheGrid() {
+        stf.devices(device("grid").owner(BOT_USER), device("john-api").owner("john").usage("automation"), device("mary-ui").owner("mary"));
+
+        // without the users the grid user reserves every device
+        STFClient.disconnectAllDevices();
+        stf.server().verify(1, deleteRequestedFor(urlMatching("/api/v1/user/devices/.*")));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/grid")));
+
+        // with them the reservations of the API of every user are the ones of the grid, a reservation of the UI is kept
+        stf.server().resetRequests();
+        GridFixtures.useHubAuth(GridFixtures.HUB_SECRET);
+        try {
+            STFClient.disconnectAllDevices();
+        } finally {
+            GridFixtures.useHubAuth(null);
+        }
+        stf.server().verify(2, deleteRequestedFor(urlMatching("/api/v1/user/devices/.*")).withHeader("Authorization", equalTo("Bearer " + DEFAULT_TOKEN)));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/grid")));
+        stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/john-api")));
     }
 
     public void notReadyDeviceIsIgnored() {
