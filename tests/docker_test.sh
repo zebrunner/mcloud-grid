@@ -2,7 +2,8 @@
 # Checks of the docker image: build, unprivileged user, the start without STF, the validation of the configuration (exit 0),
 # config generation from env vars, options
 # passed to the JVM and the hub, hub status, the authentication of the users (GRID_AUTH_SECRET), node registration with
-# node tokens verified by a fake STF and graceful shutdown.
+# node tokens verified by a fake STF, the hub status, the console and the healthcheck with a node that does not answer and
+# graceful shutdown.
 # IMAGE overrides the tag of the built image, DOCKER_BUILD_OPTS adds options to its docker build (CI: the builder and
 # its cache).
 source "$(dirname "$0")/lib.sh"
@@ -142,11 +143,12 @@ docker rm -f "$INVALID_CONTAINER" > /dev/null 2>&1
 
 section "authentication of the users"
 docker run --detach --name "$AUTH_CONTAINER" --env GRID_AUTH_SECRET="$AUTH_SECRET" --env JAVA_HEAP_OPTS="-Xms64m -Xmx512m" "$IMAGE" > /dev/null
-check "the hub status answers without a user (the healthcheck)" "200" "$(wait_hub "$AUTH_CONTAINER")"
+check "the hub status answers without a user" "200" "$(wait_hub "$AUTH_CONTAINER")"
 # auth_code <path> [<curl options>...]: the HTTP status of the hub of the authentication of the users
 auth_code() {
   docker exec "$AUTH_CONTAINER" curl -s -o /dev/null -w '%{http_code}' "${@:2}" "http://localhost:4444${1}"
 }
+check "the healthcheck answers without a user" "200" "$(auth_code /grid/api/proxy)"
 user_headers=(-H "X-MCloud-Auth: ${AUTH_SECRET}" -H "X-MCloud-User: john@example.com" -H "X-MCloud-Admin: false" -H "X-MCloud-Token: t")
 admin_headers=(-H "X-MCloud-Auth: ${AUTH_SECRET}" -H "X-MCloud-User: admin@example.com" -H "X-MCloud-Admin: true")
 check "a session without a user is refused" "401" \
@@ -288,6 +290,18 @@ check_not_contains "the node token is not in the log of the hub without STF" "$N
 answer="$(wait_registered 192.0.2.3)"
 check_contains "the node with its node token is registered" '"success": true' "$answer"
 check_not_contains "the hub does not show the node token of a node" "$NODE_SECRET" "$answer"
+# answers_within <seconds> <path>: the HTTP status of the hub and whether it answered in time
+answers_within() {
+  docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 300 "http://localhost:4444$2" |
+    awk -v limit="$1" '{ print $1, ($2 < limit ? "in time" : "after " $2 " s") }'
+}
+# the node 192.0.2.3 does not answer (TEST-NET-1): the hub waits 2 s for the connection of its status, not 5000 s
+check "the console answers with a node that does not answer" "200 in time" "$(answers_within 15 /grid/console)"
+check "the hub status answers with a node that does not answer" "200 in time" "$(answers_within 15 /wd/hub/status)"
+read -ra healthcheck <<< "$(docker inspect -f '{{range .Config.Healthcheck.Test}}{{.}} {{end}}' "$IMAGE")"
+healthcheck_timeout="$(docker inspect -f '{{.Config.Healthcheck.Timeout.Seconds}}' "$IMAGE")"
+docker exec "$CONTAINER" timeout "$healthcheck_timeout" "${healthcheck[@]:1}" > /dev/null 2>&1
+check "the healthcheck asks no node: it passes in its timeout with a node that does not answer" "0" "$?"
 check_not_contains "the console does not show the node token of a node" "$NODE_SECRET" \
   "$(docker exec "$CONTAINER" curl -s http://localhost:4444/grid/console)"
 check "the hub answers a node of another proxy class (Selenium adds it in the background)" "200" \

@@ -101,7 +101,8 @@ LABEL authors=Zebrunner \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="${VERSION}"
 
+# the node API of Selenium answers without the nodes (/wd/hub/status asks every node for its status) and without a user
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD ["curl", "-sf", "-o", "/dev/null", "http://localhost:4444/wd/hub/status"]
+    CMD ["curl", "-sf", "-o", "/dev/null", "http://localhost:4444/grid/api/proxy"]
 
 CMD ["/opt/bin/entrypoint.sh"]
