@@ -496,6 +496,66 @@ public class MobileRemoteProxyStfTest {
         stf.server().verify(deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + IOS_UDID)).withHeader("Authorization", equalTo("Bearer john-token")));
     }
 
+    private static final String KEEPALIVE = "/api/v1/user/devices/" + IOS_UDID + "/keepalive";
+
+    public void reservationOfASessionIsKeptWithTheTokenOfItsUser() {
+        stf.user("john-token", "john");
+        stf.server().stubFor(post(KEEPALIVE).willReturn(okJson("{\"success\":true}")));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        TestSession session = userSession(proxy, request("iOS"), "john-token");
+
+        Assert.assertTrue(proxy.keepReservation(session));
+
+        stf.server().verify(postRequestedFor(urlEqualTo(KEEPALIVE)).withHeader("Authorization", equalTo("Bearer john-token")));
+        Assert.assertEquals(proxy.getTotalUsed(), 1);
+    }
+
+    public void sessionWhoseDeviceIsNotReservedByItsUserAnyMoreEnds() throws InterruptedException {
+        stf.user("john-token", "john");
+        stf.server().stubFor(post(KEEPALIVE).willReturn(aResponse().withStatus(403).withBody("{\"success\":false}")));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        registry.add(proxy);
+        TestSession session = userSession(proxy, request("iOS"), "john-token");
+
+        Assert.assertFalse(proxy.keepReservation(session));
+
+        // the registry releases the slot in its own thread
+        for (int i = 0; i < 50 && proxy.getTotalUsed() > 0; i++) {
+            Thread.sleep(100);
+        }
+        Assert.assertEquals(proxy.getTotalUsed(), 0, "the session ended");
+        // the device is someone else's: it is not returned
+        stf.server().verify(0, deleteRequestedFor(urlEqualTo("/api/v1/user/devices/" + IOS_UDID)));
+        // no keepalive after the end of the session
+        stf.server().resetRequests();
+        Assert.assertTrue(proxy.keepReservation(session));
+        stf.server().verify(0, postRequestedFor(urlEqualTo(KEEPALIVE)));
+    }
+
+    public void sessionIsKeptWhenStfHasNoKeepaliveOrDoesNotAnswer() {
+        stf.user("john-token", "john");
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        TestSession session = userSession(proxy, request("iOS"), "john-token");
+
+        stf.server().stubFor(post(KEEPALIVE).willReturn(aResponse().withStatus(404)));
+        Assert.assertTrue(proxy.keepReservation(session));
+        stf.server().stubFor(post(KEEPALIVE).willReturn(aResponse().withStatus(504)));
+        Assert.assertTrue(proxy.keepReservation(session));
+        Assert.assertEquals(proxy.getTotalUsed(), 1);
+    }
+
+    public void endedSessionIsNotKept() {
+        stf.user("john-token", "john");
+        stf.server().stubFor(post(KEEPALIVE).willReturn(okJson("{\"success\":true}")));
+        MobileRemoteProxy proxy = GridFixtures.proxy(registry, nodeUrl, GridFixtures.iosNodeCaps(IOS_UDID));
+        TestSession session = userSession(proxy, request("iOS"), "john-token");
+
+        proxy.afterSession(session);
+
+        Assert.assertTrue(proxy.keepReservation(session));
+        stf.server().verify(0, postRequestedFor(urlEqualTo(KEEPALIVE)));
+    }
+
     private MobileRemoteProxy nodeTokenProxy(Map<String, Object> capabilities) {
         return new MobileRemoteProxy(GridFixtures.registrationRequest(nodeUrl, capabilities, NODE_TOKEN), registry);
     }

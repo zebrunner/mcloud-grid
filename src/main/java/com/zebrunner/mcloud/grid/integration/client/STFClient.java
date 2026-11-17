@@ -471,6 +471,30 @@ public final class STFClient {
         }
     }
 
+    /**
+     * Keeps the reservation of the device: it lasts its timeout from now. STF counts the timeout of a reservation from the
+     * last message for the device, and a session sends none (POST /api/v1/user/devices/{serial}/keepalive of STF).
+     *
+     * @return HTTP status of STF: 200 kept, 403 the device is not reserved by the user of the token any more, 404 an unknown
+     *         device or an STF without the route, 0 no answer
+     */
+    public static int keepDevice(String udid, String stfToken, String sessionUUID) {
+        HttpClient.Response response = HttpClient.uri(Path.STF_USER_DEVICES_KEEPALIVE_PATH, STF_URL, udid)
+                .withAuthorization(buildAuthToken(stfToken))
+                .withSocketTimeout(DEVICE_OPERATION_TIMEOUT)
+                .post(Void.class, null);
+        LOGGER.fine(() -> String.format("[%s][%s] Keepalive of the reservation in STF: HTTP %s.", udid, sessionUUID, response.getStatus()));
+        return response.getStatus();
+    }
+
+    /**
+     * @return how often the reservation of a session is kept: a third of its timeout in STF, from 30 s to 5 minutes
+     */
+    public static Duration keepalivePeriod(Map<String, Object> requestedCapabilities) {
+        long third = stfTimeoutSeconds(requestedCapabilities, DEFAULT_STF_TIMEOUT) / 3L;
+        return Duration.ofSeconds(Math.max(30, Math.min(300, third)));
+    }
+
     public static void disconnectAllDevices() {
         if (!STFClient.isSTFEnabled()) {
             return;

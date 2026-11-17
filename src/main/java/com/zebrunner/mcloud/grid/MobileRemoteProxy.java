@@ -82,6 +82,9 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
     public static final int SESSION_ENDED = -1;
     private static final String STF_TOKEN = "STF_TOKEN";
     private static final String STARTED_LOGGED = "STARTED_LOGGED";
+    private static final String KEEPALIVE = "STF_KEEPALIVE";
+    // the keepalives of the reservations of the sessions in STF
+    private static final ScheduledExecutorService KEEPALIVES = Executors.newScheduledThreadPool(4, new DaemonThreads("STF keepalive"));
     private static final LazyInitializer<Object> DISCONNECT_ALL_DEVICES = new LazyInitializer<>() {
         @Override
         protected Object initialize() throws ConcurrentException {
@@ -355,6 +358,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
                 reserved = true;
                 session.put(STF_TOKEN, stfToken);
                 session.put(IS_MANUALLY_RESERVED, keepsReservation(session, stfToken, device));
+                startKeepalive(session);
 
                 Map<String, Object> slotCapabilities = getSlotCapabilities(testslot, deviceType, device);
                 LOGGER.fine(() -> String.format("[%s][%s] 'zebrunner:slotCapabilities' of the session: %s", udid, internalKey, slotCapabilities));
@@ -396,6 +400,73 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             return !StringUtils.equals(stfToken, STFClient.DEFAULT_STF_TOKEN);
         }
         return device.isReservedBefore() && !STFClient.AUTOMATION_USAGE.equals(device.getUsage());
+    }
+
+    /**
+     * STF counts the timeout of a reservation (STF_TIMEOUT) from the last message for the device, and a session sends none:
+     * the reservation is kept as long as the session runs, otherwise another user could reserve the device of a long session.
+     */
+    private void startKeepalive(TestSession session) {
+        long period = STFClient.keepalivePeriod(session.getRequestedCapabilities()).toMillis();
+        session.put(KEEPALIVE, KEEPALIVES.scheduleWithFixedDelay(() -> {
+            try {
+                keepReservation(session);
+            } catch (RuntimeException e) {
+                LOGGER.log(Level.WARNING, String.format("[%s][%s] The keepalive of the reservation in STF failed.", udid, session.getInternalKey()), e);
+            }
+        }, period, period, TimeUnit.MILLISECONDS));
+    }
+
+    private static void stopKeepalive(TestSession session) {
+        Object keepalive = session.get(KEEPALIVE);
+        if (keepalive instanceof ScheduledFuture) {
+            ((ScheduledFuture<?>) keepalive).cancel(false);
+        }
+    }
+
+    /**
+     * Keeps the reservation of the device of the session in STF; a session whose device is not reserved by its user any more
+     * (STF answers 403: the reservation ended, e.g. released in STF) ends, the device is someone else's.
+     *
+     * @return true while the session keeps its device
+     */
+    boolean keepReservation(TestSession session) {
+        String internalKey = session.getInternalKey();
+        // under the lock of the device: a session that ends meanwhile is not kept, nor ended twice
+        Integer status = STFClient.withDeviceLock(udid, () -> session.get(STF_DISCONNECTED) != null
+                ? null
+                : STFClient.keepDevice(udid, String.valueOf(session.get(STF_TOKEN)), internalKey));
+        if (status == null || status == 200) {
+            return true;
+        }
+        if (status == 404) {
+            LOGGER.fine(() -> String.format("[%s][%s] STF did not keep the reservation (HTTP 404): an STF without the keepalive.", udid, internalKey));
+            return true;
+        }
+        if (status != 403) {
+            LOGGER.warning(() -> String.format("[%s][%s] STF did not keep the reservation of the device (HTTP %s), it is tried again.",
+                    udid, internalKey, status));
+            return true;
+        }
+        boolean ended = STFClient.withDeviceLock(udid, () -> {
+            if (session.get(STF_DISCONNECTED) != null) {
+                return false;
+            }
+            // the device is not the one of the session any more: it is not returned
+            session.put(STF_DISCONNECTED, true);
+            return true;
+        });
+        if (!ended) {
+            return true;
+        }
+        stopKeepalive(session);
+        LOGGER.warning(() -> String.format("[%s][%s] The device is not reserved in STF by the user of the session %s any more (released "
+                + "or reserved by another user), the session is ended.", udid, internalKey, describeExternalSession(session)));
+        if (session.getExternalKey() != null && !session.sendDeleteSessionRequest()) {
+            LOGGER.warning(() -> String.format("[%s][%s] Node did not delete the Appium session %s.", udid, internalKey, describeExternalSession(session)));
+        }
+        getRegistry().terminate(session, SessionTerminationReason.ORPHAN);
+        return false;
     }
 
     /**
@@ -657,6 +728,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
         }
         // under the lock of the device: terminateSession must not release it after it is returned (and reserved again)
         STFClient.withDeviceLock(udid, () -> {
+            stopKeepalive(session);
             if (session.get(STF_DISCONNECTED) != null) {
                 return null;
             }
@@ -689,6 +761,7 @@ public class MobileRemoteProxy extends DefaultRemoteProxy {
             if (released == 200) {
                 // the device is already released in STF, afterSession must not return it again with the grid token
                 session.put(STF_DISCONNECTED, true);
+                stopKeepalive(session);
             }
             return released;
         });
