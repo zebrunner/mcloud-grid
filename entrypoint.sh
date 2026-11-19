@@ -28,6 +28,9 @@ log() {
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$message"
 }
 
+# the first log line: the image, its version and the port of the hub (CONVENTIONS.md#terminal-output)
+log "INFO" $'\xe2\x94\x81\xe2\x94\x81'" mcloud-grid ${IMAGE_VERSION:-dev}"$' \xc2\xb7 '"hub :4444"
+
 #### Configuration
 
 invalidConfig=false

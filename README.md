@@ -37,7 +37,7 @@ docker run -d -p 4444:4444 -e GRID_NEW_SESSION_WAIT_TIMEOUT=240000 \
 
 `<tag>` is a release (e.g. `2.6`) or a build of `develop` (`<VERSION>-develop-latest`, e.g. `3.1-develop-latest`, or `<VERSION>-develop-<sha>`), see [Build](#build); the image has no `latest` tag.
 
-The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF_URL` and `STF_TOKEN` (the access token of an STF admin) are required: the nodes register with their node tokens, which the hub verifies with STF (see [Node registration](#node-registration)); without them the hub starts, logs `STF_URL and STF_TOKEN are not set` (`SEVERE`) and refuses every node, as on the first start of MCloud before an admin of STF has an access token.
+The hub runs as an unprivileged user and stops gracefully on `docker stop`. `STF_URL` and `STF_TOKEN` (the access token of an STF admin) are required: the nodes register with their node tokens, which the hub verifies with STF (see [Node registration](#node-registration)); without them the hub starts, logs `STF_URL and STF_TOKEN are not set` (`SEVERE`) and refuses every node, as on the first start of MCloud before an admin of STF has an access token. The first log line is the banner of the image with its version (`IMAGE_VERSION`, the `VERSION` of the build).
 
 ## Configuration
 

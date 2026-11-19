@@ -94,6 +94,8 @@ COPY --chown=1000:1000 logger.properties /opt/selenium/
 USER 1000:1000
 
 ARG VERSION=dev
+# the version of the image in the first log line
+ENV IMAGE_VERSION="${VERSION}"
 LABEL authors=Zebrunner \
       org.opencontainers.image.title="Zebrunner MCloud Grid" \
       org.opencontainers.image.description="The Selenium 3 hub of the Appium nodes of Zebrunner MCloud" \

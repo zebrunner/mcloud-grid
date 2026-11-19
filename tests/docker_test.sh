@@ -130,6 +130,8 @@ check_contains "an empty boolean is logged" "GRID_DEBUG '' is not true or false.
 check_contains "a number below the minimum is logged" "GRID_CLEAN_UP_CYCLE '0' is not a whole number of at least 1." "$logs"
 check_contains "a number that is not a JSON number is logged" "GRID_NEW_SESSION_WAIT_TIMEOUT '0600000' is not a whole number" "$logs"
 check_contains "an invalid class name is logged" "GRID_CAPABILITY_MATCHER 'a\\\"b' is not the name of a Java class." "$logs"
+check_contains "the first log line is the banner of the image" $'"message":"\xe2\x94\x81\xe2\x94\x81 mcloud-grid ' \
+  "$(head -1 "$WORK/invalid.log")"
 check_not_contains "the hub is not started with an invalid configuration" "Starting Selenium hub" "$logs"
 check "the log lines of the validation are JSON" "ok" \
   "$(python3 -c 'import json, sys; [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]; print("ok")' "$WORK/invalid.log" 2>&1)"
