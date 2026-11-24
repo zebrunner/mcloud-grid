@@ -25,7 +25,7 @@
 		<spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
 		<plexus-utils.version>4.2.0</plexus-utils.version>
 		<!-- plexus-utils 4 moved the XML classes out; 3.x is the Maven 3 line -->
-		<plexus-xml.version>3.1.0</plexus-xml.version>
+		<plexus-xml.version>3.1.1</plexus-xml.version>
 		<commons-beanutils.version>1.11.0</commons-beanutils.version>
 		<aircompressor.version>2.0.3</aircompressor.version>
 		<snappy.version>0.5</snappy.version>
