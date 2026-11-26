@@ -2,7 +2,6 @@ package com.zebrunner.mcloud.grid;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
-import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -22,7 +21,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.EnumSet;
@@ -69,13 +67,7 @@ public final class HubAuthFilter implements Filter {
      *         field)
      */
     static void install(Hub hub, HubAuth auth) throws ReflectiveOperationException {
-        Field field = Hub.class.getDeclaredField("server");
-        field.setAccessible(true);
-        Server server = (Server) field.get(hub);
-        if (server == null || !(server.getHandler() instanceof ServletContextHandler)) {
-            throw new IllegalStateException("The hub has no started Jetty context");
-        }
-        install((ServletContextHandler) server.getHandler(), auth);
+        install((ServletContextHandler) HubLauncher.server(hub).getHandler(), auth);
     }
 
     /**
