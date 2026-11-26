@@ -274,6 +274,19 @@ wait_registered() {
 }
 mobile=com.zebrunner.mcloud.grid.MobileRemoteProxy
 check "a node without a node token is rejected" "500" "$(register 192.0.2.1 "$mobile" "")"
+# rejected_answer <host>: the answer of the hub with its headers to a node without a node token
+rejected_answer() {
+  docker exec -i "$CONTAINER" curl -s -i -X POST --data-binary @- http://localhost:4444/grid/register << _EOF
+{"capabilities": [{"maxInstances": 1, "platformName": "ANDROID", "udid": "udid-$1", "deviceName": "Pixel"}],
+ "configuration": {"proxy": "$mobile", "url": "http://$1:4723/wd/hub", "host": "$1", "port": 4723, "id": "http://$1:4723",
+   "maxSession": 1, "register": true, "custom": {}}}
+_EOF
+}
+rejection="$(rejected_answer 192.0.2.1)"
+check_contains "a rejected node gets the reason" "has no node token" "$rejection"
+check_not_contains "a rejected node gets no stack trace" "at org." "$rejection"
+check_not_contains "a rejected node gets no exception class" "Exception" "$rejection"
+check_not_contains "the hub does not tell the version of Jetty" "Jetty" "$rejection"
 check "a node with a token that is not a node token is rejected" "500" "$(register 192.0.2.2 "$mobile" wrong-token)"
 check "a node with its node token at its address is accepted" "200" "$(register 192.0.2.3 "$mobile" "$NODE_TOKEN")"
 check "a node may not register the device of another node" "500" \
@@ -292,6 +305,8 @@ check_not_contains "the node token is not in the log of the hub without STF" "$N
 answer="$(wait_registered 192.0.2.3)"
 check_contains "the node with its node token is registered" '"success": true' "$answer"
 check_not_contains "the hub does not show the node token of a node" "$NODE_SECRET" "$answer"
+check_not_contains "the hub does not show the devices of a node" "udid-192.0.2.3" "$answer"
+check_not_contains "the hub tells about the given id only" "192.0.2.3" "$(docker exec "$CONTAINER" curl -s http://localhost:4444/grid/api/proxy)"
 # answers_within <seconds> <path>: the HTTP status of the hub and whether it answered in time
 answers_within() {
   docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 300 "http://localhost:4444$2" |
