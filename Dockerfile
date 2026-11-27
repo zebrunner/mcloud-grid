@@ -103,8 +103,10 @@ LABEL authors=Zebrunner \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="${VERSION}"
 
-# the node API of Selenium answers without the nodes (/wd/hub/status asks every node for its status) and without a user
+# the health of the hub (README.md#exit-codes-and-health): answered by a thread of Jetty like the requests of the users
+# and the nodes, without a user, asking no node and no STF; 503 while a registration of a node hangs or the registry is
+# locked. Docker only marks the container unhealthy, it does not restart it
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD ["curl", "-sf", "-o", "/dev/null", "http://localhost:4444/grid/api/proxy"]
+    CMD ["curl", "-sf", "--max-time", "4", "-o", "/dev/null", "http://localhost:4444/grid/api/health"]
 
 CMD ["/opt/bin/entrypoint.sh"]

@@ -1,5 +1,8 @@
 package com.zebrunner.mcloud.grid;
 
+import com.zebrunner.mcloud.grid.servlets.HubHealth;
+import com.zebrunner.mcloud.grid.servlets.HubStatus;
+import com.zebrunner.mcloud.grid.servlets.NodeRegistration;
 import com.zebrunner.mcloud.grid.servlets.ProxyInfo;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -13,9 +16,11 @@ import java.util.logging.Logger;
 
 /**
  * The main class of the image: starts the hub as GridLauncherV3 does, then puts {@link ProxyInfo} in place of the node API
- * of Selenium (/grid/api/proxy), the error pages of {@link HubErrorHandler} in place of the ones of Jetty, and adds
- * {@link HubAuthFilter} when the authentication of the users is on (GRID_AUTH_SECRET). A hub that could not be changed so
- * stops: it must not run without them.
+ * of Selenium (/grid/api/proxy), {@link NodeRegistration} in place of its registration (/grid/register), {@link HubStatus}
+ * in place of its status (/wd/hub/status, /status), adds {@link HubHealth} (/grid/api/health, the healthcheck of the
+ * image), puts the error pages of {@link HubErrorHandler} in place of the ones of Jetty, and adds {@link HubAuthFilter}
+ * when the authentication of the users is on (GRID_AUTH_SECRET). A hub that could not be changed so stops: it must not
+ * run without them.
  */
 public final class HubLauncher {
     private static final Logger LOGGER = Logger.getLogger(HubLauncher.class.getName());
@@ -50,16 +55,27 @@ public final class HubLauncher {
     }
 
     /**
-     * Puts {@link ProxyInfo} and {@link HubErrorHandler} into the started hub.
+     * Puts {@link ProxyInfo}, {@link NodeRegistration}, {@link HubStatus}, {@link HubHealth} and {@link HubErrorHandler}
+     * into the started hub.
      *
      * @throws ReflectiveOperationException when the hub is not the one of Selenium 3.141.59 (its Jetty server is a private
      *         field)
      */
     static void restrict(Hub hub) throws ReflectiveOperationException {
+        restrict(hub, new NodeRegistrations());
+    }
+
+    /**
+     * {@link #restrict(Hub)} with the registrations of the nodes.
+     */
+    static void restrict(Hub hub, NodeRegistrations registrations) throws ReflectiveOperationException {
         Server server = server(hub);
         ServletContextHandler context = (ServletContextHandler) server.getHandler();
         HubErrorHandler.install(server, context);
         ProxyInfo.install(context, hub.getRegistry());
+        NodeRegistration.install(context, hub.getRegistry(), registrations);
+        HubStatus.install(context, hub.getRegistry());
+        HubHealth.install(context, hub.getRegistry(), registrations);
     }
 
     /**

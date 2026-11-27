@@ -78,6 +78,16 @@ public final class StfStub {
     }
 
     /**
+     * The node of the token is enrolled at the address, as {@link #enrolledNode}, and STF answers its verification after the delay.
+     */
+    public void verifyAnswersSlowly(String token, String label, String address, int delayMs) {
+        enrolledNode(token, label, address);
+        server.stubFor(post("/api/v1/nodes/verify").atPriority(4)
+                .withRequestBody(equalToJson("{\"token\":\"" + token + "\",\"host\":\"" + address + "\"}"))
+                .willReturn(okJson("{\"label\":\"" + label + "\",\"address\":\"" + address + "\"}").withFixedDelay(delayMs)));
+    }
+
+    /**
      * POST /api/v1/nodes/verify answers the status for every token.
      */
     public void verifyAnswers(int status) {

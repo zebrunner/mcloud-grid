@@ -138,7 +138,7 @@ public final class HubAuth {
     static Access access(String path) {
         String value = StringUtils.defaultString(path);
         if (value.equals("/wd/hub/status") || value.equals("/status") || value.equals("/grid/register") || value.startsWith("/grid/register/")
-                || value.equals("/grid/api/proxy")) {
+                || value.equals("/grid/api/proxy") || value.equals("/grid/api/health")) {
             return Access.ANYONE;
         }
         if (under(value, "/wd/hub") || under(value, "/grid/console") || under(value, "/grid/resources")

@@ -22,6 +22,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
@@ -131,6 +135,8 @@ public class NodeAuthenticationTest {
     public void nodeTokenIsNotAcceptedWhenStfDoesNotAnswer() {
         for (int status : new int[] {500, 401, 404}) {
             stf.verifyAnswers(status);
+            // after a failure STF is not asked for a while
+            now.set(now.get().plus(StfNodes.UNAVAILABLE_BACKOFF));
 
             String message = rejection(authentication(), request(NODE_URL, TOKEN));
 
@@ -178,7 +184,45 @@ public class NodeAuthenticationTest {
 
         stf.reset();
         stf.enrolledNode(TOKEN, "node-1", HOST);
+        now.set(now.get().plus(StfNodes.UNAVAILABLE_BACKOFF));
         authentication.accept(request(NODE_URL, TOKEN));
+    }
+
+    public void stfIsNotAskedForAWhileAfterItDidNotAnswer() {
+        NodeAuthentication authentication = authentication();
+        stf.verifyAnswers(503);
+        rejection(authentication, request(NODE_URL, TOKEN));
+        stf.reset();
+        stf.enrolledNode(TOKEN, "node-1", HOST);
+
+        // the nodes are answered at once while STF starts, e.g. after a restart of the farm
+        now.set(now.get().plus(StfNodes.UNAVAILABLE_BACKOFF).minusSeconds(1));
+        Assert.assertTrue(rejection(authentication, request(NODE_URL, TOKEN)).contains("STF could not verify it (HTTP 503)"));
+        Assert.assertEquals(stfNodes.verifyNow(NodeToken.parse(TOKEN).orElseThrow(), HOST).getStatus(), StfNodes.Status.UNAVAILABLE);
+        stf.server().verify(0, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
+
+        now.set(now.get().plusSeconds(1));
+        authentication.accept(request(NODE_URL, TOKEN));
+        stf.server().verify(1, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
+    }
+
+    public void verificationsOfTheSameTokenAndHostShareOneRequest() throws Exception {
+        stf.verifyAnswersSlowly(TOKEN, "node-1", HOST, 500);
+        NodeToken token = NodeToken.parse(TOKEN).orElseThrow();
+        ExecutorService nodes = Executors.newFixedThreadPool(10);
+        try {
+            List<Future<StfNodes.Verification>> answers = new ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                answers.add(nodes.submit(() -> stfNodes.verifyNow(token, HOST)));
+            }
+            for (Future<StfNodes.Verification> answer : answers) {
+                Assert.assertEquals(answer.get(10, TimeUnit.SECONDS).getStatus(), StfNodes.Status.VALID);
+            }
+        } finally {
+            nodes.shutdownNow();
+        }
+        // the nodes of a host share its token: one request (or a few, as the requests do not start at once)
+        Assert.assertTrue(stf.server().findAll(postRequestedFor(urlEqualTo("/api/v1/nodes/verify"))).size() < 10);
     }
 
     public void verificationWithoutTheCacheSeesARevocation() {
@@ -259,6 +303,8 @@ public class NodeAuthenticationTest {
         stf.verifyAnswers(503);
         for (int i = 0; i < 5; i++) {
             Assert.assertTrue(rejection(authentication, request(NODE_URL, TOKEN)).contains("STF could not verify it (HTTP 503)"));
+            // after a failure STF is not asked for a while; 5 of them are within the period of the limit
+            now.set(now.get().plus(StfNodes.UNAVAILABLE_BACKOFF));
         }
         stf.server().verify(5, postRequestedFor(urlEqualTo("/api/v1/nodes/verify")));
         stf.reset();
