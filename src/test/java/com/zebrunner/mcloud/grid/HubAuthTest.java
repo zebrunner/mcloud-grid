@@ -85,7 +85,7 @@ public class HubAuthTest {
 
     @Test
     public void letsTheNodesAndTheHealthcheckInTheUsersToTheHubAndTheAdminsToTheRest() {
-        for (String path : new String[] {"/wd/hub/status", "/status", "/grid/register", "/grid/register/", "/grid/api/proxy"}) {
+        for (String path : new String[] {"/wd/hub/status", "/status", "/grid/register", "/grid/register/", "/grid/api/proxy", "/grid/api/health"}) {
             Assert.assertEquals(HubAuth.access(path), HubAuth.Access.ANYONE, path);
         }
         for (String path : new String[] {"/wd/hub/session", "/wd/hub/session/abc/url", "/wd/hub", "/grid/console", "/grid/console/x",

@@ -11,14 +11,21 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 /**
  * The node registry of STF for the registration of the nodes: the verification of the node tokens
  * (POST /api/v1/nodes/verify) with the admin token of the hub (STF_TOKEN). The definite answers are cached for
- * {@link #CACHE_TIME}: the nodes register again every few seconds while they are rejected.
+ * {@link #CACHE_TIME}: the nodes register again every few seconds while they are rejected. The nodes of a host share
+ * their node token: the verifications of the same token and host at the same time make one request to STF. While STF
+ * does not answer (or answers neither 200 nor 403, e.g. while it starts) the hub does not ask it again for
+ * {@link #UNAVAILABLE_BACKOFF}: the nodes are answered at once and register again later.
  */
 public final class StfNodes implements NodeTokenVerifier {
     public static final Duration CACHE_TIME = Duration.ofSeconds(30);
@@ -26,11 +33,17 @@ public final class StfNodes implements NodeTokenVerifier {
     // the tokens and the hosts come from the registration requests: the cache does not grow without a limit
     private static final int MAX_CACHED_VERIFICATIONS = 1000;
     private static final Duration CONFIGURATION_WARNING_PERIOD = Duration.ofMinutes(10);
+    public static final Duration UNAVAILABLE_BACKOFF = Duration.ofSeconds(5);
+    // longer than a request to STF (HttpClient: 3 s for the connection from the pool, the connection and the answer each)
+    private static final Duration SHARED_REQUEST_WAIT = Duration.ofSeconds(12);
 
     private final String stfUrl;
     private final String adminToken;
     private final Supplier<Instant> clock;
     private final Map<String, CachedVerification> verifications = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<Verification>> requests = new ConcurrentHashMap<>();
+    private volatile Instant unavailableUntil = Instant.MIN;
+    private volatile int unavailableStatus;
     private final Object warningLock = new Object();
     private Instant lastConfigurationWarning;
 
@@ -92,10 +105,38 @@ public final class StfNodes implements NodeTokenVerifier {
     }
 
     /**
-     * @return the answer of STF about the token at the host without the cache, which keeps a definite answer
+     * @return the answer of STF about the token at the host without the cache, which keeps a definite answer; while STF
+     *         does not answer ({@link #UNAVAILABLE_BACKOFF}) {@link Status#UNAVAILABLE} without a request
      */
     @Override
     public Verification verifyNow(NodeToken token, String host) {
+        if (clock.get().isBefore(unavailableUntil)) {
+            return new Verification(Status.UNAVAILABLE, unavailableStatus);
+        }
+        String key = cacheKey(token, host);
+        CompletableFuture<Verification> request = new CompletableFuture<>();
+        CompletableFuture<Verification> running = requests.putIfAbsent(key, request);
+        if (running != null) {
+            try {
+                return running.get(SHARED_REQUEST_WAIT.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return new Verification(Status.UNAVAILABLE, 0);
+            } catch (ExecutionException | TimeoutException e) {
+                return new Verification(Status.UNAVAILABLE, 0);
+            }
+        }
+        Verification verification = new Verification(Status.UNAVAILABLE, 0);
+        try {
+            verification = request(token, host);
+            return verification;
+        } finally {
+            requests.remove(key, request);
+            request.complete(verification);
+        }
+    }
+
+    private Verification request(NodeToken token, String host) {
         Map<String, String> body = new HashMap<>();
         body.put("token", token.getValue());
         body.put("host", host);
@@ -122,6 +163,8 @@ public final class StfNodes implements NodeTokenVerifier {
                 warnAboutConfiguration("[NODE TOKEN] STF has no node registry (HTTP 404 of /api/v1/nodes/verify): the node tokens are not "
                         + "verified, update STF.");
             }
+            unavailableStatus = response.getStatus();
+            unavailableUntil = clock.get().plus(UNAVAILABLE_BACKOFF);
             return new Verification(Status.UNAVAILABLE, response.getStatus());
         }
         if (verifications.size() >= MAX_CACHED_VERIFICATIONS) {

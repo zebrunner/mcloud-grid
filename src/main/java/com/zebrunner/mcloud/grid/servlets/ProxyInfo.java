@@ -16,8 +16,6 @@
 package com.zebrunner.mcloud.grid.servlets;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.Logger;
@@ -28,10 +26,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.servlet.ServletMapping;
-import org.eclipse.jetty.servlet.Source;
 import org.openqa.grid.internal.GridRegistry;
 import org.openqa.grid.web.servlet.RegistryBasedServlet;
 import org.openqa.selenium.json.Json;
@@ -39,7 +33,7 @@ import org.openqa.selenium.json.Json;
 /**
  * The node API of the hub, {@code GET /grid/api/proxy?id=<node id>}: whether the node of the id is registered. A node asks
  * it every few seconds and registers again when it is not (zebrunner/appium reads {@code success} and {@code msg}), the
- * healthcheck of the image asks it without an id.
+ * doctor of mcloud asks it with the id {@code none}.
  * <p>
  * Anyone who reaches the hub may ask it (the port of the nodes is public), so it answers about the given id only (the
  * exact id of a registered node) and never with the configuration or the capabilities of a node. {@link #install} maps
@@ -68,23 +62,8 @@ public class ProxyInfo extends RegistryBasedServlet {
      * no setting for it); the context may be started.
      */
     public static void install(ServletContextHandler context, GridRegistry registry) {
-        ServletHandler handler = context.getServletHandler();
-        ServletHolder holder = handler.newServletHolder(Source.EMBEDDED);
-        holder.setName(NAME);
-        holder.setServlet(new ProxyInfo(registry));
-        handler.addServlet(holder);
-        List<ServletMapping> mappings = new ArrayList<>();
         // the hub maps one path per servlet: the mapping of ProxyStatusServlet is dropped
-        for (ServletMapping mapping : handler.getServletMappings()) {
-            if (!mapping.containsPathSpec(PATH)) {
-                mappings.add(mapping);
-            }
-        }
-        ServletMapping mapping = new ServletMapping(Source.EMBEDDED);
-        mapping.setServletName(NAME);
-        mapping.setPathSpec(PATH);
-        mappings.add(mapping);
-        handler.setServletMappings(mappings.toArray(new ServletMapping[0]));
+        HubServlets.map(context, NAME, new ProxyInfo(registry), PATH);
         LOGGER.info("[NODE REGISTRATION] /grid/api/proxy tells a node whether its id is registered, without the configuration of the nodes.");
     }
 

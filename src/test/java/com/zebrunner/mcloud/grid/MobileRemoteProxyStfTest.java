@@ -631,6 +631,8 @@ public class MobileRemoteProxyStfTest {
         // a verification restarts the 10 minutes
         stf.reset();
         stf.enrolledNode(NODE_TOKEN, GridFixtures.NODE_LABEL, "localhost");
+        // a new node registry: the one of the hub does not ask STF for 5 s after it did not answer
+        GridFixtures.useStfNodeAuthentication();
         Assert.assertTrue(proxy.checkNodeToken(registered.plus(Duration.ofMinutes(9))));
         stf.verifyAnswers(500);
         Assert.assertTrue(proxy.checkNodeToken(registered.plus(Duration.ofMinutes(18))));

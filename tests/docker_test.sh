@@ -150,7 +150,8 @@ check "the hub status answers without a user" "200" "$(wait_hub "$AUTH_CONTAINER
 auth_code() {
   docker exec "$AUTH_CONTAINER" curl -s -o /dev/null -w '%{http_code}' "${@:2}" "http://localhost:4444${1}"
 }
-check "the healthcheck answers without a user" "200" "$(auth_code /grid/api/proxy)"
+check "the healthcheck answers without a user" "200" "$(auth_code /grid/api/health)"
+check "the node API answers without a user" "200" "$(auth_code /grid/api/proxy)"
 user_headers=(-H "X-MCloud-Auth: ${AUTH_SECRET}" -H "X-MCloud-User: john@example.com" -H "X-MCloud-Admin: false" -H "X-MCloud-Token: t")
 admin_headers=(-H "X-MCloud-Auth: ${AUTH_SECRET}" -H "X-MCloud-User: admin@example.com" -H "X-MCloud-Admin: true")
 check "a session without a user is refused" "401" \
@@ -319,6 +320,8 @@ read -ra healthcheck <<< "$(docker inspect -f '{{range .Config.Healthcheck.Test}
 healthcheck_timeout="$(docker inspect -f '{{.Config.Healthcheck.Timeout.Seconds}}' "$IMAGE")"
 docker exec "$CONTAINER" timeout "$healthcheck_timeout" "${healthcheck[@]:1}" > /dev/null 2>&1
 check "the healthcheck asks no node: it passes in its timeout with a node that does not answer" "0" "$?"
+check_contains "the healthcheck asks the health of the hub" "http://localhost:4444/grid/api/health" "${healthcheck[*]}"
+check_contains "the hub is healthy" '"healthy": true' "$(docker exec "$CONTAINER" curl -s http://localhost:4444/grid/api/health)"
 check_not_contains "the console does not show the node token of a node" "$NODE_SECRET" \
   "$(docker exec "$CONTAINER" curl -s http://localhost:4444/grid/console)"
 check "the hub answers a node of another proxy class (Selenium adds it in the background)" "200" \

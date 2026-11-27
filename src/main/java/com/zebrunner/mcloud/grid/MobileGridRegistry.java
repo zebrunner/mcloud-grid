@@ -681,6 +681,28 @@ public class MobileGridRegistry extends BaseGridRegistry implements GridRegistry
         proxies.setThrowOnCapabilityNotPresent(throwOnCapabilityNotPresent);
     }
 
+    /**
+     * The registry holds its lock for short changes only (no request to a node or STF): a lock held longer stops the queue,
+     * the end of the sessions and the registration of the nodes.
+     *
+     * @return true if the lock of the registry is free within the timeout, and the matcher runs
+     */
+    public boolean respondsWithin(Duration timeout) {
+        if (!stop && !matcher.isAlive()) {
+            return false;
+        }
+        try {
+            if (!lock.tryLock(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+                return false;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        lock.unlock();
+        return true;
+    }
+
     @Override
     public ProxySet getAllProxies() {
         return proxies;
